@@ -48,15 +48,59 @@ export default function LoginPage() {
   }
 
   // ── تسجيل دخول بـ Google ──
+// ── المعالجة الموحدة (دخول أو إنشاء حساب) ──
+// 1. امسح handleLogin خالص
+// 2. استخدم handleAuth فقط كدة:
+
+async function handleAuth(e: React.FormEvent) {
+  e.preventDefault();
+  setError('');
+  setLoading(true);
+
+  if (isSignUp) {
+    // كود إنشاء الحساب (SignUp)
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          company_name: companyName,
+          country: country,
+        }
+      }
+    });
+    
+    if (error) {
+      setError(error.message);
+    } else {
+      alert('تم إنشاء الحساب بنجاح!');
+      setIsSignUp(false);
+    }
+  } else {
+    // كود تسجيل الدخول (SignIn)
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+    } else {
+      router.push('/suppliers');
+    }
+  }
+  setLoading(false);
+}
+// ── تسجيل دخول بـ Google (أعد إضافتها هنا) ──
   async function handleGoogle() {
     setGLoading(true);
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}/suppliers` },
-    });
-    setGLoading(false);
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/suppliers` },
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setGLoading(false);
+    }
   }
-
   return (
     <div
       dir="rtl"
@@ -108,7 +152,7 @@ export default function LoginPage() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Email */}
           <div>
@@ -155,22 +199,40 @@ export default function LoginPage() {
             </div>
           </div>
 {/* حقول إضافية تظهر فقط عند إنشاء حساب جديد */}
+{/* حقول إضافية لإنشاء الحساب تظهر فقط عند الحاجة */}
           {isSignUp && (
-            <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 7 }}>اسم الشركة</label>
-                <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="اسم شركتك" required className={styles.input} />
+                <label style={{ fontSize: 13, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 7 }}>
+                  اسم الشركة
+                </label>
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={e => setCompanyName(e.target.value)}
+                  placeholder="شركة الجسر المتطور"
+                  required
+                  className={styles.input}
+                />
               </div>
+
               <div>
-                <label style={{ fontSize: 13, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 7 }}>الدولة</label>
-                <select value={country} onChange={e => setCountry(e.target.value)} className={styles.input} style={{ background: C.navy3, color: C.white }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 7 }}>
+                  الدولة
+                </label>
+                <select
+                  value={country}
+                  onChange={e => setCountry(e.target.value)}
+                  className={styles.input}
+                  style={{ background: C.navy3, color: C.white, width: '100%' }}
+                >
                   <option value="Indonesia">إندونيسيا 🇮🇩</option>
                   <option value="Lebanon">لبنان 🇱🇧</option>
                   <option value="Egypt">مصر 🇪🇬</option>
                   <option value="Saudi Arabia">السعودية 🇸🇦</option>
                 </select>
               </div>
-            </>
+            </div>
           )}
           {/* نهاية الحقول الاضافية*/}
           {/* Submit */}
