@@ -29,6 +29,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [alerts, setAlerts] = useState<any[]>([])
   const [readAlerts, setReadAlerts] = useState<string[]>([])
 
+  // --- إضافة: تعريف حالة المستخدم وقائمة التحكم ---
+  const [user, setUser] = useState<any>(null);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // --- إضافة: جلب بيانات المستخدم من Supabase عند تحميل الصفحة ---
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+    fetchUser();
+  }, []);
+  // ------------------------------------------
+
+  // بقية الكود (pageTitle والـ return) يكمل هنا...
+
   // جلب التنبيهات
   useEffect(() => {
     async function fetchAlerts() {
@@ -99,7 +115,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
         {/* ===== HEADER ===== */}
-        <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, minHeight: '66px' }}>
+<div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, minHeight: '66px' }}>
           
           {/* عنوان الصفحة */}
           <div style={{ textAlign: 'right' }}>
@@ -122,9 +138,40 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {/* الرسائل */}
             <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: S.card2, border: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', cursor: 'pointer' }}>💬</div>
 
+            {/* إضافة: الحساب (الصورة والقائمة) */}
+            <div style={{ position: 'relative' }}>
+              <div 
+                onClick={() => setShowUserMenu(!showUserMenu)} 
+                style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${S.border}`, cursor: 'pointer', overflow: 'hidden', background: S.card2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <img 
+                  src={user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=Ahmed+Salah&background=001529&color=fff`} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  alt="Profile" 
+                />
+              </div>
+
+              {showUserMenu && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowUserMenu(false)} />
+                  <div style={{ position: 'absolute', top: '45px', left: 0, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
+                    <div style={{ padding: '8px 16px', borderBottom: `1px solid ${S.border}`, fontSize: '12px', color: '#8c8c8c' }}>
+                      {user?.email}
+                    </div>
+                    <div 
+                      onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} 
+                      style={{ padding: '10px 16px', cursor: 'pointer', color: S.red, fontSize: '14px' }}
+                    >
+                      تسجيل الخروج
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
           </div>
         </div>
-
+        
         {/* ===== المحتوى ===== */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {children}
