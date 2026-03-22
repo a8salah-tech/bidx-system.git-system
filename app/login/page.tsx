@@ -29,6 +29,9 @@ export default function LoginPage() {
   const [gLoading, setGLoading] = useState(false);
   const [error, setError]       = useState('');
   const [showPass, setShowPass] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [companyName, setCompanyName] = useState('');
+  const [country, setCountry] = useState('Indonesia');
 
   // ── تسجيل دخول بالإيميل والباسورد ──
   async function handleLogin(e: React.FormEvent) {
@@ -84,10 +87,10 @@ export default function LoginPage() {
             <div className={styles.logoSq}>TF</div>
           </div>
           <div style={{ fontSize: 22, fontWeight: 900, color: C.gold2, marginTop: 14, letterSpacing: '-.01em' }}>
-            TradeFlow OS
+            BidLX
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 4, letterSpacing: '.1em', textTransform: 'uppercase' }}>
-            Bridge Edge OS
+            BidLX OS
           </div>
         </div>
 
@@ -151,7 +154,25 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
-
+{/* حقول إضافية تظهر فقط عند إنشاء حساب جديد */}
+          {isSignUp && (
+            <>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 7 }}>اسم الشركة</label>
+                <input type="text" value={companyName} onChange={e => setCompanyName(e.target.value)} placeholder="اسم شركتك" required className={styles.input} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: C.muted, display: 'block', marginBottom: 7 }}>الدولة</label>
+                <select value={country} onChange={e => setCountry(e.target.value)} className={styles.input} style={{ background: C.navy3, color: C.white }}>
+                  <option value="Indonesia">إندونيسيا 🇮🇩</option>
+                  <option value="Lebanon">لبنان 🇱🇧</option>
+                  <option value="Egypt">مصر 🇪🇬</option>
+                  <option value="Saudi Arabia">السعودية 🇸🇦</option>
+                </select>
+              </div>
+            </>
+          )}
+          {/* نهاية الحقول الاضافية*/}
           {/* Submit */}
           <button
             type="submit"
@@ -196,10 +217,14 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div style={{ marginTop: 28, textAlign: 'center', fontSize: 12, color: C.muted }}>
-          ليس لديك حساب؟{' '}
-          <a href="mailto:admin@bridgeedge.com" style={{ color: C.gold2, fontWeight: 700, textDecoration: 'none' }}>
-           إنشاء حساب جديد
-          </a>
+          {isSignUp ? 'لديك حساب بالفعل؟' : 'ليس لديك حساب؟'}{' '}
+          <button 
+            type="button"
+            onClick={() => setIsSignUp(!isSignUp)}
+            style={{ background: 'none', border: 'none', color: C.gold2, fontWeight: 700, cursor: 'pointer', padding: 0, font: 'inherit' }}
+          >
+            {isSignUp ? 'تسجيل الدخول' : 'إنشاء حساب جديد'}
+          </button>
         </div>
 
         {/* Back to home */}
