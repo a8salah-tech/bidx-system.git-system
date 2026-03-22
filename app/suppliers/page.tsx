@@ -94,13 +94,38 @@ export default function SuppliersPage() {
   }
 
   // ===== إضافة مورد جديد =====
-  async function addSupplier() {
+async function addSupplier() {
     if (!form.company_name) { alert('يرجى إدخال اسم الشركة'); return }
+
+    // 1. جلب بيانات المستخدم المسجل دخوله حالياً من الجلسة (Session)
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    // التأكد من وجود مستخدم لتجنب أي خطأ برمجبي
+    if (userError || !user) {
+      alert('جلسة الدخول انتهت، يرجى تسجيل الدخول مرة أخرى');
+      return;
+    }
+
+    // 2. إرسال البيانات مع إضافة الـ user_id "إجبارياً" لفك حظر الـ RLS
     const { error } = await supabase.from('suppliers').insert([{
-      ...form, status: 'active', rating: 0, completion_pct: calcCompletion(form)
+      ...form, 
+      status: 'active', 
+      rating: 0, 
+      completion_pct: calcCompletion(form),
+      user_id: user.id // <--- هذا هو المفتاح الذي يربط المورد بحسابك
     }])
-    if (error) { alert('خطأ: ' + error.message); return }
-    setForm({ company_name: '', country: '', city: '', contact_name: '', contact_whatsapp: '', contact_email: '', annual_sales: '', main_products: '', notes: '' })
+
+    if (error) { 
+      alert('خطأ في قاعدة البيانات: ' + error.message); 
+      return 
+    }
+
+    // إعادة تعيين الفورمة وإغلاقها
+    setForm({ 
+      company_name: '', country: '', city: '', contact_name: '', 
+      contact_whatsapp: '', contact_email: '', annual_sales: '', 
+      main_products: '', notes: '' 
+    })
     setShowForm(false)
     fetchSuppliers()
   }
@@ -112,27 +137,26 @@ export default function SuppliersPage() {
   }
 
   // ===== تعبئة البيانات بالذكاء الاصطناعي =====
-  async function fillWithAI() {
+ async function fillWithAI() {
     if (!form.company_name) { alert('اكتب اسم الشركة أولاً'); return }
     setAiLoading(true)
     try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      // بنكلم السيرفر بتاعنا مش OpenRouter مباشرة
+      const res = await fetch('/api/ai', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer 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' },
-        body: JSON.stringify({
-          model: 'openrouter/auto',
-          messages: [{ role: 'user', content: `Return ONLY a JSON object about company "${form.company_name}": {"country":"country in Arabic","city":"city in Arabic","contact_name":"known contact or empty","annual_sales":"sales volume or empty","main_products":"main products in Arabic comma separated","notes":"one line in Arabic"}` }],
-          max_tokens: 300
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_name: form.company_name })
       })
       const data = await res.json()
       const text = data?.choices?.[0]?.message?.content || '{}'
       const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
       setForm(prev => ({ ...prev, ...parsed }))
-    } catch { alert('تعذر الاتصال بالذكاء الاصطناعي') }
-    finally { setAiLoading(false) }
+    } catch { 
+      alert('تعذر الاتصال بالذكاء الاصطناعي') 
+    } finally { 
+      setAiLoading(false) 
+    }
   }
-
   // ===== حساب نسبة اكتمال الملف =====
   function calcCompletion(f: any) {
     const fields = ['company_name', 'country', 'city', 'contact_name', 'contact_whatsapp', 'contact_email', 'annual_sales', 'main_products', 'notes']

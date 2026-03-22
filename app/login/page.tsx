@@ -1,4 +1,5 @@
 'use client';
+
 export const dynamic = "force-dynamic";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -197,7 +198,7 @@ export default function LoginPage() {
         <div style={{ marginTop: 28, textAlign: 'center', fontSize: 12, color: C.muted }}>
           ليس لديك حساب؟{' '}
           <a href="mailto:admin@bridgeedge.com" style={{ color: C.gold2, fontWeight: 700, textDecoration: 'none' }}>
-            تواصل مع المسؤول
+           إنشاء حساب جديد
           </a>
         </div>
 

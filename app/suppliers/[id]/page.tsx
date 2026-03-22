@@ -573,7 +573,7 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
             try {
               const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer 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' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}` },
                 body: JSON.stringify({
                   model: 'openrouter/auto',
                   messages: [{ role: 'user', content: `أنت مستشار تجاري متخصص. حلل هذا المورد:\n- الاسم: ${supplier.company_name}\n- الدولة: ${supplier.country}\n- المنتجات: ${supplier.main_products}\n- التقييم: ${supplier.rating}/10\n- الصفقات: ${supplier.total_deals}\n\nقدم:\n## التقييم العام\n## نقاط القوة\n## نقاط الضعف\n## المخاطر\n## التوصيات` }],
