@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
+
+/* ── Ambient glow ── */
+.glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 50% at 70% 20%, rgba(201,168,76,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 60% at 20% 80%, rgba(15,32,64,0.8)   0%, transparent 60%);
+}
+
+/* ── Card ── */
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  background: #0F2040;
+  border: 1px solid rgba(201,168,76,0.18);
+  border-radius: 20px;
+  padding: 40px 36px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,168,76,0.04);
+  animation: cardIn 0.6s ease both;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Logo ── */
+.logoWrap {
+  display: flex;
+  justify-content: center;
+}
+
+.logoSq {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #C9A84C 0%, #E8C97A 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  color: #0A1628;
+  box-shadow: 0 8px 24px rgba(201,168,76,0.3);
+  position: relative;
+  overflow: hidden;
+}
+.logoSq::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.25) 50%, transparent 60%);
+  animation: shine 3s infinite;
+}
+@keyframes shine {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ── Error box ── */
+.errorBox {
+  background: rgba(239,68,68,0.10);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #EF4444;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: shake 0.3s ease;
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-6px); }
+  75%      { transform: translateX(6px); }
+}
+
+/* ── Input ── */
+.input {
+  width: 100%;
+  padding: 11px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 9px;
+  color: #FAFAF8;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.input::placeholder { color: #8A9BB5; }
+.input:focus {
+  border-color: rgba(201,168,76,0.45);
+  box-shadow: 0 0 0 3px rgba(201,168,76,0.08);
+}
+
+/* ── Primary button ── */
+.btnPrimary {
+  width: 100%;
+  padding: 13px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #C9A84C 0%, #E8C97A 100%);
+  color: #0A1628;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 20px rgba(201,168,76,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.btnPrimary:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(201,168,76,0.35);
+}
+.btnPrimary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Google button ── */
+.btnGoogle {
+  width: 100%;
+  padding: 12px;
+  border-radius: 9px;
+  background: #FAFAF8;
+  color: #0A1628;
+  font-family: 'Tajawal', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.btnGoogle:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
+.btnGoogle:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Spinners ── */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(10,22,40,0.3);
+  border-top-color: #0A1628;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+.spinnerDark {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(10,22,40,0.2);
+  border-top-color: #0A1628;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .card { margin: 16px; padding: 28px 20px; border-radius: 16px; }
+}

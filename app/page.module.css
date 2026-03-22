@@ -1,0 +1,184 @@
+.ambientGlow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 65% 50% at 80% 10%, rgba(201,168,76,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 10% 85%, rgba(15,32,64,0.6) 0%, transparent 60%);
+}
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes gradMove {
+  0%   { background-position: 0%; }
+  100% { background-position: 200%; }
+}
+
+@keyframes shine {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-7px); }
+}
+
+@keyframes tickerScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes navUnderline {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+
+/* ── Applied classes ── */
+.fadeUp1 { animation: fadeUp 0.7s 0.05s ease both; }
+.fadeUp2 { animation: fadeUp 0.7s 0.12s ease both; }
+.fadeUp3 { animation: fadeUp 0.7s 0.18s ease both; }
+.fadeUp4 { animation: fadeUp 0.7s 0.24s ease both; }
+.fadeUp5 { animation: fadeUp 0.7s 0.30s ease both; }
+.fadeUp6 { animation: fadeUp 0.7s 0.36s ease both; }
+
+.shimmerBar {
+  background: linear-gradient(90deg, #C9A84C 0%, #E8C97A 50%, #C9A84C 100%);
+  background-size: 200%;
+  animation: shimmer 5s linear infinite;
+}
+
+.goldText {
+  background: linear-gradient(90deg, #C9A84C 0%, #E8C97A 55%, #C9A84C 100%);
+  background-size: 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradMove 5s linear infinite;
+}
+
+.logoShine {
+  position: relative;
+  overflow: hidden;
+}
+.logoShine::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.25) 50%, transparent 60%);
+  animation: shine 3.5s infinite;
+}
+
+.liveDot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #22C55E;
+  animation: pulse 1.8s infinite;
+  display: inline-block;
+}
+
+.heroPill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #22C55E;
+  animation: pulse 2s infinite;
+  display: inline-block;
+}
+
+.floatBadge {
+  animation: float 3s ease-in-out infinite;
+}
+
+.ticker {
+  animation: tickerScroll 20s linear infinite;
+}
+
+.progBar {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #C9A84C 0%, #E8C97A 100%);
+  transition: width 1.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Hover effects ── */
+.navLink {
+  position: relative;
+  padding-bottom: 2px;
+}
+.navLink::after {
+  content: '';
+  position: absolute;
+  bottom: 0; right: 0;
+  width: 0; height: 1px;
+  background: #C9A84C;
+  transition: width 0.3s;
+}
+.navLink:hover::after { width: 100%; }
+
+.psCard {
+  transition: border-color 0.3s, transform 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.psCard::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #C9A84C, transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.psCard:hover { border-color: rgba(201,168,76,0.3); transform: translateY(-3px); }
+.psCard:hover::after { opacity: 1; }
+
+.featCard {
+  transition: background 0.25s;
+  position: relative;
+  overflow: hidden;
+}
+.featCard::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #C9A84C, transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.featCard:hover { background: #0C1A32; }
+.featCard:hover::after { opacity: 1; }
+
+.statCell {
+  position: relative;
+  overflow: hidden;
+}
+.statCell::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 1px; height: 100%;
+  background: linear-gradient(180deg, transparent, #C9A84C, transparent);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.statCell:hover::before { opacity: 0.5; }
+
+.metricCard { transition: border-color 0.3s; }
+.metricCard:hover { border-color: rgba(201,168,76,0.4); }

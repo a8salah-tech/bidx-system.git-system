@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* إعدادات الخلفية والخط لضمان عدم حدوث لخبطة */
+html, body {
+  background-color: #0A1628 !important;
+  color: #FAFAF8;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* تصفير أي هوامش قديمة قد تسبب لخبطة الجدول */
+* {
+  box-sizing: border-box;
+}
+table {
+  direction: rtl;
+}
+
+tbody {
+  direction: rtl;
+}
+
+tr {
+  direction: rtl;
+}
+
+td, th {
+  text-align: right;
+}
