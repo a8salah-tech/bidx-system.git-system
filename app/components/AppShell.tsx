@@ -34,13 +34,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   // --- إضافة: جلب بيانات المستخدم من Supabase عند تحميل الصفحة ---
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
-    fetchUser();
-  }, []);
+useEffect(() => {
+
+  // جلب المستخدم الحالي
+  const getUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+  };
+
+  getUser();
+
+  // الاستماع لأي تغيير في تسجيل الدخول
+  const { data: listener } = supabase.auth.onAuthStateChange(
+    (event, session) => {
+      setUser(session?.user ?? null);
+    }
+  );
+
+  return () => {
+    listener.subscription.unsubscribe();
+  };
+
+}, []);
   // ------------------------------------------
 
   // بقية الكود (pageTitle والـ return) يكمل هنا...
