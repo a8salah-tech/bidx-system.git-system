@@ -154,7 +154,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {showUserMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowUserMenu(false)} />
-                  <div style={{ position: 'absolute', top: '45px', left: 0, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
+                  <div style={{ position: 'absolute', top: '45px', left: 15, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
                     <div style={{ padding: '8px 16px', borderBottom: `1px solid ${S.border}`, fontSize: '12px', color: '#8c8c8c' }}>
                       {user?.email}
                     </div>
@@ -181,8 +181,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ===== ALERTS PANEL ===== */}
       {showAlerts && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 199, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAlerts(false)}>
-          <div style={{ position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)', width: '320px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)', direction: 'rtl', overflow: 'hidden' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 998, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAlerts(false)}>
+          <div style={{ position: 'absolute', top: '60px', left: '8%', width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', direction: 'rtl', overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button onClick={() => setShowAlerts(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: '16px', cursor: 'pointer' }}>✕</button>
@@ -190,6 +190,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(239,68,68,0.12)', color: S.red, fontWeight: 700 }}>{unreadAlerts.length} جديد</span>
                 <span style={{ fontSize: '13px', fontWeight: 700 }}>التنبيهات</span>
               </div>
+              
             </div>
             <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '8px' }}>
               {alerts.length === 0 ? (
