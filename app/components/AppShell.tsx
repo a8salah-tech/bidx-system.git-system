@@ -32,9 +32,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   
   // --- Avatar ثابت ---
-  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
-    return localStorage.getItem('avatarUrl') || ''
-  })
+const [avatarUrl, setAvatarUrl] = useState<string>('')
+
+useEffect(() => {
+  // هذا الكود سيعمل فقط داخل المتصفح بعد انتهاء البناء
+  const savedAvatar = typeof window !== 'undefined' ? localStorage.getItem('avatarUrl') : null
+  if (savedAvatar) {
+    setAvatarUrl(savedAvatar)
+  }
+}, [])
 
   // --- التنبيهات غير المقروءة ---
   const unreadAlerts = alerts.filter(s => !readAlerts.includes(s.id))
