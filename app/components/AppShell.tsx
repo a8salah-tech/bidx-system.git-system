@@ -182,7 +182,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* ===== ALERTS PANEL ===== */}
       {showAlerts && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 998, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAlerts(false)}>
-          <div style={{ position: 'absolute', top: '60px', left: '8%', width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', direction: 'rtl', overflow: 'hidden' }}
+          <div style={{ position: 'absolute', top: '60px', left: '8%', width: '280px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', direction: 'rtl', overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button onClick={() => setShowAlerts(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: '16px', cursor: 'pointer' }}>✕</button>

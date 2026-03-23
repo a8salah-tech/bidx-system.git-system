@@ -91,8 +91,8 @@ export default function Home() {
             TF
           </div>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: C.gold2, letterSpacing: '-.01em' }}>TradeFlow OS</div>
-            <div style={{ fontSize: 10, color: C.muted, fontWeight: 400, letterSpacing: '.1em', textTransform: 'uppercase' }}>Bridge Edge OS</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: C.gold2, letterSpacing: '-.01em' }}>BidLX OS</div>
+            <div style={{ fontSize: 10, color: C.muted, fontWeight: 400, letterSpacing: '.1em', textTransform: 'uppercase' }}>تجارة بلا حدود</div>
           </div>
         </Link>
 
@@ -255,7 +255,7 @@ export default function Home() {
           <div className={styles.floatBadge} style={{ position: 'absolute', bottom: -14, left: -14, background: C.navy2, border: `1px solid ${C.borderG}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 16px 40px rgba(0,0,0,0.4)' }}>
             <span style={{ fontSize: 22 }}>🏅</span>
             <div>
-              <div style={{ fontSize: 17, fontWeight: 900, color: C.gold2 }}>+٣٤٠ مورد</div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: C.gold2 }}>+٣٤٠ أداة</div>
               <div style={{ fontSize: 11, color: C.muted }}>موثق في النظام</div>
             </div>
           </div>
@@ -266,7 +266,7 @@ export default function Home() {
       <div style={{ position: 'relative', zIndex: 1, borderTop: `1px solid ${C.borderG}`, borderBottom: `1px solid ${C.borderG}` }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 52px', display: 'flex' }}>
           {[
-            { num: '٩٨٪', lbl: 'دقة بيانات الموردين', delta: '↑ مؤكد من مستخدمين فعليين' },
+            { num: '٩٨٪', lbl:' جودة تنظيم الموردين', delta: '↑  وفق معايير التجارة الدولية' },
             { num: '١٠×', lbl: 'أسرع في مقارنة الموردين', delta: '↑ مقارنةً بالجداول التقليدية' },
             { num: '٠',   lbl: 'جداول مبعثرة بعد اليوم', delta: '↑ كل شيء في مكان واحد' },
             { num: '٢٤/٧', lbl: 'وصول لبياناتك من أي مكان', delta: '↑ سحابي وآمن' },
