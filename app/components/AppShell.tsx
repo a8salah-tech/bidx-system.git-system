@@ -38,21 +38,21 @@ useEffect(() => {
 
   // جلب المستخدم الحالي
   const getUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
+    const { data } = await supabase.auth.getUser();
+    setUser(data.user);
   };
 
   getUser();
 
-  // الاستماع لأي تغيير في تسجيل الدخول
-  const { data: listener } = supabase.auth.onAuthStateChange(
+  // الاستماع لتغير حالة تسجيل الدخول
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
     (event, session) => {
       setUser(session?.user ?? null);
     }
   );
 
   return () => {
-    listener.subscription.unsubscribe();
+    subscription.unsubscribe();
   };
 
 }, []);
