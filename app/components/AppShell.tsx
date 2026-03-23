@@ -28,65 +28,84 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showAlerts, setShowAlerts] = useState(false)
   const [alerts, setAlerts] = useState<any[]>([])
   const [readAlerts, setReadAlerts] = useState<string[]>([])
+  const [user, setUser] = useState<any>(null)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  
+  // --- Avatar ثابت ---
+  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
+    return localStorage.getItem('avatarUrl') || ''
+  })
 
-  // --- إضافة: تعريف حالة المستخدم وقائمة التحكم ---
-  const [user, setUser] = useState<any>(null);
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  // --- التنبيهات غير المقروءة ---
+  const unreadAlerts = alerts.filter(s => !readAlerts.includes(s.id))
 
-  // --- إضافة: جلب بيانات المستخدم من Supabase عند تحميل الصفحة ---
-useEffect(() => {
+  function markRead(id: string) {
+    if (readAlerts.includes(id)) return
+    const newRead = [...readAlerts, id]
+    setReadAlerts(newRead)
+    localStorage.setItem('readAlerts', JSON.stringify(newRead))
+  }
 
-  // جلب المستخدم الحالي
-  const getUser = async () => {
-    const { data } = await supabase.auth.getUser();
-    setUser(data.user);
-  };
-
-  getUser();
-
-  // الاستماع لتغير حالة تسجيل الدخول
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (event, session) => {
-      setUser(session?.user ?? null);
+  // --- جلب المستخدم وتثبيت الصورة ---
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (data?.user) {
+        setUser(data.user)
+        // تثبيت صورة Avatar مرة واحدة
+        if (!localStorage.getItem('avatarUrl')) {
+          const url = data.user.user_metadata?.avatar_url ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(data.user.user_metadata?.full_name || data.user.email || 'User')}&background=0A1628&color=fff`
+          setAvatarUrl(url)
+          localStorage.setItem('avatarUrl', url)
+        }
+      }
     }
-  );
+    fetchUser()
 
-  return () => {
-    subscription.unsubscribe();
-  };
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user)
+        if (!localStorage.getItem('avatarUrl')) {
+          const url = session.user.user_metadata?.avatar_url ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(session.user.user_metadata?.full_name || session.user.email || 'User')}&background=0A1628&color=fff`
+          setAvatarUrl(url)
+          localStorage.setItem('avatarUrl', url)
+        }
+      } else {
+        setUser(null)
+      }
+    })
 
-}, []);
-  // ------------------------------------------
+    return () => subscription.unsubscribe()
+  }, [])
 
-  // بقية الكود (pageTitle والـ return) يكمل هنا...
-
-  // جلب التنبيهات
+  // --- جلب التنبيهات ---
   useEffect(() => {
     async function fetchAlerts() {
       const { data } = await supabase
         .from('suppliers')
         .select('id,company_name,last_contact_date,completion_pct,status')
         .eq('status', 'active')
-      const list = (data || []).filter(s => {
-        const noContact = !s.last_contact_date || Math.floor((Date.now() - new Date(s.last_contact_date).getTime()) / 86400000) > 30
-        const lowCompletion = (s.completion_pct || 0) < 50
-        return noContact || lowCompletion
+
+      if (!data) return
+
+      const list = data.filter((s: any) => {
+        const lastContact = s.last_contact_date
+        const completion = Number(s.completion_pct) || 0
+        const daysSinceContact = lastContact
+          ? Math.floor((Date.now() - new Date(lastContact).getTime()) / 86400000)
+          : 999
+        return (!lastContact || daysSinceContact > 30) || completion < 50
       })
       setAlerts(list)
+
+      const savedRead = localStorage.getItem('readAlerts')
+      setReadAlerts(JSON.parse(savedRead || '[]'))
     }
     fetchAlerts()
-    setReadAlerts(JSON.parse(localStorage.getItem('readAlerts') || '[]'))
   }, [])
 
-  const unreadAlerts = alerts.filter(s => !readAlerts.includes(s.id))
-
-  function markRead(id: string) {
-    const newRead = [...readAlerts, id]
-    setReadAlerts(newRead)
-    localStorage.setItem('readAlerts', JSON.stringify(newRead))
-  }
-
-  // عنوان الصفحة
   const pageTitle = pageTitles[pathname] || (pathname.startsWith('/suppliers/') ? 'ملف المورد' : 'TradeFlow')
 
   return (
@@ -94,14 +113,11 @@ useEffect(() => {
 
       {/* ===== SIDEBAR ===== */}
       <div style={{ width: '220px', flexShrink: 0, background: S.navy2, borderLeft: `1px solid ${S.border}`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        
-        {/* الشعار */}
         <div style={{ padding: '0px 24px', borderBottom: `1px solid ${S.border}`, textAlign: 'right', display: 'flex',flexDirection: 'column',justifyContent: 'center',minHeight: '66px' }}>
           <div style={{ fontSize: '22px', fontWeight: 700, color: S.gold }}>TradeFlow</div>
           <div style={{ fontSize: '9px', color: S.muted, letterSpacing: '1.5px', marginTop: '2px' }}>BRIDGE EDGE OS</div>
         </div>
 
-        {/* القائمة */}
         <div style={{ padding: '14px 24px 5px', fontSize: '9px', color: S.muted, fontWeight: 700 }}>القائمة الرئيسية</div>
         {navItems.map(n => {
           const active = pathname === n.href || pathname.startsWith(n.href + '/')
@@ -114,7 +130,6 @@ useEffect(() => {
           )
         })}
 
-        {/* بطاقة المستخدم */}
         <div style={{ marginTop: 'auto', padding: '16px', borderTop: `1px solid ${S.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexDirection: 'row-reverse' }}>
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: S.navy }}>BE</div>
@@ -128,19 +143,12 @@ useEffect(() => {
 
       {/* ===== MAIN ===== */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-
-        {/* ===== HEADER ===== */}
-<div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, minHeight: '66px' }}>
-          
-          {/* عنوان الصفحة */}
+        <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, minHeight: '66px' }}>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '16px', fontWeight: 700 }}>{pageTitle}</div>
           </div>
 
-          {/* الأيقونات */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-            {/* جرس التنبيهات */}
             <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setShowAlerts(!showAlerts)}>
               <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: S.card2, border: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px' }}>🔔</div>
               {unreadAlerts.length > 0 && (
@@ -150,17 +158,16 @@ useEffect(() => {
               )}
             </div>
 
-            {/* الرسائل */}
             <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: S.card2, border: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', cursor: 'pointer' }}>💬</div>
 
-            {/* إضافة: الحساب (الصورة والقائمة) */}
+            {/* ===== Avatar ثابت ===== */}
             <div style={{ position: 'relative' }}>
               <div 
                 onClick={() => setShowUserMenu(!showUserMenu)} 
                 style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${S.border}`, cursor: 'pointer', overflow: 'hidden', background: S.card2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 <img 
-                  src={user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=Ahmed+Salah&background=001529&color=fff`} 
+                  src={avatarUrl || `https://ui-avatars.com/api/?name=User&background=0A1628&color=fff`} 
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
                   alt="Profile" 
                 />
@@ -170,7 +177,7 @@ useEffect(() => {
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowUserMenu(false)} />
                   <div style={{ position: 'absolute', top: '45px', left: 15, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
-                    <div style={{ padding: '8px 16px', borderBottom: `1px solid ${S.border}`, fontSize: '12px', color: '#8c8c8c' }}>
+                    <div style={{ padding: '8px 16px', borderBottom: `1px solid ${S.border}`, fontSize: '11px', color: '#8c8c8c' }}>
                       {user?.email}
                     </div>
                     <div 
@@ -186,26 +193,23 @@ useEffect(() => {
 
           </div>
         </div>
-        
-        {/* ===== المحتوى ===== */}
+
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {children}
         </div>
-
       </div>
 
       {/* ===== ALERTS PANEL ===== */}
       {showAlerts && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 998, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAlerts(false)}>
-          <div style={{ position: 'absolute', top: '60px', left: '8%', width: '280px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', direction: 'rtl', overflow: 'hidden' }}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowAlerts(false)}>
+          <div style={{ position: 'absolute', top: '70px', left: '24px', width: '280px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', direction: 'rtl', overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button onClick={() => setShowAlerts(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: '16px', cursor: 'pointer' }}>✕</button>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(239,68,68,0.12)', color: S.red, fontWeight: 700 }}>{unreadAlerts.length} جديد</span>
                 <span style={{ fontSize: '13px', fontWeight: 700 }}>التنبيهات</span>
+                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(239,68,68,0.12)', color: S.red, fontWeight: 700 }}>{unreadAlerts.length} جديد</span>
               </div>
-              
+              <button onClick={() => setShowAlerts(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: '16px', cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '8px' }}>
               {alerts.length === 0 ? (
@@ -218,14 +222,14 @@ useEffect(() => {
                 return (
                   <div key={s.id}
                     onClick={() => { markRead(s.id); setShowAlerts(false); router.push(`/suppliers/${s.id}`) }}
-                    style={{ padding: '12px', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', background: isRead ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isRead ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.08)'}`, opacity: isRead ? 0.6 : 1 }}>
+                    style={{ padding: '12px', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', background: isRead ? 'transparent' : 'rgba(255,255,255,0.05)', border: `1px solid ${isRead ? 'transparent' : 'rgba(255,255,255,0.08)'}`, opacity: isRead ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      {!isRead && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.red, display: 'block' }} />}
                       <div style={{ fontSize: '12px', fontWeight: 700, textAlign: 'right', flex: 1 }}>{s.company_name}</div>
+                      {!isRead && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.red, marginRight: '8px' }} />}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {noContact && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}><span style={{ fontSize: '11px', color: S.red }}>{!s.last_contact_date ? 'لم يتم التواصل مطلقاً' : `آخر تواصل منذ ${daysSince} يوم`}</span><span>🔴</span></div>}
-                      {lowCompletion && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}><span style={{ fontSize: '11px', color: S.amber }}>ملف ناقص {s.completion_pct || 0}%</span><span>⚠️</span></div>}
+                      {noContact && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-start' }}><span>🔴</span><span style={{ fontSize: '11px', color: S.red }}>{!s.last_contact_date ? 'لم يتم التواصل' : `منذ ${daysSince} يوم`}</span></div>}
+                      {lowCompletion && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-start' }}><span>⚠️</span><span style={{ fontSize: '11px', color: S.amber }}>ملف ناقص {s.completion_pct || 0}%</span></div>}
                     </div>
                   </div>
                 )

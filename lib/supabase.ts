@@ -1,8 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
 
-// استخدام روابط وهمية (Placeholders) فقط أثناء الـ Build لمنع الانهيار
-// بمجرد تشغيل الموقع فعلياً، سيستخدم النظام القيم الحقيقية من Vercel
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+let supabase: ReturnType<typeof createClient>
+
+if (!globalThis.supabase) {
+  globalThis.supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
+}
+
+supabase = globalThis.supabase
+
+export { supabase }
