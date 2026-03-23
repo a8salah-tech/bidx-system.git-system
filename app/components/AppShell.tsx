@@ -47,58 +47,39 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   // --- جلب المستخدم وتثبيت الصورة ---
-// --- هندسة جلب المستخدم وتثبيت الهوية البصرية بـ المسطرة ---
   useEffect(() => {
     const fetchUser = async () => {
       const { data } = await supabase.auth.getUser()
       if (data?.user) {
         setUser(data.user)
-        
-        // 1. رابط صورة جوجل الحقيقية (الأصل)
-        const googlePhoto = data.user.user_metadata?.avatar_url
-        
-        // 2. رابط صورة الحروف الاحترافية (البديل الفخم)
-        // أضفنا length=2 و uppercase=true عشان تظهر أول حرفين بشكل شيك
-        const uiAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.user.user_metadata?.full_name || data.user.email || 'User')}&background=0A1628&color=fff&uppercase=true&length=2`
-
-        const storedPhoto = localStorage.getItem('avatarUrl')
-
-        // --- منطق الشلال (Waterfall Logic) ---
-        if (googlePhoto) {
-          // لو جوجل بعت صورة، نعتمدها ونحدث المخزن فوراً
-          setAvatarUrl(googlePhoto)
-          localStorage.setItem('avatarUrl', googlePhoto)
-        } else if (!storedPhoto || storedPhoto.includes('ui-avatars.com')) {
-          // لو مفيش صورة من جوجل، نستخدم الحروف ونخزنها
-          setAvatarUrl(uiAvatar)
-          localStorage.setItem('avatarUrl', uiAvatar)
-        } else {
-          // لو فيه حاجة تانية متخزنة نستخدمها (للحفاظ على الثبات)
-          setAvatarUrl(storedPhoto)
+        // تثبيت صورة Avatar مرة واحدة
+        if (!localStorage.getItem('avatarUrl')) {
+          const url = data.user.user_metadata?.avatar_url ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(data.user.user_metadata?.full_name || data.user.email || 'User')}&background=0A1628&color=fff`
+          setAvatarUrl(url)
+          localStorage.setItem('avatarUrl', url)
         }
       }
     }
     fetchUser()
 
-    // مراقبة تغيير حالة الجلسة (دخول/خروج)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user)
-        const photo = session.user.user_metadata?.avatar_url || 
-                    `https://ui-avatars.com/api/?name=${encodeURIComponent(session.user.user_metadata?.full_name || 'User')}&background=0A1628&color=fff&uppercase=true&length=2`
-        
-        setAvatarUrl(photo)
-        localStorage.setItem('avatarUrl', photo)
+        if (!localStorage.getItem('avatarUrl')) {
+          const url = session.user.user_metadata?.avatar_url ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(session.user.user_metadata?.full_name || session.user.email || 'User')}&background=0A1628&color=fff`
+          setAvatarUrl(url)
+          localStorage.setItem('avatarUrl', url)
+        }
       } else {
-        // تنظيف الأصول عند الخروج بـ المسطرة
         setUser(null)
-       const [avatarUrl, setAvatarUrl] = useState<string | null>('');
-        localStorage.removeItem('avatarUrl')
       }
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
   // --- جلب التنبيهات ---
   useEffect(() => {
     async function fetchAlerts() {
