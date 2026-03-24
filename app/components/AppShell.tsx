@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const S = {
@@ -25,226 +25,165 @@ const pageTitles: Record<string, string> = {
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [showAlerts, setShowAlerts] = useState(false)
+  
+  // States
+  const [user, setUser] = useState<any>(null)
+  const [avatarUrl, setAvatarUrl] = useState<string>('')
   const [alerts, setAlerts] = useState<any[]>([])
   const [readAlerts, setReadAlerts] = useState<string[]>([])
-  const [user, setUser] = useState<any>(null)
+  const [showAlerts, setShowAlerts] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
-  
-  // --- Avatar ثابت ---
-const [avatarUrl, setAvatarUrl] = useState<string>('')
 
-useEffect(() => {
-  // هذا الكود سيعمل فقط داخل المتصفح بعد انتهاء البناء
-  const savedAvatar = typeof window !== 'undefined' ? localStorage.getItem('avatarUrl') : null
-  if (savedAvatar) {
-    setAvatarUrl(savedAvatar)
-  }
-}, [])
+  // 1. مراجعة الجلسة (الحل الجذري لخطأ "انتهت الجلسة")
+  const syncUser = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      setUser(session.user)
+      setAvatarUrl(session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || '')
+    } else if (pathname !== '/login') {
+      router.push('/login')
+    }
+  }, [pathname, router])
 
-  // --- التنبيهات غير المقروءة ---
+  useEffect(() => {
+    syncUser()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user)
+        setAvatarUrl(session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || '')
+      } else {
+        setUser(null)
+        if (pathname !== '/login') router.push('/login')
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [syncUser, pathname, router])
+
+  // 2. جلب التنبيهات
+  useEffect(() => {
+    async function fetchAlerts() {
+      const { data } = await supabase.from('suppliers').select('id,company_name,last_contact_date,completion_pct,status').eq('status', 'active')
+      if (data) {
+        const list = data.filter((s: any) => {
+          const days = s.last_contact_date ? Math.floor((Date.now() - new Date(s.last_contact_date).getTime()) / 86400000) : 999
+          return (days > 30) || (Number(s.completion_pct) || 0) < 50
+        })
+        setAlerts(list)
+      }
+      setReadAlerts(JSON.parse(localStorage.getItem('readAlerts') || '[]'))
+    }
+    fetchAlerts()
+  }, [])
+
   const unreadAlerts = alerts.filter(s => !readAlerts.includes(s.id))
-
-  function markRead(id: string) {
-    if (readAlerts.includes(id)) return
+  const markRead = (id: string) => {
     const newRead = [...readAlerts, id]
     setReadAlerts(newRead)
     localStorage.setItem('readAlerts', JSON.stringify(newRead))
   }
-
-  // --- جلب المستخدم وتثبيت الصورة ---
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (data?.user) {
-        setUser(data.user)
-        // تثبيت صورة Avatar مرة واحدة
-        if (!localStorage.getItem('avatarUrl')) {
-          const url = data.user.user_metadata?.avatar_url ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(data.user.user_metadata?.full_name || data.user.email || 'User')}&background=0A1628&color=fff`
-          setAvatarUrl(url)
-          localStorage.setItem('avatarUrl', url)
-        }
-      }
-    }
-    fetchUser()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        if (!localStorage.getItem('avatarUrl')) {
-          const url = session.user.user_metadata?.avatar_url ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(session.user.user_metadata?.full_name || session.user.email || 'User')}&background=0A1628&color=fff`
-          setAvatarUrl(url)
-          localStorage.setItem('avatarUrl', url)
-        }
-      } else {
-        setUser(null)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  // --- جلب التنبيهات ---
-  useEffect(() => {
-    async function fetchAlerts() {
-      const { data } = await supabase
-        .from('suppliers')
-        .select('id,company_name,last_contact_date,completion_pct,status')
-        .eq('status', 'active')
-
-      if (!data) return
-
-      const list = data.filter((s: any) => {
-        const lastContact = s.last_contact_date
-        const completion = Number(s.completion_pct) || 0
-        const daysSinceContact = lastContact
-          ? Math.floor((Date.now() - new Date(lastContact).getTime()) / 86400000)
-          : 999
-        return (!lastContact || daysSinceContact > 30) || completion < 50
-      })
-      setAlerts(list)
-
-      const savedRead = localStorage.getItem('readAlerts')
-      setReadAlerts(JSON.parse(savedRead || '[]'))
-    }
-    fetchAlerts()
-  }, [])
 
   const pageTitle = pageTitles[pathname] || (pathname.startsWith('/suppliers/') ? 'ملف المورد' : 'TradeFlow')
 
   return (
     <div style={{ height: '100vh', background: S.navy, color: S.white, fontFamily: 'Tajawal,sans-serif', direction: 'rtl', display: 'flex', overflow: 'hidden' }}>
 
-      {/* ===== SIDEBAR ===== */}
-      <div style={{ width: '220px', flexShrink: 0, background: S.navy2, borderLeft: `1px solid ${S.border}`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
-        <div style={{ padding: '0px 24px', borderBottom: `1px solid ${S.border}`, textAlign: 'right', display: 'flex',flexDirection: 'column',justifyContent: 'center',minHeight: '66px' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: S.gold }}>TradeFlow</div>
-          <div style={{ fontSize: '9px', color: S.muted, letterSpacing: '1.5px', marginTop: '2px' }}>BRIDGE EDGE OS</div>
+      {/* --- SIDEBAR --- */}
+      <aside style={{ width: '240px', flexShrink: 0, background: S.navy2, borderLeft: `1px solid ${S.border}`, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '20px 24px', borderBottom: `1px solid ${S.border}`, minHeight: '66px' }}>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: S.gold }}>TradeFlow</div>
+          <div style={{ fontSize: '10px', color: S.muted, letterSpacing: '1px' }}>BRIDGE EDGE OS</div>
         </div>
 
-        <div style={{ padding: '14px 24px 5px', fontSize: '9px', color: S.muted, fontWeight: 700 }}>القائمة الرئيسية</div>
-        {navItems.map(n => {
-          const active = pathname === n.href || pathname.startsWith(n.href + '/')
-          return (
-            <div key={n.label} onClick={() => router.push(n.href)}
-              style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', margin: '2px 8px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: active ? S.gold : S.muted, background: active ? S.gold3 : 'transparent', border: active ? `1px solid rgba(201,168,76,0.18)` : '1px solid transparent' }}>
-              <span style={{ flex: 1 }}>{n.label}</span>
-              <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: n.color }} />
-            </div>
-          )
-        })}
+        <nav style={{ flex: 1, padding: '15px 0' }}>
+          <div style={{ padding: '0 24px 10px', fontSize: '10px', color: S.muted, fontWeight: 700, textTransform: 'uppercase' }}>الرئيسية</div>
+          {navItems.map(n => {
+            const active = pathname === n.href || pathname.startsWith(n.href + '/')
+            return (
+              <div key={n.label} onClick={() => router.push(n.href)}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 24px', cursor: 'pointer', transition: '0.2s', color: active ? S.gold : S.muted, background: active ? S.gold3 : 'transparent' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: n.color }} />
+                <span style={{ fontSize: '14px', fontWeight: active ? 700 : 500 }}>{n.label}</span>
+              </div>
+            )
+          })}
+        </nav>
 
-        <div style={{ marginTop: 'auto', padding: '16px', borderTop: `1px solid ${S.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexDirection: 'row-reverse' }}>
-            <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: S.navy }}>BE</div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700 }}>Bridge Edge</div>
-              <div style={{ fontSize: '10px', color: S.muted }}>مدير النظام</div>
+        {/* إطار العميل - تم ضبطه ليظهر الإيميل والاسم بوضوح */}
+        <div style={{ padding: '20px', borderTop: `1px solid ${S.border}`, background: 'rgba(0,0,0,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexDirection: 'row-reverse' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: `2px solid ${S.gold}`, overflow: 'hidden', flexShrink: 0 }}>
+              <img src={avatarUrl || `https://ui-avatars.com/api/?name=User&background=0A1628&color=fff`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="Avatar" />
+            </div>
+            <div style={{ flex: 1, overflow: 'hidden', textAlign: 'right' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: S.white, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                {user?.user_metadata?.full_name || 'مدير النظام'}
+              </div>
+              <div style={{ fontSize: '11px', color: S.muted, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                {user?.email}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </aside>
 
-      {/* ===== MAIN ===== */}
+      {/* --- MAIN CONTENT --- */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, minHeight: '66px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '16px', fontWeight: 700 }}>{pageTitle}</div>
-          </div>
+        <header style={{ height: '66px', background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 style={{ fontSize: '18px', fontWeight: 700 }}>{pageTitle}</h1>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {/* التنبيهات */}
             <div style={{ position: 'relative', cursor: 'pointer' }} onClick={() => setShowAlerts(!showAlerts)}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: S.card2, border: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px' }}>🔔</div>
+              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: S.card2, border: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🔔</div>
               {unreadAlerts.length > 0 && (
-                <div style={{ position: 'absolute', top: '-5px', left: '-5px', width: '16px', height: '16px', borderRadius: '50%', background: S.red, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: '#fff' }}>
+                <div style={{ position: 'absolute', top: '-4px', left: '-4px', width: '18px', height: '18px', borderRadius: '50%', background: S.red, color: '#fff', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${S.navy2}` }}>
                   {unreadAlerts.length}
                 </div>
               )}
             </div>
 
-            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: S.card2, border: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', cursor: 'pointer' }}>💬</div>
+            {/* الرسائل */}
+            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: S.card2, border: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>💬</div>
 
-            {/* ===== Avatar ثابت ===== */}
+            {/* المنيو العلوي */}
             <div style={{ position: 'relative' }}>
-              <div 
-                onClick={() => setShowUserMenu(!showUserMenu)} 
-                style={{ width: '36px', height: '36px', borderRadius: '50%', border: `1px solid ${S.border}`, cursor: 'pointer', overflow: 'hidden', background: S.card2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <img 
-                  src={avatarUrl || `https://ui-avatars.com/api/?name=User&background=0A1628&color=fff`} 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                  alt="Profile" 
-                />
+              <div onClick={() => setShowUserMenu(!showUserMenu)} style={{ width: '38px', height: '38px', borderRadius: '50%', border: `1px solid ${S.gold}`, cursor: 'pointer', overflow: 'hidden' }}>
+                <img src={avatarUrl || `https://ui-avatars.com/api/?name=User&background=0A1628&color=fff`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="P" />
               </div>
-
               {showUserMenu && (
-                <>
-                  <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowUserMenu(false)} />
-                  <div style={{ position: 'absolute', top: '45px', left: 15, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
-                    <div style={{ padding: '8px 16px', borderBottom: `1px solid ${S.border}`, fontSize: '11px', color: '#8c8c8c' }}>
-                      {user?.email}
-                    </div>
-                    <div 
-                      onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} 
-                      style={{ padding: '10px 16px', cursor: 'pointer', color: S.red, fontSize: '14px' }}
-                    >
-                      تسجيل الخروج
-                    </div>
-                  </div>
-                </>
+                <div style={{ position: 'absolute', top: '50px', left: 0, width: '200px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)', zIndex: 1000 }}>
+                  <div style={{ padding: '12px 16px', borderBottom: `1px solid ${S.border}`, fontSize: '11px', color: S.muted, wordBreak: 'break-all' }}>{user?.email}</div>
+                  <div onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} style={{ padding: '12px 16px', color: S.red, fontWeight: 700, cursor: 'pointer' }}>تسجيل الخروج</div>
+                </div>
               )}
             </div>
-
           </div>
-        </div>
+        </header>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
+        <main style={{ flex: 1, overflowY: 'auto', background: S.navy }}>
           {children}
-        </div>
+        </main>
       </div>
 
-      {/* ===== ALERTS PANEL ===== */}
+      {/* --- لوحة التنبيهات المنبثقة --- */}
       {showAlerts && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowAlerts(false)}>
-          <div style={{ position: 'absolute', top: '70px', left: '24px', width: '280px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', direction: 'rtl', overflow: 'hidden' }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '14px 16px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700 }}>التنبيهات</span>
-                <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: 'rgba(239,68,68,0.12)', color: S.red, fontWeight: 700 }}>{unreadAlerts.length} جديد</span>
-              </div>
-              <button onClick={() => setShowAlerts(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: '16px', cursor: 'pointer' }}>✕</button>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={() => setShowAlerts(false)}>
+          <div style={{ position: 'absolute', top: '75px', left: '24px', width: '320px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '15px', boxShadow: '0 20px 50px rgba(0,0,0,0.7)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px', borderBottom: `1px solid ${S.border}`, fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+              <span>التنبيهات</span>
+              <span onClick={() => setShowAlerts(false)} style={{ cursor: 'pointer', color: S.muted }}>✕</span>
             </div>
-            <div style={{ maxHeight: '400px', overflowY: 'auto', padding: '8px' }}>
-              {alerts.length === 0 ? (
-                <div style={{ textAlign: 'center', color: S.muted, padding: '20px', fontSize: '13px' }}>لا توجد تنبيهات</div>
-              ) : alerts.map(s => {
-                const daysSince = s.last_contact_date ? Math.floor((Date.now() - new Date(s.last_contact_date).getTime()) / 86400000) : null
-                const noContact = !s.last_contact_date || (daysSince !== null && daysSince > 30)
-                const lowCompletion = (s.completion_pct || 0) < 50
-                const isRead = readAlerts.includes(s.id)
-                return (
-                  <div key={s.id}
-                    onClick={() => { markRead(s.id); setShowAlerts(false); router.push(`/suppliers/${s.id}`) }}
-                    style={{ padding: '12px', borderRadius: '10px', cursor: 'pointer', marginBottom: '4px', background: isRead ? 'transparent' : 'rgba(255,255,255,0.05)', border: `1px solid ${isRead ? 'transparent' : 'rgba(255,255,255,0.08)'}`, opacity: isRead ? 0.6 : 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700, textAlign: 'right', flex: 1 }}>{s.company_name}</div>
-                      {!isRead && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: S.red, marginRight: '8px' }} />}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {noContact && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-start' }}><span>🔴</span><span style={{ fontSize: '11px', color: S.red }}>{!s.last_contact_date ? 'لم يتم التواصل' : `منذ ${daysSince} يوم`}</span></div>}
-                      {lowCompletion && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-start' }}><span>⚠️</span><span style={{ fontSize: '11px', color: S.amber }}>ملف ناقص {s.completion_pct || 0}%</span></div>}
-                    </div>
-                  </div>
-                )
-              })}
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {alerts.length === 0 ? <div style={{ padding: '30px', textAlign: 'center', color: S.muted }}>لا توجد تنبيهات جديدة</div> : alerts.map(s => (
+                <div key={s.id} onClick={() => { markRead(s.id); setShowAlerts(false); router.push(`/suppliers/${s.id}`) }} style={{ padding: '15px', borderBottom: `1px solid ${S.border}`, cursor: 'pointer', background: readAlerts.includes(s.id) ? 'transparent' : 'rgba(201,168,76,0.05)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700 }}>{s.company_name}</div>
+                  <div style={{ fontSize: '11px', color: S.red, marginTop: '4px' }}>⚠️ تحديث مطلوب أو بيانات ناقصة</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
-
     </div>
   )
 }
