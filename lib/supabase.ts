@@ -1,8 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 
-// جلب القيم من متغيرات البيئة
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// تأكد من أن الأسماء تطابق تماماً ما هو موجود في ملف .env.local
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// إنشاء العميل
-export const supabase = createClient(supabaseUrl, supabaseKey)
+// التحقق من وجود القيم قبل إنشاء العميل لمنع الروابط الوهمية
+if (!supabaseUrl || !supabaseKey) {
+  console.error('⚠️ خطأ: فشل في قراءة متغيرات Supabase من ملف الـ .env')
+}
+
+export const supabase = createClient(
+  supabaseUrl || '', 
+  supabaseKey || ''
+)
