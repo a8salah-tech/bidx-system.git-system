@@ -58,7 +58,8 @@ async function handleAuth(e: React.FormEvent) {
   setLoading(true);
 
   if (isSignUp) {
-    const { data, error } = await supabase.auth.signUp({
+    // كود إنشاء الحساب (SignUp)
+    const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -70,21 +71,13 @@ async function handleAuth(e: React.FormEvent) {
     });
     
     if (error) {
-      // الشرط السحري: التحقق إذا كان الإيميل مسجل مسبقاً
-      if (error.message.includes('already registered') || error.status === 400) {
-        setError('هذا البريد الإلكتروني مسجل بالفعل، يرجى تسجيل الدخول');
-      } else {
-        setError(error.message);
-      }
-    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
-      // في بعض إعدادات Supabase، إذا كان الإيميل موجوداً لا يرجع خطأ بل يرجع مصفوفة هويات فارغة
-      setError('هذا البريد الإلكتروني مسجل بالفعل، يرجى تسجيل الدخول');
+      setError(error.message);
     } else {
       alert('تم إنشاء الحساب بنجاح!');
-      router.push('/suppliers');
+      setIsSignUp(false);
     }
   } else {
-    // كود تسجيل الدخول (كما هو)
+    // كود تسجيل الدخول (SignIn)
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError('البريد الإلكتروني أو كلمة المرور غير صحيحة');
