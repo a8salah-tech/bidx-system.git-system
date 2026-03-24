@@ -40,6 +40,9 @@ useEffect(() => {
   if (savedAvatar) {
     setAvatarUrl(savedAvatar)
   }
+  if (typeof window !== 'undefined') {
+  // كود اللوكال ستورج هنا فقط
+}
 }, [])
 
   // --- التنبيهات غير المقروءة ---
