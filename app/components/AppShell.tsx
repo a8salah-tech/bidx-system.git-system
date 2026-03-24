@@ -32,9 +32,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = useState(false)
   
   // --- Avatar ثابت ---
-  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
-    return localStorage.getItem('avatarUrl') || ''
-  })
+const [avatarUrl, setAvatarUrl] = useState<string>(``)
+
+// 2. استخدم useEffect لسحب البيانات بعد تحميل الصفحة
+useEffect(() => {
+  const savedAvatar = localStorage.getItem(`avatarUrl`)
+  if (savedAvatar) {
+    setAvatarUrl(savedAvatar)
+  }
+}, [])
 
   // --- التنبيهات غير المقروءة ---
   const unreadAlerts = alerts.filter(s => !readAlerts.includes(s.id))
@@ -114,8 +120,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* ===== SIDEBAR ===== */}
       <div style={{ width: '220px', flexShrink: 0, background: S.navy2, borderLeft: `1px solid ${S.border}`, display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div style={{ padding: '0px 24px', borderBottom: `1px solid ${S.border}`, textAlign: 'right', display: 'flex',flexDirection: 'column',justifyContent: 'center',minHeight: '66px' }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: S.gold }}>TradeFlow</div>
-          <div style={{ fontSize: '9px', color: S.muted, letterSpacing: '1.5px', marginTop: '2px' }}>BRIDGE EDGE OS</div>
+          <div style={{ fontSize: '22px', fontWeight: 700, color: S.gold }}>bidlx.com</div>
+          <div style={{ fontSize: '9px', color: S.muted, letterSpacing: '1.5px', marginTop: '2px' }}>Bidlx OS</div>
         </div>
 
         <div style={{ padding: '14px 24px 5px', fontSize: '9px', color: S.muted, fontWeight: 700 }}>القائمة الرئيسية</div>
@@ -134,7 +140,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexDirection: 'row-reverse' }}>
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: S.navy }}>BE</div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700 }}>Bridge Edge</div>
+              <div style={{ fontSize: '13px', fontWeight: 700 }}>bidlx.com</div>
               <div style={{ fontSize: '10px', color: S.muted }}>مدير النظام</div>
             </div>
           </div>
