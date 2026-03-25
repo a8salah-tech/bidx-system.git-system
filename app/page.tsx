@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import styles from './page.module.css';
 
 
+
     // ── Colour tokens (match your AppShell S object) ──────────────────────────
 const C = {
   navy:    '#0A1628',
@@ -60,6 +61,20 @@ function SectionEye({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { motion } from 'framer-motion';
+
+// داخل المكون الرئيسي في الصفحة
+<motion.h1 
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.8 }}
+  style={{ color: '#FAFAF8', fontSize: '56px', fontWeight: 900 }}
+>
+  مستقبل التجارة من <span style={{ color: '#C9A84C' }}>إندونيسيا</span> يبدأ هنا
+</motion.h1>
+
+
+
 // ── Main page ─────────────────────────────────────────────────────────────
 export default function Home() {
   const router = useRouter();
@@ -96,13 +111,51 @@ export default function Home() {
           </div>
         </Link>
 
-        <ul style={{ display: 'flex', gap: 32, listStyle: 'none', margin: 0, padding: 0 }}>
-          {['المميزات','الموردون','المنتجات','الأسعار'].map(l => (
-            <li key={l}>
-              <Link href="#" className={styles.navLink} style={{ color: C.muted, textDecoration: 'none', fontSize: 14.5, fontWeight: 500 }}>{l}</Link>
-            </li>
-          ))}
-        </ul>
+<ul style={{ display: 'flex', gap: 32, listStyle: 'none', margin: 0, padding: 0 }}>
+  {/* رابط المميزات الفعلي */}
+    <li>
+    <Link 
+      href="/" 
+      className={styles.navLink} 
+      style={{ color: C.muted, textDecoration: 'none', fontSize: 14.5, fontWeight: 500 }}
+    >
+      الرئيسية
+    </Link>
+  </li>
+  <li>
+    <Link 
+      href="/features" 
+      className={styles.navLink} 
+      style={{ color: C.muted, textDecoration: 'none', fontSize: 14.5, fontWeight: 500 }}
+    >
+      المميزات
+    </Link>
+  </li>
+
+  {/* رابط الأتمتة  */}
+  <li>
+    <Link 
+      href="/automation" 
+      className={styles.navLink} 
+      style={{ color: C.muted, textDecoration: 'none', fontSize: 14.5, fontWeight: 500 }}
+    >
+      الأتمتة
+    </Link>
+  </li>
+
+  {/* الروابط المتبقية التي سنبرمجها لاحقاً */}
+  {['المنتجات', 'الأسعار'].map(l => (
+    <li key={l}>
+      <Link 
+        href="#" 
+        className={styles.navLink} 
+        style={{ color: C.muted, textDecoration: 'none', fontSize: 14.5, fontWeight: 500 }}
+      >
+        {l}
+      </Link>
+    </li>
+  ))}
+</ul>
 
         <div style={{ display: 'flex', gap: 10 }}>
           <Btn href="/login">دخول</Btn>
@@ -399,14 +452,49 @@ export default function Home() {
       </div>
 
       {/* ── Footer ── */}
-      <footer style={{ position: 'relative', zIndex: 1, borderTop: `1px solid ${C.border}`, maxWidth: 1200, margin: '0 auto', padding: '26px 52px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 12.5, color: C.muted }}>© ٢٠٢٦ BidLX  · جميع الحقوق محفوظة</div>
-        <div style={{ display: 'flex', gap: 22 }}>
-          {['الخصوصية','الشروط','الدعم','تواصل معنا'].map(l => (
-            <Link key={l} href="#" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>{l}</Link>
-          ))}
-        </div>
-      </footer>
+<footer style={{ 
+  position: 'relative', 
+  zIndex: 1, 
+  borderTop: `1px solid ${C.border}`, 
+  maxWidth: 1200, 
+  margin: '0 auto', 
+  width: '100%', 
+  padding: '26px 52px', 
+  display: 'flex', 
+  justifyContent: 'space-between', 
+  alignItems: 'center' 
+}}>
+  {/* حقوق الملكية مع اسم العقل الإلكتروني */}
+  <div style={{ fontSize: 12.5, color: C.muted, fontFamily: "'Tajawal', sans-serif" }}>
+    © ٢٠٢٦ BidLX  · العقل الإلكتروني لشركتك · جميع الحقوق محفوظة
+  </div>
+
+<div style={{ display: 'flex', gap: 22, fontFamily: "'Tajawal', sans-serif" }}>
+  {/* رابط العودة للرئيسية */}
+  <Link href="/" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الرئيسية</Link>
+  
+  {/* رابط الخصوصية */}
+  <Link href="/privacy" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الخصوصية</Link>
+
+  {/* رابط الشروط الفعلي */}
+  <Link href="/terms" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الشروط</Link>
+
+  {/* الروابط المتبقية التي لم ننشئ صفحاتها بعد */}
+  {['الدعم'].map(l => (
+    <Link key={l} href="/tech-center" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>{l}</Link>
+  ))}
+  
+  {/* رابط صفحة اتصل بنا المتميز باللون الذهبي */}
+  <Link href="/contact" style={{ 
+    fontSize: 12.5, 
+    color: C.gold2, 
+    fontWeight: 700, 
+    textDecoration: 'none' 
+  }}>
+    تواصل معنا
+  </Link>
+</div>
+</footer>
 
     </div>
   );

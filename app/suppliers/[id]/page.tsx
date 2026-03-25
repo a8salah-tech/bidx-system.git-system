@@ -295,15 +295,20 @@ function RatingTab({ supplier, supplierId }: { supplier: any, supplierId: string
 
   useEffect(() => {
     async function fetchData() {
-      const { data: sup } = await supabase
-        .from('suppliers')
-        .select('quality_rating,delivery_rating,comm_rating,price_rating,flex_rating')
-        .eq('id', supplierId).single()
-      if (sup) {
-        setRatings({ quality: sup.quality_rating || 0, delivery: sup.delivery_rating || 0, communication: sup.comm_rating || 0, price: sup.price_rating || 0, flexibility: sup.flex_rating || 0 })
-      }
-      const { data: notesData } = await supabase.from('supplier_notes').select('*').eq('supplier_id', supplierId).order('created_at', { ascending: false })
-      setNotes(notesData || [])
+// جلب الملاحظات مع ربطها بجدول البروفايلات باستخدام حقل الـ id
+const { data: notesData } = await supabase
+  .from('supplier_notes')
+  .select(`
+    *,
+    profiles:created_by (
+      full_name, 
+      department
+    )
+  `)
+  .eq('supplier_id', supplierId)
+  .order('created_at', { ascending: false });
+
+setNotes(notesData || []);
       setLoaded(true)
     }
     fetchData()
@@ -330,19 +335,49 @@ function RatingTab({ supplier, supplierId }: { supplier: any, supplierId: string
     window.location.reload()
   }
 
-  async function addNote() {
-    if (!newNote.trim()) return
-    setSavingNote(true)
-    const { data } = await supabase.from('supplier_notes').insert([{ supplier_id: supplierId, note: newNote.trim() }]).select().single()
-    if (data) setNotes([data, ...notes])
-    setNewNote('')
-    setSavingNote(false)
-  }
+async function addNote() {
+  if (!newNote.trim()) return;
+  setSavingNote(true);
 
-  async function deleteNote(id: string) {
-    if (!window.confirm('هل تريد حذف هذه الملاحظة؟')) return
-    await supabase.from('supplier_notes').delete().eq('id', id)
-    setNotes(notes.filter(n => n.id !== id))
+  // جلب هوية المستخدم المسجل حالياً
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: noteRes } = await supabase
+    .from('supplier_notes')
+    .insert([{ 
+      supplier_id: supplierId, 
+      note: newNote.trim(), 
+      created_by: user?.id // ربط الملاحظة بالموظف
+    }])
+    .select(`
+      *,
+      profiles:created_by (full_name, department)
+    `)
+    .single();
+
+  if (noteRes) setNotes([noteRes, ...notes]);
+  setNewNote('');
+  setSavingNote(false);
+}
+
+async function deleteNote(noteId: string) {
+    if (!window.confirm('هل تريد حذف هذه الملاحظة نهائياً؟')) return
+
+    // 1. محاولة الحذف من قاعدة البيانات
+    const { error } = await supabase
+      .from('supplier_notes')
+      .delete()
+      .eq('id', noteId)
+
+    if (error) {
+      // إذا حدث خطأ (مثلاً بسبب الصلاحيات) سيظهر لك هنا
+      console.error('فشل الحذف:', error.message)
+      alert('عذراً، لم يتم الحذف من الخادم: ' + error.message)
+    } else {
+      // 2. إذا نجح الحذف في الخادم، قم بتحديث الواجهة فوراً
+      setNotes(notes.filter(n => n.id !== noteId))
+      console.log('تم الحذف بنجاح');
+    }
   }
 
   if (!loaded) return <div style={{ textAlign: 'center', color: S.muted, padding: '40px 0' }}>جاري التحميل...</div>
@@ -390,34 +425,47 @@ function RatingTab({ supplier, supplierId }: { supplier: any, supplierId: string
       </div>
 
       {/* قسم الملاحظات */}
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>الملاحظات الداخلية</div>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <button onClick={addNote} disabled={savingNote}
-            style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-            {savingNote ? '...' : 'إضافة'}
-          </button>
-          <textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="اكتب ملاحظة هنا..." rows={2}
-            style={{ flex: 1, background: S.navy2, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any, resize: 'none' }} />
+<div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
+  <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>الملاحظات الداخلية</div>
+  <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+    <button onClick={addNote} disabled={savingNote}
+      style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+      {savingNote ? '...' : 'إضافة'}
+    </button>
+    <textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="اكتب ملاحظة هنا..." rows={2}
+      style={{ flex: 1, background: S.navy2, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any, resize: 'none' }} />
+  </div>
+  {(!notes || notes.length === 0) ? (
+    <div style={{ textAlign: 'center', color: S.muted, padding: '20px 0', fontSize: '13px' }}>لا توجد ملاحظات بعد</div>
+  ) : (
+<div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+  {/* عرض الملاحظات مع بيانات الكاتب من جدول البروفايلات */}
+  {notes && notes.map((n, idx) => (
+    <div key={n.id || idx} style={{ background: S.card2, borderRadius: '8px', padding: '12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+      
+      {/* زر الحذف */}
+      <button onClick={() => deleteNote(n.id)} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>✕</button>
+      
+      <div style={{ flex: 1, textAlign: 'right' }}>
+        {/* عرض اسم الشخص من جدول البروفايلات والخدمة التابع لها */}
+ <div style={{ fontSize: '10px', fontWeight: 700, color: S.gold, marginBottom: '2px' }}>
+  {n.profiles?.full_name || n.full_name || 'موظف'} 
+  {n.profiles?.department ? ` (${n.profiles.department})` : n.department ? ` (${n.department})` : ''}
+</div>
+        
+        {/* نص الملاحظة */}
+        <div style={{ fontSize: '12px', color: S.white, lineHeight: '1.6', marginBottom: '4px' }}>{n.note}</div>
+        
+        {/* التاريخ والوقت */}
+        <div style={{ fontSize: '10px', color: S.muted }}>
+          {n.created_at ? new Date(n.created_at).toLocaleDateString('ar-EG') : ''} — {n.created_at ? new Date(n.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'الآن'}
         </div>
-        {notes.length === 0 ? (
-          <div style={{ textAlign: 'center', color: S.muted, padding: '20px 0', fontSize: '13px' }}>لا توجد ملاحظات بعد</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {notes.map(n => (
-              <div key={n.id} style={{ background: S.card2, borderRadius: '8px', padding: '12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-                <button onClick={() => deleteNote(n.id)} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>✕</button>
-                <div style={{ flex: 1, textAlign: 'right' }}>
-                  <div style={{ fontSize: '12px', color: S.white, lineHeight: '1.6', marginBottom: '4px' }}>{n.note}</div>
-                  <div style={{ fontSize: '10px', color: S.muted }}>
-                    {new Date(n.created_at).toLocaleDateString('ar-EG')} — {new Date(n.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+    </div>
+  ))}
+</div>
+  )}
+</div>
     </div>
   )
 }
