@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import Link from 'next/link';
 
 const S = {
   navy: '#0A1628', navy2: '#0F2040',
@@ -20,6 +21,7 @@ const navItems = [
 const pageTitles: Record<string, string> = {
   '/suppliers': 'إدارة الموردين',
   '/products': 'إدارة المنتجات',
+  '/profile': 'ملف المدير التنفيذي', 
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -186,9 +188,34 @@ useEffect(() => {
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowUserMenu(false)} />
                   <div style={{ position: 'absolute', top: '45px', left: 15, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
-                    <div style={{ padding: '8px 16px', borderBottom: `1px solid ${S.border}`, fontSize: '11px', color: '#8c8c8c' }}>
-                      {user?.email}
-                    </div>
+
+
+<Link href="/profile" style={{ textDecoration: 'none' }}>
+  <div style={{ 
+    padding: '10px 16px', 
+    borderBottom: `1px solid ${S.border}`, 
+    fontSize: '11px', 
+    color: '#8c8c8c',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  }}
+  onMouseOver={(e) => {
+    e.currentTarget.style.backgroundColor = 'rgba(201, 168, 76, 0.05)';
+    e.currentTarget.style.color = '#C9A84C';
+  }}
+  onMouseOut={(e) => {
+    e.currentTarget.style.backgroundColor = 'transparent';
+    e.currentTarget.style.color = '#8c8c8c';
+  }}
+  >
+    <span style={{ fontSize: '14px' }}>👤</span>
+    {user?.email}
+  </div>
+</Link>
+
                     <div 
                       onClick={async () => { await supabase.auth.signOut(); router.push('/login'); }} 
                       style={{ padding: '10px 16px', cursor: 'pointer', color: S.red, fontSize: '14px' }}

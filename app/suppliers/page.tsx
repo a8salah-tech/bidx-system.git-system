@@ -79,6 +79,7 @@ export default function SuppliersPage() {
     contact_name: '', contact_whatsapp: '',
     contact_email: '', annual_sales: '',
     main_products: '', notes: '',
+    
   })
 
   // ===== تحميل الموردين =====
@@ -467,6 +468,7 @@ async function addSupplier() {
                 { label: 'المنتجات الرئيسية', key: 'main_products', placeholder: 'زيت نخيل، ورق...' },
                 { label: 'اسم المسؤول', key: 'contact_name', placeholder: 'الشخص المسؤول' },
                 { label: 'واتساب', key: 'contact_whatsapp', placeholder: '+62 8xx xxx xxxx' },
+                { label: 'الموقع الإلكتروني', key: 'website', placeholder: 'www.company.com' },
                 { label: 'الإيميل', key: 'contact_email', placeholder: 'email@company.com' },
                 { label: 'حجم المبيعات السنوية', key: 'annual_sales', placeholder: '$10M' },
               ].map(f => (

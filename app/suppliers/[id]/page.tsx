@@ -728,16 +728,50 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
                 </button>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>معلومات الشركة</div>
               </div>
-              {[{ label: 'الاسم الرسمي', key: 'company_name' }, { label: 'رقم التسجيل', key: 'registration_number' }, { label: 'الدولة', key: 'country' }, { label: 'المدينة', key: 'city' }, { label: 'الموقع', key: 'website' }].map(f => (
-                <div key={f.key} style={{ marginBottom: '12px', textAlign: 'right' }}>
-                  <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '3px' }}>{f.label}</div>
-                  {editMode ? (
-                    <input type="text" value={(editData as any)[f.key] || ''} onChange={e => setEditData({ ...editData, [f.key]: e.target.value })}
-                      style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
-                  ) : (
-                    <div style={{ fontSize: '13px', fontWeight: 500 }}>{(supplier as any)[f.key] || '—'}</div>
-                  )}
-                </div>
+              {[{ label: 'الاسم الرسمي', key: 'company_name' }, { label: 'رقم التسجيل', key: 'registration_number' }, { label: 'الدولة', key: 'country' }, { label: 'المدينة', key: 'city' }, { label: 'الموقع الإلكتروني', key: 'website' }].map(f => (
+<div key={f.key} style={{ marginBottom: '12px' }}>
+  <div style={{ fontSize: '10px', color: '#888', fontWeight: 700, marginBottom: '3px' }}>{f.label}</div>
+  
+  {editMode ? (
+    <input 
+      type="text" 
+      value={(editData as any)?.[f.key] || ''} 
+      onChange={e => setEditData({ ...editData, [f.key]: e.target.value })}
+      style={{ 
+        width: '100%', 
+        background: '#1A1A1A', 
+        border: '1px solid rgba(201,168,76,0.3)', 
+        borderRadius: '6px', 
+        padding: '7px 10px', 
+        fontSize: '13px', 
+        color: 'white', 
+        outline: 'none', 
+        textAlign: 'right' 
+      }} 
+    />
+  ) : (
+    <div style={{ fontSize: '13px', fontWeight: 500, color: 'white' }}>
+      {f.key === 'website' && (supplier as any)?.[f.key] ? (
+        <a 
+          href={(supplier as any)[f.key].startsWith('http') ? (supplier as any)[f.key] : `https://${(supplier as any)[f.key]}`} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          style={{ 
+            color: '#C9A84C', 
+            textDecoration: 'none', 
+            borderBottom: '1px solid #C9A84C',
+            display: 'inline-block',
+            paddingBottom: '1px'
+          }}
+        >
+          {(supplier as any)[f.key]}
+        </a>
+      ) : (
+        (supplier as any)?.[f.key] || '—'
+      )}
+    </div>
+  )}
+</div>
               ))}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '3px' }}>تاريخ التسجيل</div>
