@@ -76,6 +76,7 @@ function ContactTab({ supplier, supplierId }: { supplier: any, supplierId: strin
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', role: '', email: '', phone: '', whatsapp: '', notes: '' })
   const [editOfficial, setEditOfficial] = useState(false)
+  
   const [officialData, setOfficialData] = useState({
     contact_email: supplier.contact_email || '',
     contact_whatsapp: supplier.contact_whatsapp || '',
@@ -255,11 +256,11 @@ function ContactTab({ supplier, supplierId }: { supplier: any, supplierId: strin
           </div>
 
           {/* آخر تواصل */}
-          <div style={{ textAlign: 'right' }}>
+<div style={{ textAlign: 'right', direction: 'rtl' }}>
             <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>آخر تواصل</div>
             {editOfficial ? (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input type="date" value={officialData.last_contact_date}
+              <div style={{ display: 'flex', gap: '6px', direction: 'rtl' }}>
+                <input type="date" value={officialData.last_contact_date || new Date().toISOString().split('T')[0]}
                   onChange={e => setOfficialData({ ...officialData, last_contact_date: e.target.value })}
                   style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as any, colorScheme: 'dark' as any }} />
                 <select value={officialData.last_contact_method}
@@ -273,8 +274,12 @@ function ContactTab({ supplier, supplierId }: { supplier: any, supplierId: strin
                 </select>
               </div>
             ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: S.white }}>
-                {supplier.last_contact_date ? `${timeAgo(supplier.last_contact_date)}${supplier.last_contact_method ? ` — عبر ${supplier.last_contact_method}` : ''}` : '—'}
+              /* إجبار المحاذاة لليمين بغض النظر عن لغة المتصفح */
+              <div style={{ fontSize: '13px', fontWeight: 500, color: S.white, textAlign: 'right', direction: 'ltr' }}>
+                {supplier.last_contact_date ? (() => {
+                  const [y, m, d] = supplier.last_contact_date.split('-');
+                  return `${d}/${m}/${y}`;
+                })() : '—'}
               </div>
             )}
           </div>
@@ -532,6 +537,7 @@ function ProductsTab({ supplierId, mainProducts }: { supplierId: string, mainPro
 }
 
 // ===== الصفحة الرئيسية — تفاصيل المورد =====
+
 export default function SupplierDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -548,7 +554,25 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
   const [editData, setEditData] = useState({ company_name: '', registration_number: '', country: '', city: '', website: '' })
   const [editMode2, setEditMode2] = useState(false)
   const [editData2, setEditData2] = useState({ main_products: '', notes: '' })
+  
+  // 1. إضافة الـ State الجديد هنا
+  const [pricingHistory, setPricingHistory] = useState<any[]>([])
 
+  async function fetchSupplierPricing() {
+    if (!supplier?.company_name) return
+    const { data } = await supabase
+      .from('pricing_sessions')
+      .select('*')
+      .or(`accepted_supplier.eq.${supplier.company_name},rejected_summary.ilike.%${supplier.company_name}%`)
+      .order('created_at', { ascending: false })
+    
+    setPricingHistory(data || [])
+  }
+  useEffect(() => {
+  if (supplier) {
+    fetchSupplierPricing()
+  }
+}, [supplier])
   // تحميل بيانات المورد
   useEffect(() => {
     sessionStorage.removeItem('activeTab')
@@ -715,19 +739,28 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* نظرة عامة */}
+{/* نظرة عامة */}
         {tab === 'overview' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             {/* معلومات الشركة */}
             <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              
+              {/* التعديل هنا: تبديل أماكن الزر والنص مع إضافة direction للضبط */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', direction: 'rtl' }}>
+                
+                {/* 1. النص أصبح في اليمين */}
+                <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>معلومات الشركة</div>
+
+                {/* 2. الزر أصبح في اليسار */}
                 <button onClick={async () => {
                   if (editMode) { await supabase.from('suppliers').update(editData).eq('id', id); window.location.reload() }
                   setEditMode(!editMode)
                 }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editMode ? S.gold : 'transparent', color: editMode ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
                   {editMode ? 'حفظ' : 'تعديل'}
                 </button>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>معلومات الشركة</div>
+
               </div>
+              {/* باقي محتوى الكارت بالأسفل يظل كما هو */}
               {[{ label: 'الاسم الرسمي', key: 'company_name' }, { label: 'رقم التسجيل', key: 'registration_number' }, { label: 'الدولة', key: 'country' }, { label: 'المدينة', key: 'city' }, { label: 'الموقع الإلكتروني', key: 'website' }].map(f => (
 <div key={f.key} style={{ marginBottom: '12px' }}>
   <div style={{ fontSize: '10px', color: '#888', fontWeight: 700, marginBottom: '3px' }}>{f.label}</div>
@@ -781,63 +814,77 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
 
             {/* المنتجات والملاحظات */}
             <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <button onClick={async () => {
-                  if (editMode2) { await supabase.from('suppliers').update({ main_products: editData2.main_products, notes: editData2.notes }).eq('id', id); window.location.reload() }
-                  else { setEditData2({ main_products: supplier.main_products || '', notes: supplier.notes || '' }) }
-                  setEditMode2(!editMode2)
-                }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editMode2 ? S.gold : 'transparent', color: editMode2 ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-                  {editMode2 ? 'حفظ' : 'تعديل'}
-                </button>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>المنتجات الرئيسية</div>
-              </div>
 
-              {editMode2 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                    <button onClick={() => {
-                      const input = document.getElementById('newProductInput') as HTMLInputElement
-                      if (!input?.value.trim()) return
-                      const updated = [...(editData2.main_products ? editData2.main_products.split('،').map(p => p.trim()).filter(Boolean) : []), input.value.trim()]
-                      setEditData2({ ...editData2, main_products: updated.join('، ') })
-                      input.value = ''
-                    }} style={{ background: S.gold, color: S.navy, border: 'none', padding: '7px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>+ إضافة</button>
-                    <input id="newProductInput" type="text" placeholder="اسم المنتج..."
-                      style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '7px', padding: '7px 10px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' }}>
-                    {(editData2.main_products ? editData2.main_products.split('،').map(p => p.trim()).filter(Boolean) : []).map((p, i) => (
-                      <span key={i} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button onClick={() => { const updated = editData2.main_products.split('،').map(x => x.trim()).filter(x => x !== p); setEditData2({ ...editData2, main_products: updated.join('، ') }) }}
-                          style={{ background: 'none', border: 'none', color: S.red, cursor: 'pointer', fontSize: '11px', padding: 0 }}>✕</button>
-                        {p}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+{/* سجل مقارنة الأسعار */}
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+    <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>سجل مقارنة الأسعار الكامل</div>
+  </div>
 
-              {!editMode2 && supplier.main_products ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end', marginBottom: '16px' }}>
-                  {supplier.main_products.split('،').map((p, i) => (
-                    <span key={i} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 500 }}>{p.trim()}</span>
-                  ))}
-                </div>
-              ) : !editMode2 && (
-                <div style={{ color: S.muted, fontSize: '12px', textAlign: 'right', marginBottom: '16px' }}>لم تُضف منتجات بعد</div>
-              )}
+  <div style={{ overflowX: 'auto' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', direction: 'rtl', fontSize: '12px' }}>
+      <thead>
+        <tr style={{ borderBottom: `1px solid ${S.border}`, color: S.gold }}>
+          <th style={{ padding: '10px', textAlign: 'right' }}>#</th>
+          <th style={{ padding: '10px', textAlign: 'right' }}>المنتج</th>
+          <th style={{ padding: '10px', textAlign: 'right' }}>سعر المورد</th>
+          <th style={{ padding: '10px', textAlign: 'right' }}>الحالة</th>
+          <th style={{ padding: '10px', textAlign: 'right' }}>السعر الفائز</th>
+          <th style={{ padding: '10px', textAlign: 'right' }}>المورد الفائز</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Array.isArray(pricingHistory) && pricingHistory.length > 0 ? (
+          pricingHistory.map((session, idx) => {
+            const compName = supplier?.company_name || '';
+            const isAccepted = session.accepted_supplier === compName;
+            let sPrice = '---';
 
-              <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '10px', textAlign: 'right' }}>ملاحظات</div>
-              {editMode2 ? (
-                <textarea value={editData2.notes} onChange={e => setEditData2({ ...editData2, notes: e.target.value })} placeholder="ملاحظات..." rows={3}
-                  style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any, resize: 'none' }} />
-              ) : (
-                <div style={{ fontSize: '13px', lineHeight: '1.8', color: S.white, textAlign: 'right' }}>{supplier.notes || 'لا توجد ملاحظات بعد'}</div>
-              )}
-            </div>
-          </div>
+            if (isAccepted) {
+              sPrice = session.accepted_price;
+            } else if (session.rejected_summary) {
+              const parts = session.rejected_summary.split(' | ');
+              const row = parts.find((p: string) => p.includes(compName));
+              if (row) {
+                const match = row.match(/[\d.]+/);
+                sPrice = match ? match[0] : '---';
+              }
+            }
+
+            return (
+              <tr key={session.id || idx} style={{ borderBottom: `1px solid rgba(255,255,255,0.05)` }}>
+                <td style={{ padding: '12px 10px', color: S.muted }}>{idx + 1}</td>
+                <td style={{ padding: '12px 10px', fontWeight: 600, color: S.white }}>{session.product_name}</td>
+                <td style={{ padding: '12px 10px', fontWeight: 700, color: S.white }}>{sPrice}</td>
+                <td style={{ padding: '12px 10px' }}>
+                  <span style={{ 
+                    padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 700,
+                    background: isAccepted ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                    color: isAccepted ? '#10B981' : '#EF4444'
+                  }}>
+                    {isAccepted ? 'مقبول ✅' : 'مرفوض ❌'}
+                  </span>
+                </td>
+                <td style={{ padding: '12px 10px', fontWeight: 800, color: S.gold2 }}>{session.accepted_price}</td>
+                <td style={{ padding: '12px 10px', color: S.muted, fontSize: '11px' }}>{session.accepted_supplier}</td>
+              </tr>
+            );
+          })
+        ) : (
+          <tr>
+            <td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: S.muted }}>
+              لا توجد سجلات تسعير سابقة
+            </td>
+          </tr>
         )}
+      </tbody>
+    </table>
+  </div>
+</div>
 
+
+
+            </div>
+)}
         {tab === 'contact' && <ContactTab supplier={supplier} supplierId={id} />}
 
         {tab === 'products' && <ProductsTab supplierId={id} mainProducts={supplier.main_products} />}

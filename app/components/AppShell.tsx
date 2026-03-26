@@ -21,7 +21,8 @@ const navItems = [
 const pageTitles: Record<string, string> = {
   '/suppliers': 'إدارة الموردين',
   '/products': 'إدارة المنتجات',
-  '/profile': 'ملف المدير التنفيذي', 
+  '/profile': 'ملف المدير التنفيذي',
+  '/pricing/compare': 'مقارنة أسعار', 
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
