@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import * as XLSX from 'xlsx';
 
 // ===== الألوان =====
 const S = {
@@ -25,6 +26,8 @@ export default function ProductsPage() {
   const [filterCountry, setFilterCountry] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [statusFilter, setStatusFilter] = useState('active')
+  const [supplier, setSupplier] = useState<any>(null);
+//------
 
   // ===== تحميل البيانات =====
   useEffect(() => {
@@ -37,6 +40,31 @@ export default function ProductsPage() {
     }
     fetchData()
   }, [statusFilter])
+//=========
+
+
+  // 1. دالة التصدير داخل المكون
+  const exportToExcel = () => {
+    if (!supplier) return alert('لا توجد بيانات لتصديرها');
+
+    const dataToExport = [{
+      "اسم الشركة": supplier.company_name,
+      "الدولة": supplier.country,
+      "المنتجات": supplier.main_products,
+      "الموقع": supplier.website || '—',
+      "التقييم": supplier.rating
+    }];
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "بيانات المورد");
+    
+    // ضبط الاتجاه للعربية
+    if (!worksheet['!views']) worksheet['!views'] = [];
+    worksheet['!views'] = [{ RTL: true }];
+
+    XLSX.writeFile(workbook, `Bridge_Edge_${supplier.company_name}.xlsx`);
+  };
 
   // ===== بناء خريطة المنتجات =====
   const productMap: Record<string, any[]> = {}
@@ -65,9 +93,21 @@ export default function ProductsPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal,sans-serif', direction: 'rtl' }}>
 
       {/* ===== شريط المعلومات العلوي ===== */}
-      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0 }}>
-        <div style={{ fontSize: '11px', color: S.muted }}>{totalProducts} منتج من {totalSuppliers} مورد</div>
-      </div>
+      
+     <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+
+        {/* الأزرار على اليمين */}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => (true)} style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            + إضافة منتج
+          </button>
+<button 
+  style={{ background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}
+>
+  📤 تصدير
+</button>
+        </div>
+        </div>
 
       {/* ===== المحتوى =====  */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>

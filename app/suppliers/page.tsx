@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
+import * as XLSX from 'xlsx'; // استيراد مكتبة الإكسيل ✅
+const { data: { user } } = await supabase.auth.getUser();
 
 // ===== تعريف نوع بيانات المورد =====
 interface Supplier {
@@ -74,6 +76,7 @@ export default function SuppliersPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [filterCountry, setFilterCountry] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User";
   const [form, setForm] = useState({
     company_name: '', country: '', city: '',
     contact_name: '', contact_whatsapp: '',
@@ -83,14 +86,56 @@ export default function SuppliersPage() {
   })
 
   // ===== تحميل الموردين =====
-  useEffect(() => { fetchSuppliers() }, [])
+ // 1. استدعاء البيانات عند تحميل الصفحة
+  useEffect(() => { 
+    fetchSuppliers(); 
+  }, []);
+// ===== دالة تصدير البيانات إلى ملف إكسيل =====
+  const exportToExcel = () => {
+    if (filtered.length === 0) return alert("لا توجد بيانات حالية للتصدير");
 
+    const worksheet = XLSX.utils.json_to_sheet(
+      filtered.map((s) => ({
+        "رقم المورد": formatSupNum(s.supplier_number),
+        "اسم الشركة": s.company_name,
+        "الدولة": s.country,
+        "المدينة": s.city,
+        "المنتجات": s.main_products,
+        "واتساب": s.contact_whatsapp,
+        "الإيميل": s.contact_email,
+        "الحالة": s.status === 'active' ? 'نشط' : 'موقوف'
+      }))
+    );
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
+    
+// 3. تكوين اسم الملف الجديد: [اسم المستخدم]_[التاريخ]
+    const dateStr = new Date().toISOString().split('T')[0];
+    const fileName = `${userName}_Suppliers_${dateStr}.xlsx`;    XLSX.writeFile(workbook, fileName);
+  };
+  // 2. دالة جلب بيانات الموردين من Supabase
   async function fetchSuppliers() {
+    setLoading(true); // التأكد من تفعيل حالة التحميل
     try {
-      const { data } = await supabase.from('suppliers').select('*').order('created_at', { ascending: false })
-      setSuppliers(data || [])
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("خطأ في جلب البيانات:", error.message);
+        return;
+      }
+
+      // تحديث الحالة بالبيانات أو مصفوفة فارغة
+      setSuppliers(data || []);
+      
+    } catch (err) {
+      console.error("حدث خطأ غير متوقع:", err);
     } finally {
-      setLoading(false)
+      // إيقاف حالة التحميل في كل الأحوال
+      setLoading(false);
     }
   }
 
@@ -190,9 +235,12 @@ async function addSupplier() {
           <button onClick={() => setShowForm(true)} style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             + إضافة مورد
           </button>
-          <button style={{ background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
-            📤 تصدير
-          </button>
+<button 
+  onClick={exportToExcel} // <--- أضف هذا الجزء هنا
+  style={{ background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}
+>
+  📤 تصدير
+</button>
         </div>
       </div>
       {/* ===== المحتوى القابل للتمرير ===== */}
@@ -472,9 +520,17 @@ async function addSupplier() {
                 { label: 'الإيميل', key: 'contact_email', placeholder: 'email@company.com' },
                 { label: 'حجم المبيعات السنوية', key: 'annual_sales', placeholder: '$10M' },
               ].map(f => (
-                <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>{f.label}</label>
-                  <input type="text" placeholder={f.placeholder} value={(form as any)[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })} style={inp} />
+              <div key={f.key}>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>
+              {f.label}
+              </label>
+                <input 
+                type="text" 
+                placeholder={f.placeholder} 
+                value={(form as any)[f.key] || ''} 
+                onChange={e => setForm({ ...form, [f.key]: e.target.value })} 
+                style={inp} 
+                 />
                 </div>
               ))}
               <div>

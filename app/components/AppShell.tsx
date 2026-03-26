@@ -187,7 +187,7 @@ useEffect(() => {
               {showUserMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 998 }} onClick={() => setShowUserMenu(false)} />
-                  <div style={{ position: 'absolute', top: '45px', left: 15, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
+                  <div style={{ position: 'absolute', top: '56px', left: 15, width: '180px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)', zIndex: 999, padding: '8px 0' }}>
 
 
 <Link href="/profile" style={{ textDecoration: 'none' }}>
