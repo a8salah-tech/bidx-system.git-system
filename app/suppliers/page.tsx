@@ -267,6 +267,22 @@ async function addSupplier() {
 >
   📊 مقارنة أسعار
 </button>
+<button 
+  onClick={() => router.push('#')} // الانتقال لصفحة المقارنة
+  style={{ 
+    background: 'rgba(232, 201, 122, 0.1)', 
+    color: S.gold2, 
+    border: `1px solid ${S.gold}`, 
+    padding: '9px 20px', 
+    borderRadius: '8px', 
+    fontSize: '13px', 
+    fontWeight: 700, 
+    cursor: 'pointer', 
+    fontFamily: 'inherit' 
+  }}
+>
+  ⚖️  سوق الموردين 
+</button>
         </div>
       </div>
       {/* ===== المحتوى القابل للتمرير ===== */}

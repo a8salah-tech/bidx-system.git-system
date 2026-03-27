@@ -135,6 +135,9 @@ const deleteSession = async (id: string) => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
             <div>
               <h1 style={{ color: S.gold, margin: 0, fontSize: '22px', fontWeight: 700 }}> مقارنة أسعار </h1>
+              <div style={{ fontSize: '12px', color: S.muted, fontWeight: 500 }}>
+                يتم إرسال الأسعار المحدثة لكل مورد في صفحته الخاصة بشكل آلي بعد الضغط علي حفظ التقرير
+           </div>
             </div>
             
             <div style={{ display: 'flex', gap: '12px' }}>
@@ -221,7 +224,7 @@ const deleteSession = async (id: string) => {
             </tbody>
           </table>
           <button onClick={saveSession} style={{ width: '100%', padding: '16px', background: S.gold, color: S.navy2, fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: '16px' }}>
-             إرسال تقرير الجلسة للأرشيف 🏛️
+            حفظ التقرير 💾
           </button>
         </div>
 
