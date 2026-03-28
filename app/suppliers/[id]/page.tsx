@@ -66,8 +66,7 @@ const S = {
 }
 
 // ===== مكون جهات التواصل والوثائق =====
-function ContactTab({ supplier, supplierId }: { supplier: any, supplierId: string }) {
-  // 1. حالات إدارة الملفات والرفع
+function ContactTab({ supplier, supplierId, setSupplier }: { supplier: any, supplierId: string, setSupplier: any }) {  // 1. حالات إدارة الملفات والرفع
   const [selectedDoc, setSelectedDoc] = useState<any>(null)
   const [uploading, setUploading] = useState(false)
   const [fileToUpload, setFileToUpload] = useState<File | null>(null)
@@ -1172,7 +1171,7 @@ fetchPriceHistory()
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px', borderBottom: `1px solid ${S.border}44`, paddingBottom: '12px' }}>
     
     {/* الزر جهة اليسار */}
-    <div style={{ fontSize: '13px', fontWeight: 800, color: S.muted, letterSpacing: '0.5px', fontFamily: "'Tajawal', sans-serif" }}>
+    <div style={{ fontSize: '10px', fontWeight: 800, color: S.muted, letterSpacing: '0.5px', fontFamily: "'Tajawal', sans-serif" }}>
       التقرير الإستراتيجي للمورد
     </div>
 <button 
@@ -1186,7 +1185,7 @@ fetchPriceHistory()
         setEditMode2(!editMode2);
       }}
       style={{ 
-        fontSize: '12px', 
+        fontSize: '10px', 
         padding: '6px 16px', 
         borderRadius: '8px', 
         border: `1px solid ${S.gold}66`, 
@@ -1217,7 +1216,7 @@ fetchPriceHistory()
           border: `1px solid ${S.gold}33`, 
           borderRadius: '10px', 
           padding: '12px', 
-          fontSize: '14px', 
+          fontSize: '10px', 
           color: S.white, 
           outline: 'none', 
           fontFamily: "'Tajawal', sans-serif", // توحيد الخط
@@ -1227,7 +1226,7 @@ fetchPriceHistory()
         }}
       />
     ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
         {supplier.notes ? (
           supplier.notes.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => {
             const isCritical = line.trim().startsWith('**');
@@ -1272,7 +1271,7 @@ fetchPriceHistory()
      </div>
         )}
 
-        {tab === 'contact' && <ContactTab supplier={supplier} supplierId={id} />}
+        {tab === 'contact' && <ContactTab supplier={supplier} supplierId={id} setSupplier={setSupplier} />}
         {tab === 'products' && <ProductsTab supplierId={id} mainProducts={supplier.main_products} />}
 
         {tab === 'trading' && (
