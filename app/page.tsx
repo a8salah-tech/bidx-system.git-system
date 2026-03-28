@@ -95,7 +95,7 @@ export default function Home() {
 
       {/* ── Topbar ── */}
       <div className={styles.shimmerBar} style={{ position: 'relative', zIndex: 10, textAlign: 'center', padding: '9px 16px', fontSize: 13.5, fontWeight: 600, color: C.navy }}>
-        🎉 <strong>عرض الإطلاق:</strong> أول ٩٠ يوماً مجاناً للشركات و المؤسسات—{' '}
+        🎉 <strong>عرض الإطلاق:</strong> كن جزءاً من مستقبل التجارة الذكية: انضم لنخبة الموردين و الشركات بضغطة زر-{' '}
         <Link href="/login" style={{ color: C.navy, fontWeight: 800, textDecoration: 'underline' }}>سجّل الآن ←</Link>
       </div>
 

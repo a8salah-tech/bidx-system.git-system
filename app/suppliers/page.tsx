@@ -1,11 +1,9 @@
 'use client'
 
-// ===== الاستيرادات الأساسية =====
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
-import * as XLSX from 'xlsx'; // استيراد مكتبة الإكسيل ✅
-const { data: { user } } = await supabase.auth.getUser();
+import * as XLSX from 'xlsx'
 
 // ===== تعريف نوع بيانات المورد =====
 interface Supplier {
@@ -31,7 +29,6 @@ interface Supplier {
   website: string
 }
 
-// ===== دالة حساب الوقت المنقضي =====
 function timeAgo(date: string) {
   if (!date) return null
   const diff = Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
@@ -42,12 +39,10 @@ function timeAgo(date: string) {
   return `منذ ${Math.floor(diff / 30)} أشهر`
 }
 
-// ===== دالة تنسيق رقم المورد =====
 function formatSupNum(n: number) {
   return `SUP-${String(n).padStart(5, '0')}`
 }
 
-// ===== الألوان العامة =====
 const S = {
   navy: '#0A1628',
   navy2: '#0F2040',
@@ -67,7 +62,8 @@ const S = {
 export default function SuppliersPage() {
   const router = useRouter()
 
-  // ===== الـ State =====
+  const [currentPage, setCurrentPage] = useState(1)
+  const rowsPerPage = 20
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -76,102 +72,78 @@ export default function SuppliersPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [filterCountry, setFilterCountry] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "User";
+  const [userName, setUserName] = useState('User')
   const [form, setForm] = useState({
     company_name: '', country: '', city: '',
     contact_name: '', contact_whatsapp: '',
     contact_email: '', annual_sales: '',
     main_products: '', notes: '',
-    
+    website: '',
   })
 
-  // ===== تحميل الموردين =====
- // 1. استدعاء البيانات عند تحميل الصفحة
-  useEffect(() => { 
-    fetchSuppliers(); 
-  }, []);
-// ===== دالة تصدير البيانات إلى ملف إكسيل =====
-  const exportToExcel = () => {
-    if (filtered.length === 0) return alert("لا توجد بيانات حالية للتصدير");
+  // ===== تحميل البيانات عند فتح الصفحة =====
+  useEffect(() => {
+    fetchSuppliers()
+    // جلب اسم المستخدم
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User')
+      }
+    })
+  }, [])
 
-    const worksheet = XLSX.utils.json_to_sheet(
-      filtered.map((s) => ({
-        "رقم المورد": formatSupNum(s.supplier_number),
-        "اسم الشركة": s.company_name,
-        "الدولة": s.country,
-        "المدينة": s.city,
-        "المنتجات": s.main_products,
-        "واتساب": s.contact_whatsapp,
-        "الإيميل": s.contact_email,
-        "الحالة": s.status === 'active' ? 'نشط' : 'موقوف'
-      }))
-    );
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
-    
-// 3. تكوين اسم الملف الجديد: [اسم المستخدم]_[التاريخ]
-    const dateStr = new Date().toISOString().split('T')[0];
-    const fileName = `${userName}_Suppliers_${dateStr}.xlsx`;    XLSX.writeFile(workbook, fileName);
-  };
-  // 2. دالة جلب بيانات الموردين من Supabase
+  // ===== جلب الموردين =====
   async function fetchSuppliers() {
-    setLoading(true); // التأكد من تفعيل حالة التحميل
+    setLoading(true)
     try {
       const { data, error } = await supabase
         .from('suppliers')
         .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("خطأ في جلب البيانات:", error.message);
-        return;
-      }
-
-      // تحديث الحالة بالبيانات أو مصفوفة فارغة
-      setSuppliers(data || []);
-      
+        .order('created_at', { ascending: false })
+      if (error) { console.error('خطأ:', error.message); return }
+      setSuppliers(data || [])
     } catch (err) {
-      console.error("حدث خطأ غير متوقع:", err);
+      console.error('خطأ غير متوقع:', err)
     } finally {
-      // إيقاف حالة التحميل في كل الأحوال
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  // ===== إضافة مورد جديد =====
-async function addSupplier() {
+  // ===== تصدير إكسيل =====
+  const exportToExcel = () => {
+    if (filtered.length === 0) return alert('لا توجد بيانات للتصدير')
+    const worksheet = XLSX.utils.json_to_sheet(
+      filtered.map(s => ({
+        'رقم المورد': formatSupNum(s.supplier_number),
+        'اسم الشركة': s.company_name,
+        'الدولة': s.country,
+        'المدينة': s.city,
+        'المنتجات': s.main_products,
+        'واتساب': s.contact_whatsapp,
+        'الإيميل': s.contact_email,
+        'الحالة': s.status === 'active' ? 'نشط' : 'موقوف',
+      }))
+    )
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Suppliers')
+    const dateStr = new Date().toISOString().split('T')[0]
+    XLSX.writeFile(workbook, `${userName}_Suppliers_${dateStr}.xlsx`)
+  }
+
+  // ===== إضافة مورد =====
+  async function addSupplier() {
     if (!form.company_name) { alert('يرجى إدخال اسم الشركة'); return }
-
-    // 1. جلب بيانات المستخدم المسجل دخوله حالياً من الجلسة (Session)
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    // التأكد من وجود مستخدم لتجنب أي خطأ برمجبي
-    if (userError || !user) {
-      alert('جلسة الدخول انتهت، يرجى تسجيل الدخول مرة أخرى');
-      return;
-    }
-
-    // 2. إرسال البيانات مع إضافة الـ user_id "إجبارياً" لفك حظر الـ RLS
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) { alert('جلسة الدخول انتهت'); return }
     const { error } = await supabase.from('suppliers').insert([{
-      ...form, 
-      status: 'active', 
-      rating: 0, 
+      ...form,
+      status: 'active',
+      rating: 0,
       completion_pct: calcCompletion(form),
-      user_id: user.id // <--- هذا هو المفتاح الذي يربط المورد بحسابك
+      user_id: user.id,
     }])
-
-    if (error) { 
-      alert('خطأ في قاعدة البيانات: ' + error.message); 
-      return 
-    }
-
-    // إعادة تعيين الفورمة وإغلاقها
-    setForm({ 
-      company_name: '', country: '', city: '', contact_name: '', 
-      contact_whatsapp: '', contact_email: '', annual_sales: '', 
-      main_products: '', notes: '' 
-    })
+    if (error) { alert('خطأ: ' + error.message); return }
+    setForm({ company_name: '', country: '', city: '', contact_name: '', contact_whatsapp: '', contact_email: '', annual_sales: '', main_products: '', notes: '', website: '' })
     setShowForm(false)
     fetchSuppliers()
   }
@@ -182,28 +154,28 @@ async function addSupplier() {
     fetchSuppliers()
   }
 
-  // ===== تعبئة البيانات بالذكاء الاصطناعي =====
- async function fillWithAI() {
+  // ===== تعبئة بالذكاء الاصطناعي =====
+  async function fillWithAI() {
     if (!form.company_name) { alert('اكتب اسم الشركة أولاً'); return }
     setAiLoading(true)
     try {
-      // بنكلم السيرفر بتاعنا مش OpenRouter مباشرة
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_name: form.company_name })
+        body: JSON.stringify({ company_name: form.company_name }),
       })
       const data = await res.json()
       const text = data?.choices?.[0]?.message?.content || '{}'
       const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
       setForm(prev => ({ ...prev, ...parsed }))
-    } catch { 
-      alert('تعذر الاتصال بالذكاء الاصطناعي') 
-    } finally { 
-      setAiLoading(false) 
+    } catch {
+      alert('تعذر الاتصال بالذكاء الاصطناعي')
+    } finally {
+      setAiLoading(false)
     }
   }
-  // ===== حساب نسبة اكتمال الملف =====
+
+  // ===== حساب اكتمال الملف =====
   function calcCompletion(f: any) {
     const fields = ['company_name', 'country', 'city', 'contact_name', 'contact_whatsapp', 'contact_email', 'annual_sales', 'main_products', 'notes']
     return Math.round(fields.filter(k => f[k]?.trim()).length / fields.length * 100)
@@ -215,80 +187,50 @@ async function addSupplier() {
     .filter(s => s.company_name?.toLowerCase().includes(search.toLowerCase()))
     .filter(s => filterCountry ? s.country === filterCountry : true)
 
+  // ===== Pagination =====
+  const totalPages = Math.ceil(filtered.length / rowsPerPage)
+  const paginatedData = filtered.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  )
+
   const initials = (name: string) => name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??'
 
   const inp: React.CSSProperties = {
     width: '100%', background: S.navy, border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: S.white,
-    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box'
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
   }
 
   return (
-    // ===== المحتوى الرئيسي فقط بدون sidebar أو header =====
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* ===== شريط الأدوات العلوي =====  */}
+      {/* شريط الأدوات */}
       <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-
-        {/* الأزرار على اليمين */}
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => setShowForm(true)} style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={() => setShowForm(true)}
+            style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             + إضافة مورد
           </button>
-<button 
-  onClick={exportToExcel} 
-  style={{ 
-    background: 'rgba(232, 201, 122, 0.1)', 
-    color: S.gold2, 
-    border: `1px solid ${S.gold}`, 
-    padding: '9px 20px', 
-    borderRadius: '8px', 
-    fontSize: '13px', 
-    fontWeight: 700, 
-    cursor: 'pointer', 
-    fontFamily: 'inherit' 
-  }}
->
-  📤 تصدير
-</button>
-<button 
-  onClick={() => router.push('/pricing/compare')} // الانتقال لصفحة المقارنة
-  style={{ 
-    background: 'rgba(232, 201, 122, 0.1)', 
-    color: S.gold2, 
-    border: `1px solid ${S.gold}`, 
-    padding: '9px 20px', 
-    borderRadius: '8px', 
-    fontSize: '13px', 
-    fontWeight: 700, 
-    cursor: 'pointer', 
-    fontFamily: 'inherit' 
-  }}
->
-  📊 مقارنة أسعار
-</button>
-<button 
-  onClick={() => router.push('#')} // الانتقال لصفحة المقارنة
-  style={{ 
-    background: 'rgba(232, 201, 122, 0.1)', 
-    color: S.gold2, 
-    border: `1px solid ${S.gold}`, 
-    padding: '9px 20px', 
-    borderRadius: '8px', 
-    fontSize: '13px', 
-    fontWeight: 700, 
-    cursor: 'pointer', 
-    fontFamily: 'inherit' 
-  }}
->
-  ⚖️  سوق الموردين 
-</button>
+          <button onClick={exportToExcel}
+            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            📤 تصدير
+          </button>
+          <button onClick={() => router.push('/pricing/compare')}
+            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            📊 مقارنة أسعار
+          </button>
+          <button onClick={() => router.push('#')}
+            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            ⚖️ سوق الموردين
+          </button>
         </div>
       </div>
-      {/* ===== المحتوى القابل للتمرير ===== */}
+
+      {/* المحتوى القابل للتمرير */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
-        {/* ===== الإحصائيات السريعة ===== */}
+        {/* الإحصائيات */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
           {[
             { label: 'إجمالي الموردين', val: suppliers.length, color: S.gold },
@@ -303,15 +245,14 @@ async function addSupplier() {
           ))}
         </div>
 
-        {/* ===== شريط البحث والفلاتر ===== */}
+        {/* شريط البحث والفلاتر */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-
-          {/* البحث */}
-          <input type="text" placeholder="🔍  ابحث عن مورد..." value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="🔍  ابحث عن مورد..." value={search}
+            onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
             style={{ ...inp, flex: 1, background: S.navy2, borderRadius: '10px', padding: '10px 16px', minWidth: '200px' }} />
 
-          {/* فلتر الدولة */}
-          <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)}
+          <select value={filterCountry}
+            onChange={e => { setFilterCountry(e.target.value); setCurrentPage(1) }}
             style={{ background: S.navy2, color: filterCountry ? S.white : S.muted, border: `1px solid ${S.border}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12px', outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
             <option value="">كل الدول</option>
             {[...new Set(suppliers.map(s => s.country).filter(Boolean))].map(c => (
@@ -319,25 +260,22 @@ async function addSupplier() {
             ))}
           </select>
 
-          {/* تبديل العرض */}
           <button onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
             style={{ background: S.navy2, color: S.muted, border: `1px solid ${S.border}`, padding: '10px 14px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
             {viewMode === 'table' ? '⊞ بطاقات' : '☰ جدول'}
           </button>
 
-          {/* تبويب نشطون/موقوفون */}
           <div style={{ display: 'flex', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '10px', overflow: 'hidden' }}>
             {[{ key: 'active', label: 'نشطون' }, { key: 'suspended', label: 'موقوفون' }].map(t => (
-              <button key={t.key} onClick={() => setTab(t.key as any)}
+              <button key={t.key} onClick={() => { setTab(t.key as any); setCurrentPage(1) }}
                 style={{ padding: '9px 20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: tab === t.key ? (t.key === 'active' ? S.green : S.red) : 'transparent', color: tab === t.key ? '#fff' : S.muted, transition: 'all 0.15s' }}>
                 {t.label}
               </button>
             ))}
           </div>
-
         </div>
 
-        {/* ===== عرض البطاقات ===== */}
+        {/* عرض البطاقات */}
         {viewMode === 'cards' && !loading && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px', marginBottom: '12px' }}>
             {filtered.length === 0 ? (
@@ -385,7 +323,7 @@ async function addSupplier() {
           </div>
         )}
 
-        {/* ===== عرض الجدول ===== */}
+        {/* عرض الجدول */}
         {viewMode === 'table' && (
           <>
             {loading ? (
@@ -406,7 +344,7 @@ async function addSupplier() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((s, i) => (
+                    {paginatedData.map((s, i) => (
                       <tr key={s.id}
                         style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)', cursor: 'pointer' }}
                         onClick={() => router.push(`/suppliers/${s.id}`)}>
@@ -465,7 +403,6 @@ async function addSupplier() {
                           </span>
                         </td>
 
-                        {/* تواصل سريع */}
                         <td style={{ padding: '12px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             {s.contact_whatsapp && (
@@ -502,35 +439,71 @@ async function addSupplier() {
                           </div>
                         </td>
 
-                        {/* إجراء */}
-                        {/* إجراء */}
-<td style={{ padding: '12px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-    {/* زر حذف — يظهر فقط للموقوفين */}
-    {s.status === 'suspended' && (
-      <button
-        onClick={async () => {
-          const confirmed = window.confirm(`هل تريد حذف المورد "${s.company_name}" نهائياً؟\n\nهذا الإجراء لا يمكن التراجع عنه.`)
-          if (!confirmed) return
-          await supabase.from('suppliers').delete().eq('id', s.id)
-          fetchSuppliers()
-        }}
-        style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: S.red, fontSize: '14px', fontWeight: 700 }}
-        title="حذف المورد نهائياً"
-      >✕</button>
-    )}
-    {/* زر إيقاف/تفعيل */}
-    <button onClick={() => toggleStatus(s.id, s.status)}
-      style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: `1px solid rgba(255,255,255,0.15)`, background: 'transparent', color: s.status === 'active' ? S.red : S.green, cursor: 'pointer', fontFamily: 'inherit' }}>
-      {s.status === 'active' ? 'إيقاف' : 'تفعيل'}
-    </button>
-  </div>
-</td>
+                        <td style={{ padding: '12px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
+                            {s.status === 'suspended' && (
+                              <button
+                                onClick={async () => {
+                                  if (!window.confirm(`هل تريد حذف "${s.company_name}" نهائياً؟`)) return
+                                  await supabase.from('suppliers').delete().eq('id', s.id)
+                                  fetchSuppliers()
+                                }}
+                                style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: S.red, fontSize: '14px', fontWeight: 700 }}>
+                                ✕
+                              </button>
+                            )}
+                            <button onClick={() => toggleStatus(s.id, s.status)}
+                              style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: `1px solid rgba(255,255,255,0.15)`, background: 'transparent', color: s.status === 'active' ? S.red : S.green, cursor: 'pointer', fontFamily: 'inherit' }}>
+                              {s.status === 'active' ? 'إيقاف' : 'تفعيل'}
+                            </button>
+                          </div>
+                        </td>
 
                       </tr>
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination Bar */}
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderTop: `1px solid ${S.border}`, background: S.navy2 }}>
+                    <div style={{ fontSize: '12px', color: S.muted }}>
+                      عرض {(currentPage - 1) * rowsPerPage + 1} – {Math.min(currentPage * rowsPerPage, filtered.length)} من {filtered.length} مورد
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        style={{ padding: '6px 14px', borderRadius: '7px', border: `1px solid ${S.border}`, background: 'transparent', color: currentPage === 1 ? S.muted : S.white, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
+                      → السابق   
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                          if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...')
+                          acc.push(p)
+                          return acc
+                        }, [])
+                        .map((p, idx) => p === '...' ? (
+                          <span key={`dots-${idx}`} style={{ color: S.muted, fontSize: '12px', padding: '0 4px' }}>...</span>
+                        ) : (
+                          <button key={p}
+                            onClick={() => setCurrentPage(p as number)}
+                            style={{ width: '32px', height: '32px', borderRadius: '7px', border: `1px solid ${currentPage === p ? S.gold : S.border}`, background: currentPage === p ? S.gold3 : 'transparent', color: currentPage === p ? S.gold : S.muted, cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: currentPage === p ? 700 : 400 }}>
+                            {p}
+                          </button>
+                        ))
+                      }
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        style={{ padding: '6px 14px', borderRadius: '7px', border: `1px solid ${S.border}`, background: 'transparent', color: currentPage === totalPages ? S.muted : S.white, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
+                       ← التالي 
+                      </button>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </>
@@ -538,7 +511,7 @@ async function addSupplier() {
 
       </div>
 
-      {/* ===== MODAL إضافة مورد جديد ===== */}
+      {/* Modal إضافة مورد */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '16px' }}>
           <div style={{ background: S.navy2, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -562,22 +535,17 @@ async function addSupplier() {
                 { label: 'الإيميل', key: 'contact_email', placeholder: 'email@company.com' },
                 { label: 'حجم المبيعات السنوية', key: 'annual_sales', placeholder: '$10M' },
               ].map(f => (
-              <div key={f.key}>
-              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>
-              {f.label}
-              </label>
-                <input 
-                type="text" 
-                placeholder={f.placeholder} 
-                value={(form as any)[f.key] || ''} 
-                onChange={e => setForm({ ...form, [f.key]: e.target.value })} 
-                style={inp} 
-                 />
+                <div key={f.key}>
+                  <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>{f.label}</label>
+                  <input type="text" placeholder={f.placeholder} value={(form as any)[f.key] || ''}
+                    onChange={e => setForm({ ...form, [f.key]: e.target.value })} style={inp} />
                 </div>
               ))}
               <div>
                 <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>ملاحظات</label>
-                <textarea placeholder="نبذة عن المورد..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} style={{ ...inp, resize: 'none' }} />
+                <textarea placeholder="نبذة عن المورد..." value={form.notes}
+                  onChange={e => setForm({ ...form, notes: e.target.value })} rows={3}
+                  style={{ ...inp, resize: 'none' } as React.CSSProperties} />
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
