@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import AppShell from "../../components/AppShell"
 
 const tajawalFont = `'Tajawal', sans-serif`;
-
 const S = {
   gold:    '#C9A84C',
   gold2:   '#E8C97A',
@@ -19,6 +18,7 @@ const S = {
 };
 
 export default function BridgeEdgePricingRadar() {
+  const [saving,setSaving] = useState(false)
   const [allSuppliers, setAllSuppliers] = useState<any[]>([])
   const [availableProducts, setAvailableProducts] = useState<string[]>([])
   const [history, setHistory] = useState<any[]>([])
@@ -81,46 +81,92 @@ const deleteSession = async (id: string) => {
     ? allSuppliers.filter(s => s.main_products?.toLowerCase().includes(selectedProduct.toLowerCase()))
     : allSuppliers;
 
-  const saveSession = async () => {
-    try {
-      if (!selectedProduct) return alert('يرجى تحديد المنتج أولاً')
-      
-      const acceptedRow = rows.find(r => r.status === 'مقبول')
-      if (!acceptedRow || !acceptedRow.price) return alert('يرجى اختيار مورد مقبول وإدخال سعره')
+const saveSession = async () => {
 
-      // دمج الملاحظات مع ملخص المرفوضين لحفظها في قاعدة البيانات
-      const rejectedSummary = rows
-        .filter(r => r.supplierId && r.supplierId !== '')
-        .map(r => {
-          const name = allSuppliers.find(s => s.id === r.supplierId)?.company_name || 'مورد'
-          const noteText = r.notes ? ` (${r.notes})` : ''
-          return `${name}: ${r.price}${noteText} [${r.status}]`
-        }).join(' | ')
+if(saving) return
 
-      const payload = {
-        product_name: selectedProduct,
-        min_price: Number(minPrice),
-        avg_price: Number(avgPrice),
-        max_price: Number(maxPrice),
-        accepted_supplier: allSuppliers.find(s => s.id === acceptedRow.supplierId)?.company_name || 'مورد معتمد',
-        accepted_price: Number(acceptedRow.price),
-        rejected_summary: rejectedSummary
-      }
+try{
 
-      const { error } = await supabase.from('pricing_sessions').insert([payload])
-      
-      if (error) {
-        alert(`فشل الإرسال: ${error.message}`)
-      } else {
-        alert('تم اعتماد الجلسة وحفظ الملاحظات بنجاح ✅')
-        fetchHistory()
-        setRows(Array(5).fill({ supplierId: '', price: '', status: 'انتظار', notes: '' }))
-        setSelectedProduct('')
-      }
-    } catch (err: any) {
-      alert(`خطأ: ${err.message}`)
+setSaving(true)
+
+if (!selectedProduct) {
+  setSaving(false)
+  return alert('يرجى تحديد المنتج أولاً')
+}
+    const acceptedRow = rows.find(r => r.status === 'مقبول')
+  if (!acceptedRow || !acceptedRow.price){
+  setSaving(false)
+  return alert('يرجى اختيار مورد مقبول وإدخال سعره')
+}
+    const rejectedSummary = rows
+      .filter(r => r.supplierId && r.supplierId !== '')
+      .map(r => {
+        const name = allSuppliers.find(s => s.id === r.supplierId)?.company_name || 'مورد'
+        const noteText = r.notes ? ` (${r.notes})` : ''
+        return `${name}: ${r.price}${noteText} [${r.status}]`
+      }).join(' | ')
+
+    const payload = {
+      product_name: selectedProduct,
+      min_price: Number(minPrice),
+      avg_price: Number(avgPrice),
+      max_price: Number(maxPrice),
+      accepted_supplier: allSuppliers.find(s => s.id === acceptedRow.supplierId)?.company_name || 'مورد معتمد',
+      accepted_price: Number(acceptedRow.price),
+      rejected_summary: rejectedSummary
     }
-  }
+
+    const { error } = await supabase
+      .from('pricing_sessions')
+      .insert([payload])
+
+    if (error) {
+      alert(`فشل الإرسال: ${error.message}`)
+      return
+    }
+
+    /* ⭐ الجزء الجديد */
+const historyPayload = rows
+.filter(r => r.supplierId && r.price)
+.map(r => ({
+  supplier_id: r.supplierId,
+  product_name: selectedProduct,
+  price: Number(r.price),
+  status: r.status,
+  notes: r.notes || null
+}))
+
+   if (historyPayload.length > 0) {
+
+  console.log("historyPayload", historyPayload)
+      await supabase
+        .from('supplier_prices_history')
+        .insert(historyPayload)
+    }
+
+    alert('تم اعتماد الجلسة وحفظ الملاحظات بنجاح ✅')
+
+    fetchHistory()
+
+    setRows(Array(5).fill({
+      supplierId: '',
+      price: '',
+      status: 'انتظار',
+      notes: ''
+    }))
+
+    setSelectedProduct('')
+
+}catch(err:any){
+
+alert(`خطأ: ${err.message}`)
+
+}finally{
+
+setSaving(false)
+
+}
+}
 
   return (
     <AppShell>
@@ -223,9 +269,23 @@ const deleteSession = async (id: string) => {
               ))}
             </tbody>
           </table>
-          <button onClick={saveSession} style={{ width: '100%', padding: '16px', background: S.gold, color: S.navy2, fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: '16px' }}>
-            حفظ التقرير 💾
-          </button>
+<button
+  onClick={saveSession}
+  disabled={saving}
+  style={{
+    width:'100%',
+    padding:'16px',
+    background:saving ? S.muted : S.gold,
+    color:S.navy2,
+    fontWeight:800,
+    border:'none',
+    cursor:saving ? 'not-allowed':'pointer',
+    fontSize:'16px'
+  }}
+>
+  {saving ? 'جارٍ الحفظ...' : 'حفظ التقرير 💾'}
+</button>
+
         </div>
 
         <h3 style={{ color: S.gold, marginBottom: '15px', fontSize: '18px' }}>📜 سجل العمليات</h3>
@@ -293,9 +353,7 @@ const deleteSession = async (id: string) => {
     </AppShell>
   )
 }
-const deleteSession = async (id: string) => {
 
-  };
 function StatCard({ label, value, color }: any) {
   return (
     <div style={{ background: S.navy2, padding: '10px 18px', borderRadius: '12px', border: `1px solid ${S.borderG}`, textAlign: 'center', minWidth: '100px' }}>

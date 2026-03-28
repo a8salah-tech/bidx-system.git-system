@@ -688,7 +688,7 @@ const [docDetails, setDocDetails] = useState<{ type: string; exp: string; custom
 }
 
 // ===== مكون التقييم =====
-function RatingTab({ supplier, supplierId }: { supplier: any, supplierId: string }) {
+function RatingTab({ supplier, supplierId, priceHistory }: { supplier: any, supplierId: string, priceHistory: any[] }) {
   const [ratings, setRatings] = useState({ quality: 0, delivery: 0, communication: 0, price: 0, flexibility: 0 })
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -825,7 +825,6 @@ function RatingTab({ supplier, supplierId }: { supplier: any, supplierId: string
     </div>
   )
 }
-
 // ===== مكون المنتجات =====
 function ProductsTab({ supplierId, mainProducts }: { supplierId: string, mainProducts: string }) {
   const [products, setProducts] = useState<any[]>(
@@ -892,6 +891,7 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
   const { id } = use(params)
   const router = useRouter()
   const [supplier, setSupplier] = useState<Supplier | null>(null)
+  const [priceHistory, setPriceHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [aiAnalysis, setAiAnalysis] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -906,7 +906,19 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
   const [editData2, setEditData2] = useState({ main_products: '', notes: '' })
 
   useEffect(() => {
-    sessionStorage.removeItem('activeTab')
+    async function fetchPriceHistory(){
+
+const { data } = await supabase
+.from('supplier_prices_history')
+.select('*')
+.eq('supplier_id', id)
+.order('created_at',{ascending:false})
+
+setPriceHistory(data || [])
+
+}
+
+fetchPriceHistory()
     async function fetchSupplier() {
       const { data } = await supabase.from('suppliers').select('*').eq('id', id).single()
       setSupplier(data)
@@ -1066,13 +1078,13 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>معلومات الشركة</div>
                 <button onClick={async () => {
                   if (editMode) { await supabase.from('suppliers').update(editData).eq('id', id); window.location.reload() }
                   setEditMode(!editMode)
                 }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editMode ? S.gold : 'transparent', color: editMode ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
                   {editMode ? 'حفظ' : 'تعديل'}
                 </button>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>معلومات الشركة</div>
               </div>
               {[
                 { label: 'الاسم الرسمي', key: 'company_name' },
@@ -1104,63 +1116,160 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
                 <div style={{ fontSize: '13px', fontWeight: 500 }}>{new Date(supplier.created_at).toLocaleDateString('ar-EG')}</div>
               </div>
             </div>
-
+{/* بداية قسم جلب عروض الاسعار*/} 
+   
             <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <button onClick={async () => {
-                  if (editMode2) { await supabase.from('suppliers').update({ main_products: editData2.main_products, notes: editData2.notes }).eq('id', id); window.location.reload() }
-                  else { setEditData2({ main_products: supplier.main_products || '', notes: supplier.notes || '' }) }
-                  setEditMode2(!editMode2)
-                }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editMode2 ? S.gold : 'transparent', color: editMode2 ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-                  {editMode2 ? 'حفظ' : 'تعديل'}
-                </button>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>المنتجات الأكثر طلباً</div>
+  {/* الهيدر الجديد للقسم */}
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+    <div style={{ fontSize: '10px', color: S.gold, background: 'rgba(201,168,76,0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>تحديث تلقائي</div>
+    <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>سجل عروض الأسعار (من المقارنات)</div>
+  </div>
+
+  {/* جدول عرض الأسعار */}
+  <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', direction: 'rtl', textAlign: 'right' }}>
+      <thead>
+        <tr style={{ borderBottom: `1px solid ${S.border}`, color: S.muted, fontSize: '11px' }}>
+          <th style={{ padding: '8px' }}>المنتج</th>
+          <th style={{ padding: '8px' }}>السعر</th>
+          <th style={{ padding: '8px' }}>الحالة</th>
+          <th style={{ padding: '8px' }}>التاريخ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {priceHistory && priceHistory.length > 0 ? (
+          priceHistory.map((item, index) => (
+            <tr key={index} style={{ borderBottom: `1px solid ${S.border}44`, fontSize: '12px' }}>
+              <td style={{ padding: '10px', color: S.white }}>{item.product_name}</td>
+              <td style={{ padding: '10px', fontWeight: 700, color: S.gold }}>${item.price?.toLocaleString()}</td>
+              <td style={{ padding: '10px' }}>
+                <span style={{ 
+                  padding: '2px 8px', borderRadius: '4px', fontSize: '10px',
+                  background: item.status === 'مقبول' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                  color: item.status === 'مقبول' ? S.green : S.red 
+                }}>
+                  {item.status}
+                </span>
+              </td>
+              <td style={{ padding: '10px', color: S.muted, fontSize: '11px' }}>
+                {new Date(item.created_at).toLocaleDateString('ar-EG')}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: S.muted, fontSize: '12px' }}>
+              لا توجد عروض أسعار مسجلة لهذا المورد حتى الآن.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+<div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '18px', marginTop: '20px', fontFamily: "'Tajawal', sans-serif" }}>
+  
+  {/* الهيدر: العنوان يميناً والزر يساراً */}
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px', borderBottom: `1px solid ${S.border}44`, paddingBottom: '12px' }}>
+    
+    {/* الزر جهة اليسار */}
+    <div style={{ fontSize: '13px', fontWeight: 800, color: S.muted, letterSpacing: '0.5px', fontFamily: "'Tajawal', sans-serif" }}>
+      التقرير الإستراتيجي للمورد
+    </div>
+<button 
+      onClick={async () => {
+        if (editMode2) {
+          const { error } = await supabase.from('suppliers').update({ notes: editData2.notes }).eq('id', id);
+          if (!error) setSupplier({ ...supplier, notes: editData2.notes });
+        } else {
+          setEditData2({ ...editData2, notes: supplier.notes || '' });
+        }
+        setEditMode2(!editMode2);
+      }}
+      style={{ 
+        fontSize: '12px', 
+        padding: '6px 16px', 
+        borderRadius: '8px', 
+        border: `1px solid ${S.gold}66`, 
+        background: editMode2 ? S.gold : 'transparent', 
+        color: editMode2 ? S.navy : S.gold, 
+        cursor: 'pointer', 
+        fontWeight: 700,
+        fontFamily: "'Tajawal', sans-serif", // توحيد الخط
+        transition: 'all 0.3s ease'
+      }}
+    >
+      {editMode2 ? 'حفظ التقرير' : 'تعديل / إضافة'}
+    </button>
+
+  </div>
+
+  {/* محتوى التقرير */}
+  <div style={{ marginTop: '10px' }}>
+    {editMode2 ? (
+      <textarea 
+        value={editData2.notes} 
+        onChange={(e) => setEditData2({ ...editData2, notes: e.target.value })}
+        placeholder="اكتب ملاحظاتك هنا... استخدم ** لتمييز النقاط الهامة"
+        rows={5}
+        style={{ 
+          width: '100%', 
+          background: S.navy2, 
+          border: `1px solid ${S.gold}33`, 
+          borderRadius: '10px', 
+          padding: '12px', 
+          fontSize: '14px', 
+          color: S.white, 
+          outline: 'none', 
+          fontFamily: "'Tajawal', sans-serif", // توحيد الخط
+          textAlign: 'right', 
+          lineHeight: '1.6',
+          resize: 'none' 
+        }}
+      />
+    ) : (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {supplier.notes ? (
+          supplier.notes.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => {
+            const isCritical = line.trim().startsWith('**');
+            const cleanText = line.replace(/\*\*/g, '').trim();
+
+            return (
+              <div key={i} style={{ 
+                padding: isCritical ? '12px 15px' : '4px 0',
+                background: isCritical ? 'rgba(201, 168, 76, 0.07)' : 'transparent',
+                borderRight: isCritical ? `4px solid ${S.gold}` : 'none',
+                borderRadius: '8px'
+              }}>
+                <div style={{ 
+                  fontSize: isCritical ? '14px' : '13px', 
+                  fontWeight: isCritical ? 700 : 400, 
+                  color: isCritical ? S.gold : S.white,
+                  lineHeight: '1.8',
+                  textAlign: 'right',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  fontFamily: "'Tajawal', sans-serif" // توحيد الخط
+                }}>
+                  {isCritical && <span style={{ fontSize: '15px' }}>📌</span>}
+                  <span style={{ flex: 1 }}>{cleanText}</span>
+                </div>
               </div>
-
-              {editMode2 && (
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                    <button onClick={() => {
-                      const input = document.getElementById('newProductInput') as HTMLInputElement
-                      if (!input?.value.trim()) return
-                      const updated = [...(editData2.main_products ? editData2.main_products.split('،').map(p => p.trim()).filter(Boolean) : []), input.value.trim()]
-                      setEditData2({ ...editData2, main_products: updated.join('، ') })
-                      input.value = ''
-                    }} style={{ background: S.gold, color: S.navy, border: 'none', padding: '7px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>+ إضافة</button>
-                    <input id="newProductInput" type="text" placeholder="اسم المنتج..."
-                      style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '7px', padding: '7px 10px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right' }} />
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' }}>
-                    {(editData2.main_products ? editData2.main_products.split('،').map(p => p.trim()).filter(Boolean) : []).map((p, i) => (
-                      <span key={i} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <button onClick={() => { const updated = editData2.main_products.split('،').map(x => x.trim()).filter(x => x !== p); setEditData2({ ...editData2, main_products: updated.join('، ') }) }}
-                          style={{ background: 'none', border: 'none', color: S.red, cursor: 'pointer', fontSize: '11px', padding: 0 }}>✕</button>
-                        {p}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!editMode2 && supplier.main_products ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end', marginBottom: '16px' }}>
-                  {supplier.main_products.split('،').map((p, i) => (
-                    <span key={i} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 500 }}>{p.trim()}</span>
-                  ))}
-                </div>
-              ) : !editMode2 && (
-                <div style={{ color: S.muted, fontSize: '12px', textAlign: 'right', marginBottom: '16px' }}>لم تُضف منتجات بعد</div>
-              )}
-
-              <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '10px', textAlign: 'right' }}>ملاحظات</div>
-              {editMode2 ? (
-                <textarea value={editData2.notes} onChange={e => setEditData2({ ...editData2, notes: e.target.value })} placeholder="ملاحظات..." rows={3}
-                  style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any, resize: 'none' }} />
-              ) : (
-                <div style={{ fontSize: '13px', lineHeight: '1.8', color: S.white, textAlign: 'right' }}>{supplier.notes || 'لا توجد ملاحظات بعد'}</div>
-              )}
-            </div>
+            );
+          })
+        ) : (
+          <div style={{ color: S.muted, fontSize: '13px', textAlign: 'center', padding: '25px', fontFamily: "'Tajawal', sans-serif" }}>
+            لا توجد بيانات في التقرير حالياً. اضغط تعديل للبدء.
           </div>
+        )}
+      </div>
+    )}
+  </div>
+</div>
+</div>
+
+{/* نهاية قسم جلب عروض الاسعار*/}     
+     </div>
         )}
 
         {tab === 'contact' && <ContactTab supplier={supplier} supplierId={id} />}
@@ -1215,8 +1324,13 @@ export default function SupplierDetail({ params }: { params: Promise<{ id: strin
         )}
 
         {tab === 'docs' && <DocsTab supplierId={id} />}
-        {tab === 'rating' && <RatingTab supplier={supplier} supplierId={id} />}
-
+{tab === 'rating' && (
+  <RatingTab 
+    supplier={supplier} 
+    supplierId={id} 
+    priceHistory={priceHistory} 
+  />
+)}
       </div>
 
       {/* AI Modal */}
