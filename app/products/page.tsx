@@ -4,7 +4,26 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx'
+import {
+  PRODUCT_CATEGORIES,
+  CURRENCIES,
+  COUNTRIES,
+  PRODUCT_UNITS,
+} from '../components/options'
+
+// ===== تحويل كود الدولة أو قيمتها لاسمها الكامل =====
+function getCountryLabel(val: string) {
+  if (!val) return '—'
+  const found = COUNTRIES.find(c =>
+    c.id === val ||
+    c.value === val ||
+    c.label === val ||
+    c.label.includes(val) ||
+    val.includes(c.value)
+  )
+  return found?.label || val
+}
 
 // ===== الألوان =====
 const S = {
@@ -13,6 +32,20 @@ const S = {
   white: '#FAFAF8', muted: '#8A9BB5', border: 'rgba(255,255,255,0.08)',
   green: '#22C55E', red: '#EF4444', blue: '#3B82F6', amber: '#F59E0B',
   card: 'rgba(255,255,255,0.04)', card2: 'rgba(255,255,255,0.08)',
+}
+
+// ===== style مشترك للـ select والـ input =====
+const fieldStyle = {
+  width: '100%',
+  background: 'rgba(255,255,255,0.03)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  padding: '12px',
+  borderRadius: '10px',
+  color: '#fff',
+  fontFamily: 'inherit',
+  outline: 'none',
+  cursor: 'pointer',
+  fontSize: '14px',
 }
 
 export default function ProductsPage() {
@@ -26,93 +59,332 @@ export default function ProductsPage() {
   const [filterCountry, setFilterCountry] = useState('')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [statusFilter, setStatusFilter] = useState('active')
-  const [supplier, setSupplier] = useState<any>(null);
-//------
+  const [products, setProducts] = useState<any[]>([])
+  const [showAddProduct, setShowAddProduct] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [newProduct, setNewProduct] = useState({
+    name: '',
+    category: '',
+    price: '',
+    currency: '',
+    unit: '',
+    stock_quantity: '',
+    moq: '',
+    description: '',
+    certifications: '',
+    supplier_id: '',
+    origin_country: '',
+    market_country: '',
+  })
 
   // ===== تحميل البيانات =====
   useEffect(() => {
     async function fetchData() {
-      let query = supabase.from('suppliers').select('id,company_name,main_products,rating,country,city,status')
-      if (statusFilter === 'active') query = query.eq('status', 'active')
-      const { data } = await query
-      setSuppliers(data || [])
+      setLoading(true)
+
+      let query = supabase
+        .from('suppliers')
+        .select('id,company_name,main_products,rating,country,city,status')
+
+      if (statusFilter === 'active') {
+        query = query.eq('status', 'active')
+      }
+
+      const { data: suppliersData } = await query
+      const { data: productsData } = await supabase.from('supplier_products').select('*')
+
+      setSuppliers(suppliersData || [])
+      setProducts(productsData || [])
       setLoading(false)
     }
     fetchData()
   }, [statusFilter])
-//=========
 
+  // ===== جلب المنتجات فقط =====
+  const fetchProducts = async () => {
+    const { data, error } = await supabase.from('supplier_products').select('*')
+    if (!error) setProducts(data || [])
+  }
 
-  // 1. دالة التصدير داخل المكون
+  // ===== إضافة منتج — مع حفظ origin_country و market_country =====
+  const handleAddProduct = async () => {
+    try {
+      setSaving(true)
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { alert('يجب تسجيل الدخول'); return }
+      if (!newProduct.name || !newProduct.category) { alert('يرجى إدخال اسم المنتج والفئة'); return }
+
+      const { error } = await supabase.from('supplier_products').insert([{
+        supplier_id: newProduct.supplier_id || null,
+        user_id: user.id,
+        name: newProduct.name,
+        category: newProduct.category,
+        min_order: newProduct.moq,
+        price_range: newProduct.price,
+        certifications: newProduct.certifications,
+        notes: newProduct.description,
+        origin_country: newProduct.origin_country,   // ✅ يُحفظ الآن
+        market_country: newProduct.market_country,   // ✅ يُحفظ الآن
+      }])
+
+      if (error) { alert(error.message); return }
+
+      alert('تم إضافة المنتج بنجاح ✅')
+      setShowAddProduct(false)
+      setNewProduct({
+        name: '', category: '', price: '', currency: '', unit: '',
+        stock_quantity: '', moq: '', description: '', certifications: '',
+        supplier_id: '', origin_country: '', market_country: '',
+      })
+      await fetchProducts()
+
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ===== دالة التصدير =====
   const exportToExcel = () => {
-    if (!supplier) return alert('لا توجد بيانات لتصديرها');
+    if (sortedProducts.length === 0) return alert('لا توجد بيانات للتصدير')
+    const worksheet = XLSX.utils.json_to_sheet(
+      sortedProducts.map(([name, sups]) => ({
+        'المنتج': name,
+        'عدد الموردين': sups.length,
+        'بلد المنشأ': getCountryLabel((sups[0] as any)?.origin_country),
+        'سوق البيع': getCountryLabel((sups[0] as any)?.market_country),
+      }))
+    )
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'المنتجات')
+    XLSX.writeFile(workbook, `Products_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
 
-    const dataToExport = [{
-      "اسم الشركة": supplier.company_name,
-      "الدولة": supplier.country,
-      "المنتجات": supplier.main_products,
-      "الموقع": supplier.website || '—',
-      "التقييم": supplier.rating
-    }];
+ // ===== بناء خريطة المنتجات (المنطق النهائي) =====
+  const productMap: Record<string, any[]> = {};
 
-    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "بيانات المورد");
+  // 1. تجميع المنتجات من جدول supplier_products
+  products.forEach((p) => {
+    const name = (p.name || p.product_name || '').trim();
+    if (!name) return;
+    if (!productMap[name]) productMap[name] = [];
     
-    // ضبط الاتجاه للعربية
-    if (!worksheet['!views']) worksheet['!views'] = [];
-    worksheet['!views'] = [{ RTL: true }];
+    const sup = suppliers.find(s => s.id === p.supplier_id);
+    productMap[name].push({
+      ...p,
+      origin_country: p.origin_country || sup?.country || '—',
+      market_country: p.market_country || '—',
+      rating: sup?.rating || 0
+    });
+  });
 
-    XLSX.writeFile(workbook, `Bridge_Edge_${supplier.company_name}.xlsx`);
-  };
+  // 2. تجميع المنتجات من حقل main_products في جدول الموردين
+  suppliers.forEach((s) => {
+    if (!s.main_products) return;
+    const splitChar = s.main_products.includes('،') ? '،' : ',';
+    s.main_products.split(splitChar).forEach((pName: string) => {
+      const name = pName.trim();
+      if (!name) return;
+      
+      // منع التكرار إذا كان المنتج مضافاً بالفعل لنفس المورد
+      if (productMap[name]?.some(p => p.supplier_id === s.id)) return;
+      
+      if (!productMap[name]) productMap[name] = [];
+      productMap[name].push({
+        name,
+        supplier_id: s.id,
+        origin_country: s.country || '—',
+        market_country: '—',
+        rating: s.rating || 0
+      });
+    });
+  });
 
-  // ===== بناء خريطة المنتجات =====
-  const productMap: Record<string, any[]> = {}
-  suppliers.forEach(s => {
-    if (!s.main_products) return
-    s.main_products.split('،').forEach((p: string) => {
-      const name = p.trim()
-      if (!name) return
-      if (!productMap[name]) productMap[name] = []
-      productMap[name].push(s)
-    })
-  })
-
-  // ===== ترتيب وفلترة المنتجات =====
+  // 3. الترتيب والفلترة (تم دمج كل الشروط لضمان عمل sortedProducts)
   const sortedProducts = Object.entries(productMap)
     .sort((a, b) => b[1].length - a[1].length)
-    .filter(([name]) => name.includes(search) || search === '')
-    .filter(([, sups]) => filterCountry ? sups.some(s => s.country === filterCountry) : true)
+    .filter(([name, sups]) => {
+      const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
+      const matchesCountry = filterCountry 
+        ? sups.some(s => s.origin_country === filterCountry || s.country === filterCountry) 
+        : true;
+      return matchesSearch && matchesCountry;
+    });
 
-  const totalProducts = Object.keys(productMap).length
-  const totalSuppliers = suppliers.length
-  const mostPopular = sortedProducts[0]
+  // 4. الإحصائيات النهائية
+  const totalProducts = Object.keys(productMap).length;
+  const totalSuppliers = suppliers.length;
+  const mostPopular = sortedProducts.length > 0 ? sortedProducts[0] : null;
 
+  // ===== الآن تأتي جملة الـ return =====
   return (
-    // ===== المحتوى الرئيسي فقط — بدون sidebar أو header خارجي =====
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal,sans-serif', direction: 'rtl' }}>
 
-      {/* ===== شريط المعلومات العلوي ===== */}
-      
-     <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-
-        {/* الأزرار على اليمين */}
+      {/* شريط الأدوات */}
+      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => (true)} style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={() => setShowAddProduct(true)}
+            style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             + إضافة منتج
           </button>
-<button 
-  style={{ background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}
->
-  📤 تصدير
-</button>
+          <button onClick={exportToExcel}
+            style={{ background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            📤 تصدير
+          </button>
         </div>
-        </div>
+      </div>
 
-      {/* ===== المحتوى =====  */}
+      {/* Modal إضافة منتج */}
+      {showAddProduct && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px', backdropFilter: 'blur(4px)' }}>
+          <div style={{ background: S.navy2, width: '100%', maxWidth: '650px', borderRadius: '20px', border: `1px solid ${S.border}`, padding: '30px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+
+            <div style={{ marginBottom: '25px' }}>
+              <h3 style={{ fontSize: '20px', color: S.gold, marginBottom: '8px' }}>إضافة منتج جديد</h3>
+              <p style={{ fontSize: '12px', color: S.muted }}>أدخل تفاصيل المنتج بدقة</p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+
+              {/* اسم المنتج + الفئة */}
+              <div style={{ gridColumn: 'span 2', display: 'flex', gap: '15px' }}>
+                <div style={{ flex: 2 }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px', fontWeight: 600 }}>اسم المنتج التجاري *</label>
+                  <input
+                    placeholder="مثال: فحم جوز هند طبيعي"
+                    style={fieldStyle}
+                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                  />
+                </div>
+                <div style={{ flex: 1.2 }}>
+                  <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px', fontWeight: 600 }}>فئة المنتج *</label>
+                  <select style={fieldStyle} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}>
+                    <option value="" style={{ background: S.navy2 }}>اختر الفئة...</option>
+                    {PRODUCT_CATEGORIES.map((cat) => (
+                      <option key={cat.id} value={cat.label} style={{ background: S.navy2 }}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* المورد */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px', fontWeight: 600 }}>المورد (اختياري)</label>
+                <select style={fieldStyle} onChange={(e) => setNewProduct({ ...newProduct, supplier_id: e.target.value })}>
+                  <option value="" style={{ background: S.navy2 }}>غير مرتبط بمورد حالياً</option>
+                  {suppliers.map((sup) => (
+                    <option key={sup.id} value={sup.id} style={{ background: S.navy2 }}>
+                      {sup.company_name} — {sup.country}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* السعر والعملة */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px' }}>متوسط السعر (لكل وحدة)</label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <input
+                    type="number" placeholder="0.00"
+                    style={{ ...fieldStyle, flex: 2 }}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                  />
+                  <select
+                    style={{ ...fieldStyle, flex: 1, padding: '0 10px' }}
+                    onChange={(e) => setNewProduct({ ...newProduct, currency: e.target.value })}>
+                    <option value="" style={{ background: S.navy2 }}>العملة</option>
+                    {CURRENCIES.map((curr) => (
+                      <option key={curr.id} value={curr.value} style={{ background: S.navy2 }}>{curr.id}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* وحدة القياس */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px' }}>وحدة القياس</label>
+                <select style={fieldStyle} onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}>
+                  <option value="" style={{ background: S.navy2 }}>اختر الوحدة...</option>
+                  {PRODUCT_UNITS.map((unit) => (
+                    <option key={unit.id} value={unit.value} style={{ background: S.navy2 }}>{unit.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* الكمية */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px' }}>الكمية المتاحة (Stock)</label>
+                <input type="number" placeholder="الكمية الإجمالية"
+                  style={fieldStyle}
+                  onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value })} />
+              </div>
+
+              {/* MOQ */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px' }}>أقل كمية للطلب (MOQ)</label>
+                <input placeholder="مثال: 50 قطعة"
+                  style={fieldStyle}
+                  onChange={(e) => setNewProduct({ ...newProduct, moq: e.target.value })} />
+              </div>
+
+              {/* دولة المنشأ ✅ */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px' }}>دولة المنشأ</label>
+                <select
+                  style={fieldStyle}
+                  onChange={(e) => setNewProduct({ ...newProduct, origin_country: e.target.value })}>
+                  <option value="" style={{ background: S.navy2 }}>اختر الدولة</option>
+                  {COUNTRIES.map((country) => (
+                    <option key={country.id} value={country.label} style={{ background: S.navy2 }}>{country.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* سوق البيع ✅ */}
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px' }}>السوق الذي تبيع فيه المنتج</label>
+                <select
+                  style={fieldStyle}
+                  onChange={(e) => setNewProduct({ ...newProduct, market_country: e.target.value })}>
+                  <option value="" style={{ background: S.navy2 }}>اختر السوق</option>
+                  {COUNTRIES.map((country) => (
+                    <option key={country.id} value={country.label} style={{ background: S.navy2 }}>{country.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* الوصف */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: S.muted, marginBottom: '8px' }}>وصف المنتج والمميزات</label>
+                <textarea rows={4} placeholder="اكتب تفاصيل المنتج التي تهم المشتري..."
+                  style={{ ...fieldStyle, resize: 'none', lineHeight: '1.6' } as React.CSSProperties}
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })} />
+              </div>
+
+            </div>
+
+            {/* أزرار الحفظ */}
+            <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
+              <button onClick={handleAddProduct} disabled={saving}
+                style={{ flex: 2, background: saving ? '#666' : S.gold, color: S.navy, padding: '14px', borderRadius: '12px', fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: '15px', fontFamily: 'inherit' }}>
+                {saving ? 'جاري الإضافة...' : 'إضافة المنتج'}
+              </button>
+              <button onClick={() => setShowAddProduct(false)}
+                style={{ flex: 1, background: 'transparent', color: S.white, padding: '12px', borderRadius: '8px', border: `1px solid ${S.border}`, cursor: 'pointer', fontFamily: 'inherit' }}>
+                إلغاء
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* المحتوى الرئيسي */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
-        {/* ===== الإحصائيات ===== */}
+        {/* الإحصائيات */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
           {[
             { label: 'إجمالي المنتجات', val: totalProducts, color: S.gold },
@@ -127,14 +399,11 @@ export default function ProductsPage() {
           ))}
         </div>
 
-        {/* ===== البحث والفلاتر ===== */}
+        {/* البحث والفلاتر */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-
-          {/* البحث */}
           <input type="text" placeholder="🔍 ابحث عن منتج..." value={search} onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: '200px', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '10px', padding: '10px 16px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
 
-          {/* فلتر الدولة */}
           <select value={filterCountry} onChange={e => setFilterCountry(e.target.value)}
             style={{ background: S.navy2, color: filterCountry ? S.white : S.muted, border: `1px solid ${S.border}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12px', outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
             <option value="">كل الدول</option>
@@ -143,13 +412,11 @@ export default function ProductsPage() {
             ))}
           </select>
 
-          {/* تبديل العرض */}
           <button onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
             style={{ background: S.navy2, color: S.muted, border: `1px solid ${S.border}`, padding: '10px 14px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
             {viewMode === 'table' ? '⊞ بطاقات' : '☰ جدول'}
           </button>
 
-          {/* فلتر الحالة */}
           <div style={{ display: 'flex', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '10px', overflow: 'hidden' }}>
             {[{ key: 'active', label: 'نشط' }, { key: 'all', label: 'الكل' }].map(t => (
               <button key={t.key} onClick={() => setStatusFilter(t.key)}
@@ -158,7 +425,6 @@ export default function ProductsPage() {
               </button>
             ))}
           </div>
-
         </div>
 
         {loading ? (
@@ -166,88 +432,98 @@ export default function ProductsPage() {
         ) : (
           <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
 
-            {/* ===== الجدول ===== */}
+            {/* الجدول */}
             {viewMode === 'table' && (
               <div style={{ flex: selectedProduct ? '0 0 55%' : '1', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
-                      {['#', 'المنتج', 'عدد الموردين', 'التوزيع', 'متوسط التقييم', 'الدول'].map(h => (
+                      {['#', 'المنتج', 'عدد الموردين', 'بلد المنشأ', 'سوق البيع', 'التوزيع', 'متوسط التقييم', 'الدول'].map(h => (
                         <th key={h} style={{ padding: '12px 14px', textAlign: 'right', fontSize: '10px', color: S.muted, fontWeight: 700 }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {sortedProducts.map(([name, sups], i) => {
-                      const avgRating = (sups.reduce((a, s) => a + (s.rating || 0), 0) / sups.length).toFixed(1)
-                      const countries = [...new Set(sups.map(s => s.country).filter(Boolean))]
-                      const isSelected = selectedProduct === name
-                      return (
-                        <tr key={name} onClick={() => setSelectedProduct(isSelected ? null : name)}
-                          style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, background: isSelected ? 'rgba(201,168,76,0.08)' : i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)', cursor: 'pointer', transition: 'background 0.15s', height: '48px' }}>
+<tbody>
+  {sortedProducts.map(([name, sups], i) => {
+    // 1. ضمان أن sups هي مصفوفة دائمًا
+    const safeSups = Array.isArray(sups) ? sups : [];
+    
+    // 2. حل خطأ "Cannot find name 'displaySup'"
+    // نبحث عن أول مورد لديه بيانات سوق بيع حقيقية، وإذا لم نجد نأخذ المورد الأول
+    const displaySup = safeSups.find(s => s.market_country && s.market_country !== `—`) || safeSups[0] || {};
 
-                          {/* الرقم */}
-                          <td style={{ padding: '12px 14px', fontSize: '11px', color: S.muted, textAlign: 'right' }}>{i + 1}</td>
+    // 3. حل خطأ "Cannot find name 'allCountries'"
+    // نجمع أسماء الدول الفريدة لهذا المنتج من جميع مورديه
+    const allCountries: string[] = [...new Set(safeSups.map(s => getCountryLabel(s.origin_country)).filter(c => c !== `—`))];
 
-                          {/* اسم المنتج */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right', direction: 'rtl' }}>
-                            <div style={{ display: 'flex-start', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', direction: 'rtl' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 600 }}>📦 {name}</span>
-                                {i === 0 && <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '8px', background: 'rgba(201,168,76,0.12)', color: S.gold, fontWeight: 700, marginRight: '7px'}}>الأكثر</span>}
-                            </div>
-                          </td>
+    const count = safeSups.length;
+    const avgRating = count > 0 ? (safeSups.reduce((a, s) => a + (s.rating || 0), 0) / count).toFixed(1) : 0;
+    const totalSupsCount = suppliers.length || 1;
 
-                          {/* عدد الموردين */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <span style={{ fontSize: '14px', fontWeight: 700, color: S.gold }}>{sups.length}</span>
-                            <span style={{ fontSize: '11px', color: S.muted, marginRight: '4px' }}>مورد</span>
-                          </td>
+    return (
+      <tr key={name} style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, direction: `rtl` }}>
+        <td style={{ padding: `12px 14px`, textAlign: `center` }}>{i + 1}</td>
 
-                          {/* التوزيع */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                              <span style={{ fontSize: '10px', color: S.muted }}>{((sups.length / totalSuppliers) * 100).toFixed(0)}%</span>
-                              <div style={{ width: '60px', height: '4px', background: S.border, borderRadius: '2px', overflow: 'hidden' }}>
-                                <div style={{ height: '100%', width: `${(sups.length / totalSuppliers) * 100}%`, background: i === 0 ? S.gold : i === 1 ? S.green : S.blue, borderRadius: '2px' }} />
-                              </div>
-                            </div>
-                          </td>
+        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+          <span style={{ fontSize: `13px`, fontWeight: 600 }}>📦 {name}</span>
+        </td>
 
-                          {/* متوسط التقييم */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
-                              {[1,2,3,4,5].map(j => (
-                                <svg key={j} width="10" height="10" viewBox="0 0 16 16" style={{ fill: j <= Math.round(Number(avgRating) / 2) ? S.gold : 'rgba(201,168,76,0.2)' }}>
-                                  <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z"/>
-                                </svg>
-                              ))}
-                              <span style={{ fontSize: '10px', color: S.muted, marginRight: '4px' }}>{avgRating}</span>
-                            </div>
-                          </td>
+        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+          <span style={{ fontSize: `12px`, color: S.gold }}>{count} {`مورد`}</span>
+        </td>
 
-                          {/* الدول */}
-                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                              {countries.slice(0, 2).map(c => (
-                                <span key={c} style={{ fontSize: '9px', padding: '2px 6px', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)' }}>{c}</span>
-                              ))}
-                              {countries.length > 2 && <span style={{ fontSize: '9px', color: S.muted }}>+{countries.length - 2}</span>}
-                            </div>
-                          </td>
+        {/* عرض بلد المنشأ باستخدام displaySup */}
+        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+          <span style={{ fontSize: `12px`, color: S.white }}>
+            🌍 {getCountryLabel(displaySup.origin_country)}
+          </span>
+        </td>
 
-                        </tr>
-                      )
-                    })}
-                  </tbody>
+        {/* عرض سوق البيع باستخدام displaySup */}
+        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+          <div style={{ display: `flex`, alignItems: `center`, gap: `6px`, background: `rgba(201,168,76,0.1)`, padding: `4px 8px`, borderRadius: `6px`, width: `fit-content` }}>
+            <span style={{ fontSize: `11px`, color: S.gold }}>
+              🛒 {getCountryLabel(displaySup.market_country)}
+            </span>
+          </div>
+        </td>
+
+        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+          <div style={{ display: `flex`, alignItems: `center`, gap: `6px` }}>
+             <div style={{ width: `60px`, height: `4px`, background: S.border, borderRadius: `2px`, overflow: `hidden` }}>
+                <div style={{ height: `100%`, width: `${(count / totalSupsCount) * 100}%`, background: S.gold }} />
+             </div>
+             <span style={{ fontSize: `10px`, color: S.muted }}>{((count / totalSupsCount) * 100).toFixed(0)}%</span>
+          </div>
+        </td>
+
+        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+           <span style={{ fontSize: `10px`, color: S.muted }}>{avgRating} ⭐</span>
+        </td>
+
+        {/* عرض قائمة الدول (allCountries) - حل خطأ النوع 'any' لـ c */}
+        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+          <div style={{ display: `flex`, gap: `4px`, justifyContent: `flex-end` }}>
+            {allCountries.slice(0, 2).map((c: string) => (
+              <span key={c} style={{ fontSize: `9px`, padding: `2px 6px`, borderRadius: `8px`, background: `rgba(59,130,246,0.1)`, color: `#93C5FD` }}>
+                {c}
+              </span>
+            ))}
+          </div>
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
                 </table>
               </div>
             )}
 
-            {/* ===== البطاقات ===== */}
+            {/* البطاقات */}
             {viewMode === 'cards' && (
               <div style={{ flex: selectedProduct ? '0 0 55%' : '1', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
                 {sortedProducts.map(([name, sups], i) => {
-                  const avgRating = (sups.reduce((a, s) => a + (s.rating || 0), 0) / sups.length).toFixed(1)
+                  const avgRating = sups.length > 0 ? (sups.reduce((a, s) => a + (s.rating || 0), 0) / sups.length).toFixed(1) : 0
                   const isSelected = selectedProduct === name
                   return (
                     <div key={name} onClick={() => setSelectedProduct(isSelected ? null : name)}
@@ -265,7 +541,7 @@ export default function ProductsPage() {
               </div>
             )}
 
-            {/* ===== لوحة تفاصيل المنتج ===== */}
+            {/* لوحة تفاصيل المنتج */}
             {selectedProduct && productMap[selectedProduct] && (
               <div style={{ flex: '0 0 43%', background: S.navy2, border: `1px solid ${S.gold}`, borderRadius: '14px', padding: '20px', position: 'sticky', top: 0, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -276,7 +552,6 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                {/* إحصائيات */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '16px' }}>
                   {[
                     { label: 'من الموردين', val: ((productMap[selectedProduct].length / totalSuppliers) * 100).toFixed(0) + '%', color: S.gold },
@@ -290,17 +565,16 @@ export default function ProductsPage() {
                   ))}
                 </div>
 
-                {/* قائمة الموردين */}
                 <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '10px', textAlign: 'right' }}>الموردين</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {productMap[selectedProduct].map(s => (
-                    <div key={s.id} onClick={() => router.push(`/suppliers/${s.id}`)}
+                  {productMap[selectedProduct].map((s, idx) => (
+                    <div key={idx} onClick={() => router.push(`/suppliers/${s.supplier_id}`)}
                       style={{ background: S.card2, borderRadius: '10px', padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <div style={{ display: 'flex', gap: '2px' }}>
-                          {[1,2,3,4,5].map(i => (
+                          {[1, 2, 3, 4, 5].map(i => (
                             <svg key={i} width="10" height="10" viewBox="0 0 16 16" style={{ fill: i <= Math.round((s.rating || 0) / 2) ? S.gold : 'rgba(201,168,76,0.2)' }}>
-                              <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z"/>
+                              <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z" />
                             </svg>
                           ))}
                         </div>
@@ -308,7 +582,10 @@ export default function ProductsPage() {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: '13px', fontWeight: 700 }}>{s.company_name}</div>
-                        <div style={{ fontSize: '10px', color: S.muted }}>{s.country || '—'}{s.city ? ` / ${s.city}` : ''}</div>
+                        <div style={{ fontSize: '10px', color: S.muted }}>
+                          {s.country || '—'}{s.city ? ` / ${s.city}` : ''}
+                          {s.origin_country && <span style={{ color: S.gold, marginRight: '6px' }}> · 🌍 {getCountryLabel(s.origin_country)}</span>}
+                        </div>
                       </div>
                     </div>
                   ))}

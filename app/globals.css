@@ -1,33 +1,53 @@
+/* 1. استدعاء الخط (يجب أن يكون أول سطر) */
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+
+/* 2. قواعد Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* إعدادات الخلفية والخط لضمان عدم حدوث لخبطة */
+/* 3. توحيد الخط الشامل (بما في ذلك كل العناصر) */
+* {
+  box-sizing: border-box;
+  font-family: 'Tajawal', sans-serif !important;
+}
+
+/* 4. استهداف عناصر الإدخال والأزرار بشكل خاص لضمان التطبيق */
+/* هذا هو القسم الأهم لحل مشكلتك */
+input, 
+select, 
+textarea, 
+button, 
+option, 
+optgroup {
+  font-family: 'Tajawal', sans-serif !important;
+  font-weight: 500; /* وزن متوسط ليظهر الخط بوضوح داخل المربعات */
+  direction: rtl; /* لضمان أن الكتابة داخل المربعات تبدأ من اليمين */
+}
+
+/* 5. إعدادات الهيكل الرئيسي للمنصة */
 html, body {
   background-color: #0A1628 !important;
   color: #FAFAF8;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
   overflow-x: hidden;
+  font-family: 'Tajawal', sans-serif !important;
 }
 
-/* تصفير أي هوامش قديمة قد تسبب لخبطة الجدول */
-* {
-  box-sizing: border-box;
-}
-table {
-  direction: rtl;
-}
-
-tbody {
-  direction: rtl;
-}
-
-tr {
+/* 6. تنسيقات الجداول واتجاه النصوص (RTL) */
+table, tbody, tr {
   direction: rtl;
 }
 
 td, th {
   text-align: right;
+  font-family: 'Tajawal', sans-serif !important;
+}
+
+/* 7. تحسين مظهر الأزرار (Buttons) */
+button {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: 'Tajawal', sans-serif !important;
 }

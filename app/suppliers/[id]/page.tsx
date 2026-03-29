@@ -1088,7 +1088,7 @@ fetchPriceHistory()
               {[
                 { label: 'الاسم الرسمي', key: 'company_name' },
                 { label: 'رقم التسجيل', key: 'registration_number' },
-                { label: 'الدولة', key: 'country' },
+                { label: '', key: 'country' },
                 { label: 'المدينة', key: 'city' },
                 { label: 'الموقع الإلكتروني', key: 'website' },
               ].map(f => (
