@@ -162,63 +162,63 @@ export default function ProductsPage() {
     XLSX.writeFile(workbook, `Products_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
- // ===== بناء خريطة المنتجات (المنطق النهائي) =====
-  const productMap: Record<string, any[]> = {};
+  // ===== بناء خريطة المنتجات =====
+  const productMap: Record<string, any[]> = {}
 
-  // 1. تجميع المنتجات من جدول supplier_products
+  // من جدول supplier_products
   products.forEach((p) => {
-    const name = (p.name || p.product_name || '').trim();
-    if (!name) return;
-    if (!productMap[name]) productMap[name] = [];
-    
-    const sup = suppliers.find(s => s.id === p.supplier_id);
+    const name = (p.name || '').trim()
+    if (!name) return
+    if (!productMap[name]) productMap[name] = []
+    const sup = suppliers.find(s => s.id === p.supplier_id)
     productMap[name].push({
-      ...p,
-      origin_country: p.origin_country || sup?.country || '—',
-      market_country: p.market_country || '—',
-      rating: sup?.rating || 0
-    });
-  });
+      supplier_id: p.supplier_id,
+      name,
+      category: p.category || 'غير محدد',
+      country: sup?.country || 'غير معروف',
+      // origin_country: نستخدم القيمة المحفوظة في الجدول أولاً
+      origin_country: p.origin_country || sup?.country || '',
+      market_country: p.market_country || '',
+      rating: sup?.rating || 0,
+      company_name: sup?.company_name || '—',
+      city: sup?.city || '',
+    })
+  })
 
-  // 2. تجميع المنتجات من حقل main_products في جدول الموردين
+  // من main_products في جدول الموردين
   suppliers.forEach((s) => {
-    if (!s.main_products) return;
-    const splitChar = s.main_products.includes('،') ? '،' : ',';
-    s.main_products.split(splitChar).forEach((pName: string) => {
-      const name = pName.trim();
-      if (!name) return;
-      
-      // منع التكرار إذا كان المنتج مضافاً بالفعل لنفس المورد
-      if (productMap[name]?.some(p => p.supplier_id === s.id)) return;
-      
-      if (!productMap[name]) productMap[name] = [];
+    if (!s.main_products) return
+    s.main_products.split('،').forEach((product: string) => {
+      const name = product.trim()
+      if (!name) return
+      if (!productMap[name]) productMap[name] = []
+      // تجنب التكرار — لو المنتج موجود بالفعل من supplier_products لنفس المورد لا تضيفه
+      const alreadyExists = productMap[name].some(p => p.supplier_id === s.id)
+      if (alreadyExists) return
       productMap[name].push({
-        name,
         supplier_id: s.id,
-        origin_country: s.country || '—',
-        market_country: '—',
-        rating: s.rating || 0
-      });
-    });
-  });
+        name,
+        category: 'غير محدد',
+        country: s.country || 'غير معروف',
+        origin_country: s.country || '',
+        market_country: '',
+        rating: s.rating || 0,
+        company_name: s.company_name || '—',
+        city: s.city || '',
+      })
+    })
+  })
 
-  // 3. الترتيب والفلترة (تم دمج كل الشروط لضمان عمل sortedProducts)
+  // ===== ترتيب وفلترة =====
   const sortedProducts = Object.entries(productMap)
     .sort((a, b) => b[1].length - a[1].length)
-    .filter(([name, sups]) => {
-      const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
-      const matchesCountry = filterCountry 
-        ? sups.some(s => s.origin_country === filterCountry || s.country === filterCountry) 
-        : true;
-      return matchesSearch && matchesCountry;
-    });
+    .filter(([name]) => name.includes(search) || search === '')
+    .filter(([, sups]) => filterCountry ? sups.some(s => s.country === filterCountry) : true)
 
-  // 4. الإحصائيات النهائية
-  const totalProducts = Object.keys(productMap).length;
-  const totalSuppliers = suppliers.length;
-  const mostPopular = sortedProducts.length > 0 ? sortedProducts[0] : null;
+  const totalProducts = Object.keys(productMap).length
+  const totalSuppliers = suppliers.length
+  const mostPopular = sortedProducts[0]
 
-  // ===== الآن تأتي جملة الـ return =====
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal,sans-serif', direction: 'rtl' }}>
 
@@ -443,78 +443,82 @@ export default function ProductsPage() {
                       ))}
                     </tr>
                   </thead>
-<tbody>
-  {sortedProducts.map(([name, sups], i) => {
-    // 1. ضمان أن sups هي مصفوفة دائمًا
-    const safeSups = Array.isArray(sups) ? sups : [];
-    
-    // 2. حل خطأ "Cannot find name 'displaySup'"
-    // نبحث عن أول مورد لديه بيانات سوق بيع حقيقية، وإذا لم نجد نأخذ المورد الأول
-    const displaySup = safeSups.find(s => s.market_country && s.market_country !== `—`) || safeSups[0] || {};
+                  <tbody>
+                    {sortedProducts.map(([name, sups], i) => {
+                      const safeSups = Array.isArray(sups) ? sups : []
+                      const count = safeSups.length
+                      const avgRating = count > 0
+                        ? (safeSups.reduce((a, s) => a + (s.rating || 0), 0) / count).toFixed(1)
+                        : 0
+                      const allCountries = [...new Set(safeSups.map(s => getCountryLabel(s.origin_country)).filter(c => c !== '—'))]
+                      const isSelected = selectedProduct === name
+                      const totalSupsCount = suppliers.length || 1
+                      const firstSup = safeSups[0] || {}
 
-    // 3. حل خطأ "Cannot find name 'allCountries'"
-    // نجمع أسماء الدول الفريدة لهذا المنتج من جميع مورديه
-    const allCountries: string[] = [...new Set(safeSups.map(s => getCountryLabel(s.origin_country)).filter(c => c !== `—`))];
+                      return (
+                        <tr key={name} onClick={() => setSelectedProduct(isSelected ? null : name)}
+                          style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, background: isSelected ? `rgba(201,168,76,0.08)` : i % 2 === 0 ? `transparent` : `rgba(255,255,255,0.02)`, cursor: `pointer`, transition: `background 0.15s`, height: `48px`, direction: `rtl` }}>
 
-    const count = safeSups.length;
-    const avgRating = count > 0 ? (safeSups.reduce((a, s) => a + (s.rating || 0), 0) / count).toFixed(1) : 0;
-    const totalSupsCount = suppliers.length || 1;
+                          <td style={{ padding: `12px 14px`, fontSize: `11px`, color: S.muted, textAlign: `center`, width: `50px` }}>{i + 1}</td>
 
-    return (
-      <tr key={name} style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, direction: `rtl` }}>
-        <td style={{ padding: `12px 14px`, textAlign: `center` }}>{i + 1}</td>
+                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+                            <div style={{ display: `flex`, alignItems: `center`, gap: `8px` }}>
+                              <span style={{ fontSize: `13px`, fontWeight: 600 }}>📦 {name}</span>
+                              {i === 0 && <span style={{ fontSize: `9px`, padding: `2px 8px`, borderRadius: `8px`, background: `rgba(201,168,76,0.12)`, color: S.gold, fontWeight: 700 }}>الأكثر</span>}
+                            </div>
+                          </td>
 
-        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-          <span style={{ fontSize: `13px`, fontWeight: 600 }}>📦 {name}</span>
-        </td>
+                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+                            <span style={{ fontSize: `14px`, fontWeight: 700, color: S.gold }}>{safeSups.filter((s: any) => s.supplier_id).length}</span>
+                            <span style={{ fontSize: `11px`, color: S.muted, marginRight: `4px` }}>مورد</span>
+                          </td>
 
-        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-          <span style={{ fontSize: `12px`, color: S.gold }}>{count} {`مورد`}</span>
-        </td>
+                          {/* بلد المنشأ ✅ */}
+                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+                            <span style={{ fontSize: `12px`, color: S.white }}>
+                               {firstSup.origin_country ? getCountryLabel(firstSup.origin_country) : '—'}
+                            </span>
+                          </td>
 
-        {/* عرض بلد المنشأ باستخدام displaySup */}
-        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-          <span style={{ fontSize: `12px`, color: S.white }}>
-            🌍 {getCountryLabel(displaySup.origin_country)}
-          </span>
-        </td>
+                          {/* سوق البيع ✅ */}
+                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+                            <span style={{ fontSize: `11px`, color: S.gold, background: `rgba(201,168,76,0.1)`, padding: `2px 8px`, borderRadius: `6px` }}>
+                              🛒 {firstSup.market_country ? getCountryLabel(firstSup.market_country) : '—'}
+                            </span>
+                          </td>
 
-        {/* عرض سوق البيع باستخدام displaySup */}
-        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-          <div style={{ display: `flex`, alignItems: `center`, gap: `6px`, background: `rgba(201,168,76,0.1)`, padding: `4px 8px`, borderRadius: `6px`, width: `fit-content` }}>
-            <span style={{ fontSize: `11px`, color: S.gold }}>
-              🛒 {getCountryLabel(displaySup.market_country)}
-            </span>
-          </div>
-        </td>
+                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+                            <div style={{ display: `flex`, alignItems: `center`, gap: `6px` }}>
+                              <span style={{ fontSize: `10px`, color: S.muted }}>{((count / totalSupsCount) * 100).toFixed(0)}%</span>
+                              <div style={{ width: `60px`, height: `4px`, background: S.border, borderRadius: `2px`, overflow: `hidden` }}>
+                                <div style={{ height: `100%`, width: `${(count / totalSupsCount) * 100}%`, background: i === 0 ? S.gold : i === 1 ? S.green : S.blue }} />
+                              </div>
+                            </div>
+                          </td>
 
-        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-          <div style={{ display: `flex`, alignItems: `center`, gap: `6px` }}>
-             <div style={{ width: `60px`, height: `4px`, background: S.border, borderRadius: `2px`, overflow: `hidden` }}>
-                <div style={{ height: `100%`, width: `${(count / totalSupsCount) * 100}%`, background: S.gold }} />
-             </div>
-             <span style={{ fontSize: `10px`, color: S.muted }}>{((count / totalSupsCount) * 100).toFixed(0)}%</span>
-          </div>
-        </td>
+                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+                            <div style={{ display: `flex`, alignItems: `center`, gap: `4px` }}>
+                              {[1, 2, 3, 4, 5].map(j => (
+                                <svg key={j} width="10" height="10" viewBox="0 0 16 16" style={{ fill: j <= Math.round(Number(avgRating) / 2) ? S.gold : `rgba(201,168,76,0.2)` }}>
+                                  <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z" />
+                                </svg>
+                              ))}
+                              <span style={{ fontSize: `10px`, color: S.muted, marginRight: `4px` }}>{avgRating}</span>
+                            </div>
+                          </td>
 
-        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-           <span style={{ fontSize: `10px`, color: S.muted }}>{avgRating} ⭐</span>
-        </td>
+                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+                            <div style={{ display: `flex`, gap: `4px`, flexWrap: `wrap` }}>
+                              {allCountries.map(c => (
+                                <span key={c} style={{ fontSize: `9px`, padding: `2px 6px`, borderRadius: `8px`, background: `rgba(59,130,246,0.1)`, color: `#93C5FD`, border: `1px solid rgba(59,130,246,0.2)` }}>{c}</span>
+                              ))}
+                            </div>
+                          </td>
 
-        {/* عرض قائمة الدول (allCountries) - حل خطأ النوع 'any' لـ c */}
-        <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-          <div style={{ display: `flex`, gap: `4px`, justifyContent: `flex-end` }}>
-            {allCountries.slice(0, 2).map((c: string) => (
-              <span key={c} style={{ fontSize: `9px`, padding: `2px 6px`, borderRadius: `8px`, background: `rgba(59,130,246,0.1)`, color: `#93C5FD` }}>
-                {c}
-              </span>
-            ))}
-          </div>
-        </td>
-      </tr>
-    );
-  })}
-</tbody>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
                 </table>
               </div>
             )}
@@ -540,8 +544,7 @@ export default function ProductsPage() {
                 })}
               </div>
             )}
-
-            {/* لوحة تفاصيل المنتج */}
+{/* لوحة تفاصيل المنتج */}
             {selectedProduct && productMap[selectedProduct] && (
               <div style={{ flex: '0 0 43%', background: S.navy2, border: `1px solid ${S.gold}`, borderRadius: '14px', padding: '20px', position: 'sticky', top: 0, maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -567,35 +570,37 @@ export default function ProductsPage() {
 
                 <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '10px', textAlign: 'right' }}>الموردين</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {productMap[selectedProduct].map((s, idx) => (
-                    <div key={idx} onClick={() => router.push(`/suppliers/${s.supplier_id}`)}
-                      style={{ background: S.card2, borderRadius: '10px', padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ display: 'flex', gap: '2px' }}>
-                          {[1, 2, 3, 4, 5].map(i => (
-                            <svg key={i} width="10" height="10" viewBox="0 0 16 16" style={{ fill: i <= Math.round((s.rating || 0) / 2) ? S.gold : 'rgba(201,168,76,0.2)' }}>
-                              <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z" />
-                            </svg>
-                          ))}
+                  {productMap[selectedProduct].map((s, idx) => {
+                    const supInfo = suppliers.find(sup => sup.id === s.supplier_id) || s;
+                    return (
+                      <div key={idx} onClick={() => router.push(`/suppliers/${s.supplier_id}`)}
+                        style={{ background: S.card2, borderRadius: '10px', padding: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ display: 'flex', gap: '2px' }}>
+                            {[1, 2, 3, 4, 5].map(i => (
+                              <svg key={i} width="10" height="10" viewBox="0 0 16 16" style={{ fill: i <= Math.round((s.rating || 0) / 2) ? S.gold : 'rgba(201,168,76,0.2)' }}>
+                                <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z" />
+                              </svg>
+                            ))}
+                          </div>
+                          <span style={{ fontSize: '10px', color: S.muted }}>{s.rating || 0}/10</span>
                         </div>
-                        <span style={{ fontSize: '10px', color: S.muted }}>{s.rating || 0}/10</span>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 700 }}>{s.company_name}</div>
-                        <div style={{ fontSize: '10px', color: S.muted }}>
-                          {s.country || '—'}{s.city ? ` / ${s.city}` : ''}
-                          {s.origin_country && <span style={{ color: S.gold, marginRight: '6px' }}> · 🌍 {getCountryLabel(s.origin_country)}</span>}
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 700 }}>{supInfo.company_name || s.company_name}</div>
+                          <div style={{ fontSize: '10px', color: S.muted }}>
+                            {supInfo.country || '—'}{supInfo.city ? ` / ${supInfo.city}` : ''}
+                            {s.origin_country && <span style={{ color: S.gold, marginRight: '6px' }}> · 🌍 {getCountryLabel(s.origin_country)}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
-
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }
