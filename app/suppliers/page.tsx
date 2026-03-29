@@ -220,10 +220,22 @@ export default function SuppliersPage() {
             style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             📊 مقارنة أسعار
           </button>
-          <button onClick={() => router.push('#')}
-            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            ⚖️ سوق الموردين
-          </button>
+<button 
+  onClick={() => router.push('/Buy-Request')}
+  style={{ 
+    background: 'rgba(232,201,122,0.1)', 
+    color: S.gold2, 
+    border: `1px solid ${S.gold}`, 
+    padding: '9px 20px', 
+    borderRadius: '8px', 
+    fontSize: '13px', 
+    fontWeight: 700, 
+    cursor: 'pointer', 
+    fontFamily: 'inherit' 
+  }}
+>
+  ⚖️ طلب شراء
+</button>
         </div>
       </div>
 

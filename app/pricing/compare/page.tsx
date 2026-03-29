@@ -11,21 +11,31 @@ const S = {
   white:   '#FAFAF8',
   muted:   '#8A9BB5',
   navy2:   '#0F2040',
-  borderG: 'rgba(201,168,76,0.15)',
+  border:  'rgba(201,168,76,0.15)',
   navyBg:  '#081226',
   green:   '#10B981',
   red:     '#EF4444',
 };
 
+const fM = (v: any) => {
+  const n = parseFloat(v);
+  return isNaN(n) ? "0.00" : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export default function BridgeEdgePricingRadar() {
-  const [saving,setSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [allSuppliers, setAllSuppliers] = useState<any[]>([])
   const [availableProducts, setAvailableProducts] = useState<string[]>([])
   const [history, setHistory] = useState<any[]>([])
   const [selectedProduct, setSelectedProduct] = useState('')
-  
-  // إضافة field الملاحظات في الحالة الابتدائية
-  const [rows, setRows] = useState(Array(5).fill({ supplierId: '', price: '', status: 'انتظار', notes: '' }))
+  const [rows, setRows] = useState(Array(5).fill({ 
+    supplierId: '', 
+    price: '', 
+    qty: '1', 
+    unit: 'قطعة', 
+    status: 'انتظار', 
+    notes: '' 
+  }))
 
   useEffect(() => {
     fetchInitialData()
@@ -46,25 +56,10 @@ export default function BridgeEdgePricingRadar() {
     }
   }
 
-async function fetchHistory() {
-  const { data } = await supabase.from('pricing_sessions').select('*').order('created_at', { ascending: false })
-  setHistory(data || [])
-}
-
-// دالة الحذف لازم تكون هنا عشان "تشوف" الدالة اللي فوقها
-const deleteSession = async (id: string) => {
-  const confirmDelete = window.confirm('هل أنت متأكد من حذف هذه الجلسة؟');
-  if (confirmDelete) {
-    const { error } = await supabase.from('pricing_sessions').delete().eq('id', id);
-    if (error) {
-      alert(`فشل الحذف: ${error.message}`);
-    } else {
-      alert('تم الحذف بنجاح ✅');
-      // تأكد إن الاسم هنا مطابق تماماً لاسم الدالة اللي فوق
-      await fetchHistory(); 
-    }
+  async function fetchHistory() {
+    const { data } = await supabase.from('pricing_sessions').select('*').order('created_at', { ascending: false })
+    setHistory(data || [])
   }
-};
 
   const handleRowChange = (index: number, field: string, value: string) => {
     const newRows = [...rows]
@@ -72,282 +67,198 @@ const deleteSession = async (id: string) => {
     setRows(newRows)
   }
 
-  const currentPrices = rows.map(r => parseFloat(r.price)).filter(p => !isNaN(p))
-  const minPrice = currentPrices.length ? Math.min(...currentPrices) : 0
-  const avgPrice = currentPrices.length ? (currentPrices.reduce((a, b) => a + b, 0) / currentPrices.length).toFixed(2) : 0
-  const maxPrice = currentPrices.length ? Math.max(...currentPrices) : 0
+  const deleteSession = async (id: string) => {
+    if (window.confirm('هل أنت متأكد من حذف هذه الجلسة من السجل؟')) {
+      const { error } = await supabase.from('pricing_sessions').delete().eq('id', id);
+      if (!error) fetchHistory();
+    }
+  }
+
+  const activePrices = rows.map(r => parseFloat(r.price)).filter(p => !isNaN(p) && p > 0)
+  const minPrice = activePrices.length ? Math.min(...activePrices) : 0
+  const maxPrice = activePrices.length ? Math.max(...activePrices) : 0
+  const avgPrice = activePrices.length ? (activePrices.reduce((a, b) => a + b, 0) / activePrices.length) : 0
 
   const filteredSuppliers = selectedProduct 
     ? allSuppliers.filter(s => s.main_products?.toLowerCase().includes(selectedProduct.toLowerCase()))
     : allSuppliers;
 
-const saveSession = async () => {
+  const saveSession = async () => {
+    if(saving) return
+    setSaving(true)
+    try {
+      if (!selectedProduct) throw new Error('حدد المنتج المستهدف أولاً')
+      const acceptedRow = rows.find(r => r.status === 'مقبول')
+      if (!acceptedRow || !acceptedRow.price) throw new Error('يجب تعميد مورد واحد على الأقل (مقبول)')
 
-if(saving) return
+      const rejectedSummary = rows
+        .filter(r => r.supplierId && r.status !== 'مقبول')
+        .map(r => {
+          const sName = allSuppliers.find(s => s.id === r.supplierId)?.company_name || 'مورد';
+          return `${sName}: ${r.price}`;
+        }).join(' | ')
 
-try{
+      const { error } = await supabase.from('pricing_sessions').insert([{
+        product_name: selectedProduct,
+        min_price: minPrice,
+        avg_price: avgPrice,
+        max_price: maxPrice,
+        accepted_supplier: allSuppliers.find(s => s.id === acceptedRow.supplierId)?.company_name || 'مورد معتمد',
+        accepted_price: Number(acceptedRow.price),
+        rejected_summary: rejectedSummary
+      }])
 
-setSaving(true)
+      if (error) throw error
+      alert('تم اعتماد وحفظ الجلسة بنجاح ✅');
+      fetchHistory();
+      setRows(Array(5).fill({ supplierId: '', price: '', qty: '1', unit: 'قطعة', status: 'انتظار', notes: '' }));
+      setSelectedProduct('');
+    } catch(err:any) { alert(err.message) }
+    finally { setSaving(false) }
+  }
 
-if (!selectedProduct) {
-  setSaving(false)
-  return alert('يرجى تحديد المنتج أولاً')
-}
-    const acceptedRow = rows.find(r => r.status === 'مقبول')
-  if (!acceptedRow || !acceptedRow.price){
-  setSaving(false)
-  return alert('يرجى اختيار مورد مقبول وإدخال سعره')
-}
-    const rejectedSummary = rows
-      .filter(r => r.supplierId && r.supplierId !== '')
-      .map(r => {
-        const name = allSuppliers.find(s => s.id === r.supplierId)?.company_name || 'مورد'
-        const noteText = r.notes ? ` (${r.notes})` : ''
-        return `${name}: ${r.price}${noteText} [${r.status}]`
-      }).join(' | ')
-
-    const payload = {
-      product_name: selectedProduct,
-      min_price: Number(minPrice),
-      avg_price: Number(avgPrice),
-      max_price: Number(maxPrice),
-      accepted_supplier: allSuppliers.find(s => s.id === acceptedRow.supplierId)?.company_name || 'مورد معتمد',
-      accepted_price: Number(acceptedRow.price),
-      rejected_summary: rejectedSummary
-    }
-
-    const { error } = await supabase
-      .from('pricing_sessions')
-      .insert([payload])
-
-    if (error) {
-      alert(`فشل الإرسال: ${error.message}`)
-      return
-    }
-
-    /* ⭐ الجزء الجديد */
-const historyPayload = rows
-.filter(r => r.supplierId && r.price)
-.map(r => ({
-  supplier_id: r.supplierId,
-  product_name: selectedProduct,
-  price: Number(r.price),
-  status: r.status,
-  notes: r.notes || null
-}))
-
-   if (historyPayload.length > 0) {
-
-  console.log("historyPayload", historyPayload)
-      await supabase
-        .from('supplier_prices_history')
-        .insert(historyPayload)
-    }
-
-    alert('تم اعتماد الجلسة وحفظ الملاحظات بنجاح ✅')
-
-    fetchHistory()
-
-    setRows(Array(5).fill({
-      supplierId: '',
-      price: '',
-      status: 'انتظار',
-      notes: ''
-    }))
-
-    setSelectedProduct('')
-
-}catch(err:any){
-
-alert(`خطأ: ${err.message}`)
-
-}finally{
-
-setSaving(false)
-
-}
-}
-
+ 
   return (
     <AppShell>
       <style dangerouslySetInnerHTML={{ __html: `
-        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
         * { font-family: ${tajawalFont} !important; }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       `}} />
 
-      <div style={{ backgroundColor: S.navyBg, minHeight: '100vh', direction: 'rtl', padding: '25px', color: S.white }}>
+      <div style={{ backgroundColor: S.navyBg, minHeight: '100vh', direction: 'rtl', padding: '30px', color: S.white }}>
         
+        {/* Radar Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
             <div>
-              <h1 style={{ color: S.gold, margin: 0, fontSize: '22px', fontWeight: 700 }}> مقارنة أسعار </h1>
-              <div style={{ fontSize: '12px', color: S.muted, fontWeight: 500 }}>
-                يتم إرسال الأسعار المحدثة لكل مورد في صفحته الخاصة بشكل آلي بعد الضغط علي حفظ التقرير
-           </div>
+              <h1 style={{ color: S.gold, margin: 0, fontSize: '22px', fontWeight: 800 }}> مقارنة أسعار الموردين </h1>
+              <p style={{ fontSize: '11px', color: S.muted, margin: '4px 0 0 0' }}> يتم إرسال الأسعار المحدثة لكل مورد في صفحته الخاصة بشكل آلي بعد الضغط علي حفظ التقرير
+</p>
             </div>
-            
-            <div style={{ display: 'flex', gap: '12px' }}>
-  <StatCard label="أقل عرض" value={`${minPrice}`} color={S.green} />
-  <StatCard label="المتوسط" value={`${avgPrice}`} color={S.gold2} />
-  <StatCard label="أعلى عرض" value={`${maxPrice}`} color={S.red} />
-</div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <StatCard label="الأدنى" value={fM(minPrice)} color={S.green} />
+              <StatCard label="المتوسط" value={fM(avgPrice)} color={S.gold2} />
+              <StatCard label="الأعلى" value={fM(maxPrice)} color={S.red} />
+            </div>
         </div>
 
-        <div style={{ background: S.navy2, padding: '20px', borderRadius: '16px', border: `1px solid ${S.borderG}`, marginBottom: '25px' }}>
-            <label style={{ display: 'block', color: S.gold2, fontSize: '12px', marginBottom: '8px', fontWeight: 700 }}>📦 المنتج المستهدف</label>
-            <select 
-              value={selectedProduct}
-              onChange={(e) => setSelectedProduct(e.target.value)}
-              style={{ width: '100%', padding: '12px', borderRadius: '10px', border: `1px solid ${S.borderG}`, background: S.navyBg, color: S.white, fontSize: '14px', outline: 'none' }}
-            >
+        {/* Product Selection */}
+        <div style={{ background: S.navy2, padding: '12px 20px', borderRadius: '10px', border: `1px solid ${S.border}`, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <div style={{ color: S.gold, fontWeight: 700, fontSize: '12px' }}>📦 المنتج المستهدف:</div>
+            <select value={selectedProduct} onChange={(e) => setSelectedProduct(e.target.value)}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: `1px solid ${S.border}`, background: S.navyBg, color: S.white, fontSize: '13px', outline: 'none' }}>
               <option value="">-- ابحث عن منتج --</option>
-              {availableProducts.map((prod, idx) => (
-                <option key={idx} value={prod}>{prod}</option>
-              ))}
+              {availableProducts.map((p, i) => <option key={i} value={p}>{p}</option>)}
             </select>
         </div>
 
-        <div style={{ background: S.navy2, borderRadius: '16px', border: `1px solid ${S.borderG}`, overflow: 'hidden', marginBottom: '40px' }}>
+        {/* Comparison Table */}
+        <div style={{ background: S.navy2, borderRadius: '12px', border: `1px solid ${S.border}`, overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.3)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
             <thead>
-              <tr style={{ background: 'rgba(201, 168, 76, 0.08)', color: S.gold, fontSize: '12px' }}>
-                <th style={{ padding: '15px', width: '50px', textAlign: 'center' }}>#</th>
-                <th style={{ padding: '15px' }}>المورد</th>
-                <th style={{ padding: '15px' }}>السعر </th>
-                <th style={{ padding: '15px' }}>الحالة</th>
-                <th style={{ padding: '15px' }}>الملاحظات</th>
+              <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
+                {['#', 'المورد', 'سعر الوحدة', 'الكمية', 'الوحدة', 'إجمالي العرض', 'الحالة', 'ملاحظات'].map(h => (
+                  <th key={h} style={{ padding: '12px 14px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
-                <tr key={index} style={{ borderBottom: `1px solid ${S.borderG}` }}>
-                  <td style={{ padding: '12px', color: S.muted, textAlign: 'center' }}>{index + 1}</td>
-                  <td style={{ padding: '12px' }}>
-                    <select 
-                      value={row.supplierId}
-                      onChange={(e) => handleRowChange(index, 'supplierId', e.target.value)}
-                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${S.borderG}`, background: S.navyBg, color: S.white, fontSize: '13px' }}
-                    >
-                      <option value="">-- اختر مورد --</option>
-                      {filteredSuppliers.map(s => <option key={s.id} value={s.id}>{s.company_name}</option>)}
-                    </select>
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    <input 
-                      type="number" 
-                      value={row.price}
-                      onChange={(e) => handleRowChange(index, 'price', e.target.value)}
-                      placeholder="0.00"
-                      style={{ width: '90px', padding: '10px', borderRadius: '8px', border: `1px solid ${S.borderG}`, background: S.navyBg, color: S.green, fontWeight: 700, textAlign: 'center' }} 
-                    />
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    <select 
-                      value={row.status}
-                      onChange={(e) => handleRowChange(index, 'status', e.target.value)}
-                      style={{ 
-                        width: '95px', padding: '8px', borderRadius: '8px', border: 'none',
-                        background: row.status === 'مقبول' ? S.green : row.status === 'مرفوض' ? S.red : S.navyBg,
-                        color: S.white, fontWeight: 700, fontSize: '11px', textAlign: 'center'
-                      }}
-                    >
-                      <option value="انتظار">انتظار</option>
-                      <option value="مقبول">مقبول ✅</option>
-                      <option value="مرفوض">مرفوض ❌</option>
-                    </select>
-                  </td>
-                  <td style={{ padding: '12px' }}>
-                    <input 
-                      type="text" 
-                      value={row.notes}
-                      onChange={(e) => handleRowChange(index, 'notes', e.target.value)}
-                      placeholder="جودة، شحن..."
-                      style={{ width: '100%', padding: '10px', borderRadius: '8px', border: `1px solid ${S.borderG}`, background: S.navyBg, color: S.white, fontSize: '12px' }} 
-                    />
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row, index) => {
+                const total = (parseFloat(row.price) || 0) * (parseFloat(row.qty) || 0);
+                return (
+                  <tr key={index} style={{ borderBottom: `1px solid ${S.border}` }}>
+                    <td style={{ padding: '12px', color: S.muted, textAlign: 'center', fontSize: '11px' }}>{index + 1}</td>
+                    <td style={{ padding: '8px' }}>
+                      <select value={row.supplierId} onChange={(e) => handleRowChange(index, 'supplierId', e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: `1px solid ${S.border}`, background: S.navyBg, color: S.white, fontSize: '12px' }}>
+                        <option value="">-- المورد --</option>
+                        {filteredSuppliers.map(s => <option key={s.id} value={s.id}>{s.company_name}</option>)}
+                      </select>
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <input type="number" value={row.price} onChange={(e) => handleRowChange(index, 'price', e.target.value)}
+                        style={{ width: '90px', padding: '8px', borderRadius: '6px', border: `1px solid ${S.border}`, background: S.navyBg, color: S.green, fontWeight: 700, textAlign: 'center' }} />
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <input type="number" value={row.qty} onChange={(e) => handleRowChange(index, 'qty', e.target.value)}
+                        style={{ width: '110px', padding: '8px', borderRadius: '6px', border: `1px solid ${S.border}`, background: S.navyBg, color: S.white, textAlign: 'center' }} />
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <input type="text" value={row.unit} onChange={(e) => handleRowChange(index, 'unit', e.target.value)}
+                        style={{ width: '60px', padding: '8px', borderRadius: '6px', border: `1px solid ${S.border}`, background: S.navyBg, color: S.muted, textAlign: 'center', fontSize: '11px' }} />
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <div style={{ background: 'rgba(201,168,76,0.08)', padding: '8px', borderRadius: '6px', border: `1px solid ${S.border}`, color: S.gold2, fontWeight: 800, textAlign: 'center', fontSize: '12px', minWidth: '100px' }}>
+                        {fM(total)}
+                      </div>
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <select value={row.status} onChange={(e) => handleRowChange(index, 'status', e.target.value)}
+                        style={{ width: '85px', padding: '6px', borderRadius: '6px', background: row.status === 'مقبول' ? S.green : row.status === 'مرفوض' ? S.red : S.navyBg, color: S.white, fontWeight: 700, fontSize: '10px', textAlign: 'center', border: 'none' }}>
+                        <option value="انتظار">انتظار</option>
+                        <option value="مقبول">مقبول</option>
+                        <option value="مرفوض">مرفوض</option>
+                      </select>
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <input type="text" value={row.notes} onChange={(e) => handleRowChange(index, 'notes', e.target.value)}
+                        style={{ width: '100%', padding: '8px', borderRadius: '6px', border: `1px solid ${S.border}`, background: S.navyBg, color: S.white, fontSize: '11px' }} />
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
-<button
-  onClick={saveSession}
-  disabled={saving}
-  style={{
-    width:'100%',
-    padding:'16px',
-    background:saving ? S.muted : S.gold,
-    color:S.navy2,
-    fontWeight:800,
-    border:'none',
-    cursor:saving ? 'not-allowed':'pointer',
-    fontSize:'16px'
-  }}
->
-  {saving ? 'جارٍ الحفظ...' : 'حفظ التقرير 💾'}
-</button>
-
+          <button onClick={saveSession} disabled={saving}
+            style={{ width: '100%', padding: '16px', background: S.gold, color: S.navy2, fontWeight: 800, border: 'none', cursor: 'pointer', fontSize: '14px' }}>
+            {saving ? 'جاري معالجة البيانات...' : 'اعتماد وحفظ تقرير التسعير 💾'}
+          </button>
         </div>
 
-        <h3 style={{ color: S.gold, marginBottom: '15px', fontSize: '18px' }}>📜 سجل العمليات</h3>
-        <div style={{ background: S.navy2, borderRadius: '16px', border: `1px solid ${S.borderG}`, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-            <thead>
-              <tr style={{ background: 'rgba(255, 255, 255, 0.02)', color: S.gold2, fontSize: '12px' }}>
-                <th style={{ padding: '15px', width: '50px', textAlign: 'center' }}>#</th>
-<th style={{ padding: '15px' }}>المنتج</th>
-                <th style={{ padding: '15px' }}>المعتمد</th>
-                <th style={{ padding: '15px' }}>السعر</th>
-                <th style={{ padding: '15px' }}>التفاصيل والملاحظات</th>
-                <th style={{ padding: '15px' }}>التاريخ</th>
-                <th style={{ padding: '15px', textAlign: 'center' }}>الإجراءات</th>
-              </tr>
-            </thead>
- <tbody style={{ fontSize: '13px' }}>
-  {history.map((item, idx) => (
-    <tr key={item.id || idx} style={{ borderBottom: `1px solid ${S.borderG}` }}>
-      {/* 1. الرقم التسلسلي */}
-      <td style={{ padding: '15px', color: S.muted, textAlign: 'center', fontWeight: 500 }}>
-        {idx + 1}
-      </td>
-
-      {/* 2. اسم المنتج */}
-      <td style={{ padding: '15px', fontWeight: 700 }}>{item.product_name}</td>
-
-      {/* 3. المورد المعتمد */}
-      <td style={{ padding: '15px', color: S.green }}>{item.accepted_supplier}</td>
-
-      {/* 4. السعر المعتمد */}
-      <td style={{ padding: '15px', fontWeight: 700 }}>{item.accepted_price}</td>
-
-      {/* 5. التفاصيل والملاحظات */}
-      <td style={{ padding: '15px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {item.rejected_summary?.split(' | ').map((rs: string, i: number) => (
-            <span key={i} style={{ fontSize: '10px', background: 'rgba(255, 255, 255, 0.05)', color: S.muted, padding: '3px 10px', borderRadius: '6px', border: `1px solid ${S.borderG}` }}>
-              {rs}
-            </span>
-          ))}
-        </div>
-      </td>
-
-      {/* 6. التاريخ */}
-      <td style={{ padding: '15px', color: S.muted, fontSize: '11px' }}>
-        {item.created_at ? new Date(item.created_at).toLocaleDateString('ar-EG') : '---'}
-      </td>
-
-      {/* 7. زر الحذف */}
-      <td style={{ padding: '15px', textAlign: 'center' }}>
-        <button 
-          onClick={() => deleteSession(item.id)} 
-          style={{ background: 'none', border: 'none', color: S.red, cursor: 'pointer', fontSize: '16px' }}
-        >
-          🗑️
-        </button>
-      </td>
-    </tr>
-  ))}
-</tbody>
-          </table>
+        {/* History Table with Rejected Offers */}
+        <div style={{ marginTop: '40px' }}>
+          <h3 style={{ color: S.gold, fontSize: '16px', marginBottom: '15px', fontWeight: 700 }}>📜 سجل جلسات التسعير السابقة</h3>
+          <div style={{ background: S.navy2, borderRadius: '12px', border: `1px solid ${S.border}`, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+<thead>
+  <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
+     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>المنتج</th>
+     
+     {/* قم بتغيير العرض هنا (مثلاً 180px أو 200px) */}
+     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700, width: '200px' }}>المورد المعتمد</th>
+     
+     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>السعر المعتمد</th>
+     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>العروض الأخرى (المرفوضة)</th>
+     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>التاريخ</th>
+     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>حذف</th>
+  </tr>
+</thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.id} style={{ borderBottom: `1px solid ${S.border}` }}>
+                    <td style={{ padding: '15px', fontSize: '12px', fontWeight: 700 }}>{h.product_name}</td>
+                    <td style={{ padding: '15px' }}>
+                       <span style={{ color: S.green, background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px' }}>{h.accepted_supplier}</span>
+                    </td>
+                    <td style={{ padding: '15px', fontWeight: 800, fontSize: '13px', color: S.white }}>{fM(h.accepted_price)}</td>
+                    <td style={{ padding: '15px' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {h.rejected_summary ? h.rejected_summary.split(' | ').map((rs: string, i: number) => (
+                          <span key={i} style={{ fontSize: '10px', background: 'rgba(239,68,68,0.08)', color: S.muted, padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(239,68,68,0.2)' }}>
+                            {rs}
+                          </span>
+                        )) : <span style={{ color: S.muted, fontSize: '10px' }}>لا توجد عروض أخرى</span>}
+                      </div>
+                    </td>
+                    <td style={{ padding: '15px', color: S.muted, fontSize: '11px' }}>{new Date(h.created_at).toLocaleDateString('ar-EG')}</td>
+                    <td style={{ padding: '15px', textAlign: 'center' }}>
+                      <button onClick={() => deleteSession(h.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.red, fontSize: '16px' }}>🗑️</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </AppShell>
@@ -356,9 +267,9 @@ setSaving(false)
 
 function StatCard({ label, value, color }: any) {
   return (
-    <div style={{ background: S.navy2, padding: '10px 18px', borderRadius: '12px', border: `1px solid ${S.borderG}`, textAlign: 'center', minWidth: '100px' }}>
-      <div style={{ color: S.muted, fontSize: '10px', marginBottom: '4px' }}>{label}</div>
-      <div style={{ fontSize: '18px', fontWeight: 800, color: color }}>{value}</div>
+    <div style={{ background: S.navy2, padding: '8px 15px', borderRadius: '10px', border: `1px solid ${S.border}`, textAlign: 'center', minWidth: '100px' }}>
+      <div style={{ color: S.muted, fontSize: '9px', fontWeight: 700, marginBottom: '2px' }}>{label}</div>
+      <div style={{ fontSize: '15px', fontWeight: 900, color: color }}>{value}</div>
     </div>
   )
 }

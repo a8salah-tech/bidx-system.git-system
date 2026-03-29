@@ -14,3 +14,33 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+<style dangerouslySetInnerHTML={{ __html: `
+  @media print {
+    /* إجبار الصفحة على الوضع العرضي */
+    @page { 
+      size: landscape !important; 
+      margin: 1cm !important; 
+    }
+    
+    /* التأكد من أن الحاوية الرئيسية تأخذ العرض الكامل */
+    html, body, #__next, main {
+      width: 100% !important;
+      height: auto !important;
+      background: white !important;
+      color: black !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    /* إخفاء الأزرار وأي شيء لا نحتاجه في الورق */
+    button, .no-print, nav, aside {
+      display: none !important;
+    }
+
+    /* إظهار خلفيات الجداول والألوان (مهم جداً للبريدج إيدج) */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  }
+` }} />

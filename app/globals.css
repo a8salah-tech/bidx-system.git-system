@@ -51,3 +51,33 @@ button {
   transition: all 0.3s ease;
   font-family: 'Tajawal', sans-serif !important;
 }
+/* --- إعدادات الطباعة العالمية للمشروع --- */
+@media print {
+  @page { 
+    /* إجبار المتصفح على اختيار وضعية العرض لجميع الصفحات */
+    size: landscape; 
+    margin: 15mm; 
+  }
+
+  /* تحسينات عامة للطباعة لراحة العين على الورق */
+  body {
+    background-color: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* إخفاء أي عناصر غير مخصصة للورق (مثل أزرار التنقل أو الحذف) */
+  button, 
+  .no-print, 
+  nav, 
+  footer { 
+    display: none !important; 
+  }
+
+  /* ضمان تمدد الجداول لتملأ عرض الورقة */
+  table {
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+}

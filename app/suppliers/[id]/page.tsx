@@ -4,6 +4,8 @@ import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 
+
+
 interface Supplier {
   id: string
   created_at: string
@@ -70,6 +72,14 @@ function ContactTab({ supplier, supplierId, setSupplier }: { supplier: any, supp
   const [selectedDoc, setSelectedDoc] = useState<any>(null)
   const [uploading, setUploading] = useState(false)
   const [fileToUpload, setFileToUpload] = useState<File | null>(null)
+  // أضف هذا السطر مع بقية الـ states في الأعلى
+const [ratings, setRatings] = useState({
+  quality: 0,
+  delivery: 0,
+  communication: 0,
+  price: 0,
+  flexibility: 0
+});
   
   // دمج تفاصيل المستند مع حقل الاسم المخصص وتاريخ اليوم تلقائياً
   const [docDetails, setDocDetails] = useState({ 
@@ -128,6 +138,31 @@ function ContactTab({ supplier, supplierId, setSupplier }: { supplier: any, supp
       console.error('Fetch Error:', err)
     }
   }
+useEffect(() => {
+  async function fetchSupplierRating() {
+    const { data } = await supabase
+       .from('suppliers')
+       .select('quality_rating, delivery_rating, comm_rating, price_rating, flex_rating')
+       .eq('id', supplierId)
+       .single();
+
+    if (data) {
+      // هنا نقوم بتحديث الـ State لكي تظهر النجوم والارقام فوراً
+      setRatings({
+        quality: data.quality_rating || 0,
+        delivery: data.delivery_rating || 0,
+        communication: data.comm_rating || 0,
+        price: data.price_rating || 0,
+        flexibility: data.flex_rating || 0
+      });
+      // إذا كان لديك State خاص بالمتوسط العام (avg) سيتم تحديثه تلقائياً
+    }
+  }
+
+  if (supplierId) {
+    fetchSupplierRating();
+  }
+}, [supplierId]);
 
   useEffect(() => { fetchDocs() }, [supplierId])
 
@@ -716,7 +751,13 @@ function RatingTab({ supplier, supplierId, priceHistory }: { supplier: any, supp
     { key: 'flexibility', label: 'المرونة', color: '#F59E0B' },
   ]
 
-  const avg = loaded ? Math.round((ratings.quality + ratings.delivery + ratings.communication + ratings.price + ratings.flexibility) / 5 * 10) / 10 : 0
+const avg = Math.round(
+  ((ratings.quality || supplier.quality_rating || 0) + 
+   (ratings.delivery || supplier.delivery_rating || 0) + 
+   (ratings.communication || supplier.comm_rating || 0) + 
+   (ratings.price || supplier.price_rating || 0) + 
+   (ratings.flexibility || supplier.flex_rating || 0)) / 5 * 10
+) / 10;
 
   async function saveRating() {
     if (!window.confirm(`هل تريد حفظ التقييم الإجمالي ${avg}/10 ؟`)) return
@@ -754,7 +795,7 @@ function RatingTab({ supplier, supplierId, priceHistory }: { supplier: any, supp
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '16px', textAlign: 'right' }}>تقييم Bridge Edge للمورد</div>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '16px', textAlign: 'right' }}>تقييم   المورد</div>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '24px', marginBottom: '20px' }}>
           <div style={{ textAlign: 'center', flexShrink: 0, background: S.card2, borderRadius: '12px', padding: '16px 20px', minWidth: '100px' }}>
             <div style={{ fontSize: '36px', fontWeight: 700, color: S.white, lineHeight: 1 }}>{avg}</div>
@@ -1052,8 +1093,7 @@ fetchPriceHistory()
           {[
             { label: 'إجمالي الصفقات', val: supplier.total_deals || 0, color: S.gold },
             { label: 'إجمالي المبلغ', val: supplier.total_amount ? `$${supplier.total_amount.toLocaleString()}` : '$0', color: S.green },
-            { label: 'التقييم', val: `${avg}/10`, color: S.blue },
-            { label: 'المبيعات السنوية', val: supplier.annual_sales || '—', color: S.amber },
+{ label: 'التقييم', val: `${avg > 0 ? avg : (supplier?.rating || 0)}/10`, color: S.blue },            { label: 'المبيعات السنوية', val: supplier.annual_sales || '—', color: S.amber },
           ].map((m, i) => (
             <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px', textAlign: 'right' }}>
               <div style={{ fontSize: '22px', fontWeight: 700, color: m.color, marginBottom: '4px' }}>{m.val}</div>
