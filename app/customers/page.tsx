@@ -196,7 +196,6 @@ export default function CustomersPage() {
 
   // ===== الواجهة =====
   return (
-  <AppShell> 
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal, sans-serif', direction: 'rtl' }}>
 
       {/* ── شريط الأدوات ── */}
@@ -579,6 +578,5 @@ export default function CustomersPage() {
          )}
 
       </div>
-    </AppShell>
   );
 }
