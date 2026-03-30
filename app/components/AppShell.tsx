@@ -14,8 +14,10 @@ const S = {
 }
 
 const navItems = [
-  { label: 'قائمة الموردين', href: '/suppliers', color: '#7F77DD' },
-  { label: 'المنتجات', href: '/products', color: S.gold },
+  { label: 'إدارة الموردين', href: '/suppliers', color: '#7F77DD' },
+  { label: 'إدرة المنتجات', href: '/products', color: S.gold },
+  { label: 'إدرة العملاء', href: '/customers', color: '#FAFAF8' },
+
 ]
 
 const pageTitles: Record<string, string> = {

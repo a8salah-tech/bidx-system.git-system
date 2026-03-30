@@ -230,7 +230,7 @@ export default function ProductsPage() {
             + إضافة منتج
           </button>
           <button onClick={exportToExcel}
-            style={{ background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             📤 تصدير
           </button>
         </div>

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
-
+import AppShell from "../components/AppShell";
 // ===== تعريف نوع بيانات المورد =====
 interface Supplier {
   id: string
