@@ -1,5 +1,6 @@
 'use client'
 
+// ===== الاستيرادات =====
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
@@ -29,6 +30,7 @@ interface Supplier {
   website: string
 }
 
+// ===== دوال مساعدة (خارج المكون — صحيح) =====
 function timeAgo(date: string) {
   if (!date) return null
   const diff = Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
@@ -43,36 +45,50 @@ function formatSupNum(n: number) {
   return `SUP-${String(n).padStart(5, '0')}`
 }
 
+// ===== دالة تنظيف اسم المنتج (BidLX V1.2.1) =====
+function cleanProductName(name: string): string {
+  return name
+    .trim()
+    .replace(/^(ال)/, '')       // حذف "ال" التعريف من البداية
+    .replace(/\s+/g, ' ')        // توحيد المسافات
+    .toLowerCase()               // توحيد الأحرف
+}
+
+// ===== نظام الألوان الموحد =====
 const S = {
-  navy: '#0A1628',
+  navy:  '#0A1628',
   navy2: '#0F2040',
-  gold: '#C9A84C',
+  gold:  '#C9A84C',
   gold2: '#E8C97A',
   gold3: 'rgba(201,168,76,0.12)',
   white: '#FAFAF8',
   muted: '#8A9BB5',
   border: 'rgba(255,255,255,0.08)',
   green: '#22C55E',
-  red: '#EF4444',
-  blue: '#3B82F6',
+  red:   '#EF4444',
+  blue:  '#3B82F6',
   amber: '#F59E0B',
   card2: 'rgba(255,255,255,0.08)',
 }
 
+// ===== المكون الرئيسي =====
 export default function SuppliersPage() {
+
+  // ===== الراوتر — داخل المكون (صحيح) =====
   const router = useRouter()
 
-  const [currentPage, setCurrentPage] = useState(1)
+  // ===== الـ State — كل الـ Hooks في أعلى المكون =====
+  const [currentPage, setCurrentPage]   = useState(1)
   const rowsPerPage = 20
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<'active' | 'suspended'>('active')
-  const [showForm, setShowForm] = useState(false)
-  const [aiLoading, setAiLoading] = useState(false)
+  const [suppliers, setSuppliers]       = useState<Supplier[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [search, setSearch]             = useState('')
+  const [tab, setTab]                   = useState<'active' | 'suspended'>('active')
+  const [showForm, setShowForm]         = useState(false)
+  const [aiLoading, setAiLoading]       = useState(false)
   const [filterCountry, setFilterCountry] = useState('')
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [userName, setUserName] = useState('User')
+  const [viewMode, setViewMode]         = useState<'table' | 'cards'>('table')
+  const [userName, setUserName]         = useState('User')
   const [form, setForm] = useState({
     company_name: '', country: '', city: '',
     contact_name: '', contact_whatsapp: '',
@@ -84,15 +100,12 @@ export default function SuppliersPage() {
   // ===== تحميل البيانات عند فتح الصفحة =====
   useEffect(() => {
     fetchSuppliers()
-    // جلب اسم المستخدم
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User')
-      }
+      if (user) setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User')
     })
   }, [])
 
-  // ===== جلب الموردين =====
+  // ===== 1. جلب الموردين =====
   async function fetchSuppliers() {
     setLoading(true)
     try {
@@ -109,7 +122,102 @@ export default function SuppliersPage() {
     }
   }
 
-  // ===== تصدير إكسيل =====
+  // ===== 2. تعبئة بالذكاء الاصطناعي (BidLX V1.2.1) =====
+  async function fillWithAI() {
+    if (!form.company_name) { alert('اكتب اسم الشركة أولاً'); return }
+    setAiLoading(true)
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_name: form.company_name }),
+      })
+      const data = await res.json()
+      const aiContent = data?.choices?.[0]?.message?.content || '{}'
+
+      // تحليل JSON القادم من AI مع معالجة الأخطاء
+      const parsed = JSON.parse(aiContent.replace(/```json|```/g, '').trim())
+
+      // توزيع البيانات على الـ Form State
+      // مع تحويل المصفوفات → نص مفصول بفاصلة عربية ،
+      setForm(prev => ({
+        ...prev,
+        ...parsed,
+        main_products: Array.isArray(parsed.main_products)
+          ? parsed.main_products.join('، ')
+          : (parsed.main_products || prev.main_products),
+      }))
+    } catch (err: any) {
+      alert('تعذر الاتصال بالذكاء الاصطناعي')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  // ===== 3. إضافة مورد جديد مع ترحيل المنتجات (BidLX V1.2.1) =====
+  async function addSupplier() {
+    // التحقق الأساسي
+    if (!form.company_name) { alert('يرجى إدخال اسم الشركة'); return }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) { alert('جلسة الدخول انتهت'); return }
+
+    try {
+      // معالجة المنتجات وتنظيفها باستخدام cleanProductName
+      const rawProducts = form.main_products || ''
+      const productsArray = rawProducts
+        .split(/[،,]/)
+        .map(p => cleanProductName(p))
+        .filter(p => p !== '')
+
+      // ترحيل المنتجات لجدول products مع منع التكرار (upsert)
+      if (productsArray.length > 0) {
+        const productInserts = productsArray.map(name => ({ name }))
+        const { error: prodError } = await supabase
+          .from('products')
+          .upsert(productInserts, { onConflict: 'name' })
+        if (prodError) throw prodError
+      }
+
+      // حفظ بيانات المورد في جدول suppliers
+      const { error: suppError } = await supabase.from('suppliers').insert([{
+        ...form,
+        main_products: productsArray.join('، '), // النسخة المنسقة والموحدة
+        status: 'active',
+        rating: 0,
+        completion_pct: calcCompletion(form),
+        user_id: user.id,
+      }])
+      if (suppError) throw suppError
+
+      alert('تم ترحيل المورد وتحديث مخزن المنتجات بنجاح ✅')
+      setForm({
+        company_name: '', country: '', city: '', contact_name: '',
+        contact_whatsapp: '', contact_email: '', annual_sales: '',
+        main_products: '', notes: '', website: '',
+      })
+      setShowForm(false)
+      fetchSuppliers()
+
+    } catch (err: any) {
+      console.error('خطأ ترحيل BidLX:', err.message)
+      alert('حدث خطأ أثناء الحفظ: ' + err.message)
+    }
+  }
+
+  // ===== 4. تغيير حالة المورد (toggleStatus) =====
+  async function toggleStatus(id: string, currentStatus: string) {
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
+    const { error } = await supabase
+      .from('suppliers')
+      .update({ status: newStatus })
+      .eq('id', id)
+    if (error) { console.error('خطأ تغيير الحالة:', error.message); return }
+    // تحديث القائمة فوراً دون إعادة تحميل كاملة
+    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
+  }
+
+  // ===== 5. تصدير إكسيل =====
   const exportToExcel = () => {
     if (filtered.length === 0) return alert('لا توجد بيانات للتصدير')
     const worksheet = XLSX.utils.json_to_sheet(
@@ -128,51 +236,6 @@ export default function SuppliersPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Suppliers')
     const dateStr = new Date().toISOString().split('T')[0]
     XLSX.writeFile(workbook, `${userName}_Suppliers_${dateStr}.xlsx`)
-  }
-
-  // ===== إضافة مورد =====
-  async function addSupplier() {
-    if (!form.company_name) { alert('يرجى إدخال اسم الشركة'); return }
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) { alert('جلسة الدخول انتهت'); return }
-    const { error } = await supabase.from('suppliers').insert([{
-      ...form,
-      status: 'active',
-      rating: 0,
-      completion_pct: calcCompletion(form),
-      user_id: user.id,
-    }])
-    if (error) { alert('خطأ: ' + error.message); return }
-    setForm({ company_name: '', country: '', city: '', contact_name: '', contact_whatsapp: '', contact_email: '', annual_sales: '', main_products: '', notes: '', website: '' })
-    setShowForm(false)
-    fetchSuppliers()
-  }
-
-  // ===== تغيير حالة المورد =====
-  async function toggleStatus(id: string, current: string) {
-    await supabase.from('suppliers').update({ status: current === 'active' ? 'suspended' : 'active' }).eq('id', id)
-    fetchSuppliers()
-  }
-
-  // ===== تعبئة بالذكاء الاصطناعي =====
-  async function fillWithAI() {
-    if (!form.company_name) { alert('اكتب اسم الشركة أولاً'); return }
-    setAiLoading(true)
-    try {
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_name: form.company_name }),
-      })
-      const data = await res.json()
-      const text = data?.choices?.[0]?.message?.content || '{}'
-      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim())
-      setForm(prev => ({ ...prev, ...parsed }))
-    } catch {
-      alert('تعذر الاتصال بالذكاء الاصطناعي')
-    } finally {
-      setAiLoading(false)
-    }
   }
 
   // ===== حساب اكتمال الملف =====
@@ -202,6 +265,7 @@ export default function SuppliersPage() {
     outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
   }
 
+  // ===== الواجهة =====
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
@@ -220,22 +284,10 @@ export default function SuppliersPage() {
             style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             📊 مقارنة أسعار
           </button>
-<button 
-  onClick={() => router.push('/Buy-Request')}
-  style={{ 
-    background: 'rgba(232,201,122,0.1)', 
-    color: S.gold2, 
-    border: `1px solid ${S.gold}`, 
-    padding: '9px 20px', 
-    borderRadius: '8px', 
-    fontSize: '13px', 
-    fontWeight: 700, 
-    cursor: 'pointer', 
-    fontFamily: 'inherit' 
-  }}
->
-  ⚖️ طلب شراء
-</button>
+          <button onClick={() => router.push('/Buy-Request')}
+            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            ⚖️ طلب شراء
+          </button>
         </div>
       </div>
 
@@ -245,10 +297,10 @@ export default function SuppliersPage() {
         {/* الإحصائيات */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
           {[
-            { label: 'إجمالي الموردين', val: suppliers.length, color: S.gold },
-            { label: 'موردون نشطون', val: suppliers.filter(s => s.status === 'active').length, color: S.green },
-            { label: 'موقوفون', val: suppliers.filter(s => s.status === 'suspended').length, color: S.red },
-            { label: 'إجمالي الصفقات', val: suppliers.reduce((a, b) => a + (b.total_deals || 0), 0), color: S.blue },
+            { label: 'إجمالي الموردين',  val: suppliers.length, color: S.gold },
+            { label: 'موردون نشطون',     val: suppliers.filter(s => s.status === 'active').length, color: S.green },
+            { label: 'موقوفون',          val: suppliers.filter(s => s.status === 'suspended').length, color: S.red },
+            { label: 'إجمالي الصفقات',   val: suppliers.reduce((a, b) => a + (b.total_deals || 0), 0), color: S.blue },
           ].map((s, i) => (
             <div key={i} style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
               <div style={{ fontSize: '28px', fontWeight: 700, color: s.color, marginBottom: '4px' }}>{s.val}</div>
@@ -415,6 +467,7 @@ export default function SuppliersPage() {
                           </span>
                         </td>
 
+                        {/* تواصل سريع */}
                         <td style={{ padding: '12px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             {s.contact_whatsapp && (
@@ -451,6 +504,7 @@ export default function SuppliersPage() {
                           </div>
                         </td>
 
+                        {/* إجراء */}
                         <td style={{ padding: '12px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
                             {s.status === 'suspended' && (
@@ -464,6 +518,7 @@ export default function SuppliersPage() {
                                 ✕
                               </button>
                             )}
+                            {/* toggleStatus — مربوط بالدالة المصلحة */}
                             <button onClick={() => toggleStatus(s.id, s.status)}
                               style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: `1px solid rgba(255,255,255,0.15)`, background: 'transparent', color: s.status === 'active' ? S.red : S.green, cursor: 'pointer', fontFamily: 'inherit' }}>
                               {s.status === 'active' ? 'إيقاف' : 'تفعيل'}
@@ -487,7 +542,7 @@ export default function SuppliersPage() {
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         disabled={currentPage === 1}
                         style={{ padding: '6px 14px', borderRadius: '7px', border: `1px solid ${S.border}`, background: 'transparent', color: currentPage === 1 ? S.muted : S.white, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
-                      → السابق   
+                        → السابق
                       </button>
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
                         .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
@@ -510,7 +565,7 @@ export default function SuppliersPage() {
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages}
                         style={{ padding: '6px 14px', borderRadius: '7px', border: `1px solid ${S.border}`, background: 'transparent', color: currentPage === totalPages ? S.muted : S.white, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
-                       ← التالي 
+                        ← التالي
                       </button>
                     </div>
                   </div>
@@ -538,13 +593,13 @@ export default function SuppliersPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
                 { label: 'اسم الشركة *', key: 'company_name', placeholder: 'مثال: Wilmar International' },
-                { label: 'الدولة', key: 'country', placeholder: 'إندونيسيا' },
-                { label: 'المدينة', key: 'city', placeholder: 'جاكرتا' },
+                { label: 'الدولة',         key: 'country',       placeholder: 'إندونيسيا' },
+                { label: 'المدينة',        key: 'city',          placeholder: 'جاكرتا' },
                 { label: 'المنتجات الرئيسية', key: 'main_products', placeholder: 'زيت نخيل، ورق...' },
-                { label: 'اسم المسؤول', key: 'contact_name', placeholder: 'الشخص المسؤول' },
-                { label: 'واتساب', key: 'contact_whatsapp', placeholder: '+62 8xx xxx xxxx' },
-                { label: 'الموقع الإلكتروني', key: 'website', placeholder: 'www.company.com' },
-                { label: 'الإيميل', key: 'contact_email', placeholder: 'email@company.com' },
+                { label: 'اسم المسؤول',   key: 'contact_name',  placeholder: 'الشخص المسؤول' },
+                { label: 'واتساب',         key: 'contact_whatsapp', placeholder: '+62 8xx xxx xxxx' },
+                { label: 'الموقع الإلكتروني', key: 'website',   placeholder: 'www.company.com' },
+                { label: 'الإيميل',        key: 'contact_email', placeholder: 'email@company.com' },
                 { label: 'حجم المبيعات السنوية', key: 'annual_sales', placeholder: '$10M' },
               ].map(f => (
                 <div key={f.key}>
