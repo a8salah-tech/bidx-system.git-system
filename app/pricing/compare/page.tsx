@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import AppShell from "../../components/AppShell"
+import { CURRENCIES, COUNTRIES } from '../../components/options' 
 
 const tajawalFont = `'Tajawal', sans-serif`;
 const S = {
@@ -17,12 +18,16 @@ const S = {
   red:     '#EF4444',
 };
 
-const fM = (v: any) => {
-  const n = parseFloat(v);
-  return isNaN(n) ? "0.00" : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
+interface CurrencyOption {
+  id: string;
+  label: string;
+  value: string;
+  symbol?: string;
+}
 
 export default function BridgeEdgePricingRadar() {
+  const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [selectedCountry, setSelectedCountry] = useState('ID');
   const [saving, setSaving] = useState(false)
   const [allSuppliers, setAllSuppliers] = useState<any[]>([])
   const [availableProducts, setAvailableProducts] = useState<string[]>([])
@@ -74,6 +79,23 @@ export default function BridgeEdgePricingRadar() {
     }
   }
 
+  const formatPrice = (amount: number) => {
+    if (!amount) return '0.00';
+    const currencyInfo = (CURRENCIES as CurrencyOption[]).find(c => c.value === selectedCurrency);
+    const symbol = currencyInfo?.symbol || selectedCurrency;
+    const formattedNumber = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+    return `${symbol} ${formattedNumber}`;
+  };
+
+  const fM = (v: any) => {
+    const n = parseFloat(v);
+    if (isNaN(n)) return "0.00";
+    return formatPrice(n); // نستخدم الدالة الموحدة هنا
+  };
+
   const activePrices = rows.map(r => parseFloat(r.price)).filter(p => !isNaN(p) && p > 0)
   const minPrice = activePrices.length ? Math.min(...activePrices) : 0
   const maxPrice = activePrices.length ? Math.max(...activePrices) : 0
@@ -83,30 +105,33 @@ export default function BridgeEdgePricingRadar() {
     ? allSuppliers.filter(s => s.main_products?.toLowerCase().includes(selectedProduct.toLowerCase()))
     : allSuppliers;
 
-  const saveSession = async () => {
-    if(saving) return
-    setSaving(true)
-    try {
-      if (!selectedProduct) throw new Error('حدد المنتج المستهدف أولاً')
-      const acceptedRow = rows.find(r => r.status === 'مقبول')
-      if (!acceptedRow || !acceptedRow.price) throw new Error('يجب تعميد مورد واحد على الأقل (مقبول)')
+const saveSession = async () => {
+  if(saving) return
+  setSaving(true)
+  try {
+    if (!selectedProduct) throw new Error('حدد المنتج المستهدف أولاً')
+    const acceptedRow = rows.find(r => r.status === 'مقبول')
+    if (!acceptedRow || !acceptedRow.price) throw new Error('يجب تعميد مورد واحد على الأقل (مقبول)')
 
-      const rejectedSummary = rows
-        .filter(r => r.supplierId && r.status !== 'مقبول')
-        .map(r => {
-          const sName = allSuppliers.find(s => s.id === r.supplierId)?.company_name || 'مورد';
-          return `${sName}: ${r.price}`;
-        }).join(' | ')
+    const rejectedSummary = rows
+      .filter(r => r.supplierId && r.status !== 'مقبول')
+      .map(r => {
+        const sName = allSuppliers.find(s => s.id === r.supplierId)?.company_name || 'مورد';
+        return `${sName}: ${r.price}`;
+      }).join(' | ')
 
-      const { error } = await supabase.from('pricing_sessions').insert([{
-        product_name: selectedProduct,
-        min_price: minPrice,
-        avg_price: avgPrice,
-        max_price: maxPrice,
-        accepted_supplier: allSuppliers.find(s => s.id === acceptedRow.supplierId)?.company_name || 'مورد معتمد',
-        accepted_price: Number(acceptedRow.price),
-        rejected_summary: rejectedSummary
-      }])
+    // --- التعديل هنا ---
+    const { error } = await supabase.from('pricing_sessions').insert([{
+      product_name: selectedProduct,
+      min_price: minPrice,
+      avg_price: avgPrice,
+      max_price: maxPrice,
+      accepted_supplier: allSuppliers.find(s => s.id === acceptedRow.supplierId)?.company_name || 'مورد معتمد',
+      accepted_price: Number(acceptedRow.price),
+      currency: selectedCurrency, // أضف هذا السطر لضمان حفظ العملة المختارة حالياً
+      rejected_summary: rejectedSummary
+    }])
+    // ------------------
 
       if (error) throw error
       alert('تم اعتماد وحفظ الجلسة بنجاح ✅');
@@ -117,7 +142,6 @@ export default function BridgeEdgePricingRadar() {
     finally { setSaving(false) }
   }
 
- 
   return (
     <AppShell>
       <style dangerouslySetInnerHTML={{ __html: `
@@ -128,18 +152,118 @@ export default function BridgeEdgePricingRadar() {
 
       <div style={{ backgroundColor: S.navyBg, minHeight: '100vh', direction: 'rtl', padding: '30px', color: S.white }}>
         
-        {/* Radar Header */}
+        {/* Header Section */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
-            <div>
-              <h1 style={{ color: S.gold, margin: 0, fontSize: '22px', fontWeight: 800 }}> مقارنة أسعار الموردين </h1>
-              <p style={{ fontSize: '11px', color: S.muted, margin: '4px 0 0 0' }}> يتم إرسال الأسعار المحدثة لكل مورد في صفحته الخاصة بشكل آلي بعد الضغط علي حفظ التقرير
-</p>
-            </div>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <StatCard label="الأدنى" value={fM(minPrice)} color={S.green} />
-              <StatCard label="المتوسط" value={fM(avgPrice)} color={S.gold2} />
-              <StatCard label="الأعلى" value={fM(maxPrice)} color={S.red} />
-            </div>
+          <div>
+            <h1 style={{ color: S.gold, margin: 0, fontSize: '22px', fontWeight: 800 }}> مقارنة أسعار الموردين </h1>
+            <p style={{ fontSize: '11px', color: S.muted, margin: '4px 0 0 0' }}> يتم إرسال الأسعار المحدثة لكل مورد آلياً بعد الحفظ </p>
+          </div>
+          <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+            {/* Currency Selector */}
+{/* Currency & Country Selector */}
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '5px' }}>
+{/* Container للقوائم مرتبة فوق بعضها */}
+<div style={{ 
+  display: 'flex', 
+  flexDirection: 'column', // ترتيب العناصر رأسياً
+  alignItems: 'flex-end',  // محاذاة لليمين (بما أن الواجهة RTL)
+  gap: '10px',             // مسافة بين الدولة والعملة
+  marginBottom: '20px' 
+}}>
+  
+</div>
+
+</div>
+<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '25px', gap: '20px' }}>
+  
+
+
+<div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', height: '94px' }}>
+  
+  {/* عمود القوائم المنسدلة */}
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', height: '100%' }}>
+    
+    {/* اختيار الدولة */}
+    <div style={{ 
+      background: S.navy2, padding: '0 12px', borderRadius: '10px', border: `1px solid ${S.border}`, 
+      display: 'flex', alignItems: 'center', width: '220px', height: '44px' 
+    }}>
+      <label style={{ fontSize: '10px', color: S.gold, fontWeight: 700, marginLeft: '8px' }}>📍 الدولة:</label>
+      <select 
+        value={selectedCountry} 
+        onChange={(e) => setSelectedCountry(e.target.value)}
+        style={{ background: 'none', border: 'none', color: S.white, fontSize: '12px', fontWeight: 'bold', outline: 'none', cursor: 'pointer', width: '100%' }}
+      >
+        <option value="" style={{background: S.navyBg}}>-- اختر الدولة --</option>
+        {(COUNTRIES as any[]).map((country) => (
+          <option key={country.id} value={country.id} style={{background: S.navyBg}}>{country.label}</option>
+        ))}
+      </select>
+    </div>
+
+    {/* اختيار العملة */}
+    <div style={{ 
+      background: S.navy2, padding: '0 12px', borderRadius: '10px', border: `1px solid ${S.border}`, 
+      display: 'flex', alignItems: 'center', width: '220px', height: '44px' 
+    }}>
+      <label style={{ fontSize: '10px', color: S.gold, fontWeight: 700, marginLeft: '8px' }}>💰 العملة:</label>
+      <select 
+        value={selectedCurrency} 
+        onChange={(e) => setSelectedCurrency(e.target.value)}
+        style={{ background: 'none', border: 'none', color: S.white, fontSize: '12px', fontWeight: 'bold', outline: 'none', cursor: 'pointer', width: '100%' }}
+      >
+        {(CURRENCIES as any[]).map((curr) => (
+          <option key={curr.value} value={curr.value} style={{background: S.navyBg}}>{curr.label} ({curr.symbol})</option>
+        ))}
+      </select>
+    </div>
+  </div>
+
+  {/* المربعات الثلاثة المقسمة بفاصلين */}
+  <div style={{ display: 'flex', gap: '10px', height: '94px' }}>
+    {[
+      { label: 'الأدنى', value: fM(minPrice), color: S.green },
+      { label: 'المتوسط', value: fM(avgPrice), color: S.gold2 },
+      { label: 'الأعلى', value: fM(maxPrice), color: S.red }
+    ].map((card, index) => {
+      const parts = card.value.split(' ');
+      const symbol = parts[0] || '';
+      const amount = parts[1] || card.value;
+
+      return (
+        <div key={index} style={{ 
+          background: S.navy2, borderRadius: '10px', border: `1px solid ${S.border}`, 
+          textAlign: 'center', minWidth: '115px', height: '100%', 
+          display: 'flex', flexDirection: 'column', overflow: 'hidden' 
+        }}>
+          {/* قسم العنوان */}
+          <div style={{ padding: '6px 0', fontSize: '10px', fontWeight: 700, color: S.muted }}>{card.label}</div>
+          
+          {/* الخط الفاصل الأول */}
+          <div style={{ width: '100%', height: '1px', background: S.border, opacity: 0.4 }}></div>
+          
+          {/* قسم المبلغ */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 900, color: card.color }}>
+            {amount}
+          </div>
+          
+          {/* الخط الفاصل الثاني */}
+          <div style={{ width: '100%', height: '1px', background: S.border, opacity: 0.4 }}></div>
+
+          {/* قسم العملة */}
+          <div style={{ padding: '4px 0', fontSize: '10px', color: S.gold2, fontWeight: 800, background: 'rgba(201,168,76,0.05)' }}>
+            {symbol}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</div>
+  
+</div>
+
+
+          </div>
         </div>
 
         {/* Product Selection */}
@@ -215,51 +339,62 @@ export default function BridgeEdgePricingRadar() {
           </button>
         </div>
 
-        {/* History Table with Rejected Offers */}
-        <div style={{ marginTop: '40px' }}>
-          <h3 style={{ color: S.gold, fontSize: '16px', marginBottom: '15px', fontWeight: 700 }}>📜 سجل جلسات التسعير السابقة</h3>
-          <div style={{ background: S.navy2, borderRadius: '12px', border: `1px solid ${S.border}`, overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-<thead>
-  <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
-     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>المنتج</th>
-     
-     {/* قم بتغيير العرض هنا (مثلاً 180px أو 200px) */}
-     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700, width: '200px' }}>المورد المعتمد</th>
-     
-     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>السعر المعتمد</th>
-     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>العروض الأخرى (المرفوضة)</th>
-     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>التاريخ</th>
-     <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>حذف</th>
-  </tr>
-</thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.id} style={{ borderBottom: `1px solid ${S.border}` }}>
-                    <td style={{ padding: '15px', fontSize: '12px', fontWeight: 700 }}>{h.product_name}</td>
-                    <td style={{ padding: '15px' }}>
-                       <span style={{ color: S.green, background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px' }}>{h.accepted_supplier}</span>
-                    </td>
-                    <td style={{ padding: '15px', fontWeight: 800, fontSize: '13px', color: S.white }}>{fM(h.accepted_price)}</td>
-                    <td style={{ padding: '15px' }}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                        {h.rejected_summary ? h.rejected_summary.split(' | ').map((rs: string, i: number) => (
-                          <span key={i} style={{ fontSize: '10px', background: 'rgba(239,68,68,0.08)', color: S.muted, padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(239,68,68,0.2)' }}>
-                            {rs}
-                          </span>
-                        )) : <span style={{ color: S.muted, fontSize: '10px' }}>لا توجد عروض أخرى</span>}
-                      </div>
-                    </td>
-                    <td style={{ padding: '15px', color: S.muted, fontSize: '11px' }}>{new Date(h.created_at).toLocaleDateString('ar-EG')}</td>
-                    <td style={{ padding: '15px', textAlign: 'center' }}>
-                      <button onClick={() => deleteSession(h.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.red, fontSize: '16px' }}>🗑️</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+<div style={{ marginTop: '40px' }}>
+  <h3 style={{ color: S.gold, fontSize: '16px', marginBottom: '15px', fontWeight: 700 }}>📜 سجل جلسات التسعير السابقة</h3>
+  <div style={{ background: S.navy2, borderRadius: '12px', border: `1px solid ${S.border}`, overflow: 'hidden' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+      <thead>
+        <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
+          <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>المنتج</th>
+          <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700, width: '200px' }}>المورد المعتمد</th>
+          <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>السعر المعتمد</th>
+          <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>العروض الأخرى</th>
+          <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>التاريخ</th>
+          <th style={{ padding: '12px 15px', fontSize: '10px', color: S.muted, fontWeight: 700 }}>حذف</th>
+        </tr>
+      </thead>
+ <tbody>
+  {history.map((h) => (
+    <tr key={h.id} style={{ borderBottom: `1px solid ${S.border}` }}>
+      <td style={{ padding: '15px', fontSize: '12px', fontWeight: 700 }}>{h.product_name}</td>
+      <td style={{ padding: '15px' }}>
+        <span style={{ color: S.green, background: 'rgba(16,185,129,0.1)', padding: '4px 10px', borderRadius: '6px', fontSize: '12px' }}>{h.accepted_supplier}</span>
+      </td>
+
+      {/* تعديل خلية السعر لتظهر العملة بشكل مميز */}
+<td style={{ padding: '15px' }}>
+  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+    {/* السعر الرقمي */}
+    <div style={{ fontWeight: 800, fontSize: '14px', color: S.white }}>
+      {Number(h.accepted_price).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+    </div>
+    
+    {/* عرض العملة: يحاول جلبها من السجل h.currency، وإذا لم يجدها يستخدم selectedCurrency */}
+    <div style={{ fontSize: '10px', color: S.gold2, fontWeight: 700, opacity: 0.8 }}>
+      {h.currency || selectedCurrency || (CURRENCIES as any[]).find(c => c.value === selectedCurrency)?.symbol}
+    </div>
+  </div>
+</td>
+
+      <td style={{ padding: '15px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {h.rejected_summary ? h.rejected_summary.split(' | ').map((rs: string, i: number) => (
+            <span key={i} style={{ fontSize: '10px', background: 'rgba(239,68,68,0.08)', color: S.muted, padding: '3px 8px', borderRadius: '4px', border: '1px solid rgba(239,68,68,0.2)' }}>
+              {rs}
+            </span>
+          )) : <span style={{ color: S.muted, fontSize: '10px' }}>لا توجد عروض أخرى</span>}
         </div>
+      </td>
+      <td style={{ padding: '15px', color: S.muted, fontSize: '11px' }}>{new Date(h.created_at).toLocaleDateString('ar-EG')}</td>
+      <td style={{ padding: '15px', textAlign: 'center' }}>
+        <button onClick={() => deleteSession(h.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.red, fontSize: '16px' }}>🗑️</button>
+      </td>
+    </tr>
+  ))}
+</tbody>
+    </table>
+  </div>
+</div>
       </div>
     </AppShell>
   )
