@@ -3,38 +3,35 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
-import AppShell from "../../components/AppShell";
 
-
+// ===== نوع بيانات العميل — بناءً على الأعمدة الفعلية في قاعدة البيانات =====
 interface Customer {
   id: string
   created_at: string
   customer_number: number
+  full_name: string
   company_name: string
   country: string
   city: string
   status: string
-  rating: number
-  completion_pct: number
-  contact_name: string
-  contact_whatsapp: string
-  contact_email: string
-  annual_sales: string
+  email: string
+  phone: string
+  interest: string
   notes: string
-  total_deals: number
-  total_amount: number
+  total_deals: string   // text في قاعدة البيانات
+  total_amount: string  // text في قاعدة البيانات
   main_products: string
   last_contact_date: string
-  last_contact_method: string
   website: string
-  registration_number: string
-  quality_rating: number
-  delivery_rating: number
-  comm_rating: number
-  price_rating: number
-  flex_rating: number
+  // أعمدة التقييم الفعلية
+  quality_rating: number   // عملية الشراء الأولى
+  delivery_rating: number  // عملية الشراء الثانية
+  comm_rating: number      // عملية الشراء الثالثة
+  price_rating: number     // عملية الشراء الرابعة
+  flex_rating: number      // عملية الشراء الخامسة
 }
 
+// ===== دوال مساعدة =====
 function timeAgo(date: string) {
   if (!date) return null
   const diff = Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
@@ -45,160 +42,80 @@ function timeAgo(date: string) {
   return `منذ ${Math.floor(diff / 30)} أشهر`
 }
 
-function formatSupNum(n: number) {
+function formatCustNum(n: number) {
   return `CUS-${String(n).padStart(5, '0')}`
 }
 
-const S = {
-  navy: '#0A1628',
-  navy2: '#0F2040',
-  navy3: '#152A52',
-  gold: '#C9A84C',
-  gold2: '#E8C97A',
-  gold3: 'rgba(201,168,76,0.12)',
-  white: '#FAFAF8',
-  muted: '#8A9BB5',
-  border: 'rgba(255,255,255,0.08)',
-  green: '#22C55E',
-  red: '#EF4444',
-  blue: '#3B82F6',
-  amber: '#F59E0B',
-  card: 'rgba(255,255,255,0.04)',
-  card2: 'rgba(255,255,255,0.08)',
+// ===== وسائل التواصل =====
+const METHODS: Record<string, { label: string; icon: string; color: string }> = {
+  email:    { label: 'إيميل',  icon: '✉️', color: '#3B82F6' },
+  whatsapp: { label: 'واتساب', icon: '📱', color: '#22C55E' },
+  call:     { label: 'مكالمة', icon: '📞', color: '#F59E0B' },
+  meeting:  { label: 'اجتماع', icon: '🤝', color: '#8B5CF6' },
+  visit:    { label: 'زيارة',  icon: '🏢', color: '#C9A84C' },
 }
 
-// ===== مكون جهات التواصل والوثائق =====
-function ContactTab({ customer, customerId, setCustomer }: { customer: any, customerId: string, setCustomer: any }) {  // 1. حالات إدارة الملفات والرفع
-  const [selectedDoc, setSelectedDoc] = useState<any>(null)
-  const [uploading, setUploading] = useState(false)
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null)
-  // أضف هذا السطر مع بقية الـ states في الأعلى
-const [ratings, setRatings] = useState({
-  quality: 0,
-  delivery: 0,
-  communication: 0,
-  price: 0,
-  flexibility: 0
-});
-  
-  // دمج تفاصيل المستند مع حقل الاسم المخصص وتاريخ اليوم تلقائياً
-  const [docDetails, setDocDetails] = useState({ 
-    type: '', 
-    exp: new Date().toISOString().split('T')[0], 
-    customName: '' 
-  })
+// ===== نظام الألوان =====
+const S = {
+  navy:   '#0A1628', navy2: '#0F2040', navy3: '#152A52',
+  gold:   '#C9A84C', gold2: '#E8C97A', gold3: 'rgba(201,168,76,0.12)',
+  white:  '#FAFAF8', muted: '#8A9BB5', border: 'rgba(255,255,255,0.08)',
+  green:  '#22C55E', red: '#EF4444', blue: '#3B82F6',
+  amber:  '#F59E0B', purple: '#8B5CF6',
+  card:   'rgba(255,255,255,0.04)', card2: 'rgba(255,255,255,0.08)',
+}
 
-  // 2. حالات البيانات (المستندات وجهات الاتصال)
-  const [docs, setDocs] = useState<any[]>([])
-  const [contacts, setContacts] = useState<any[]>([])
+// ===== style مشترك للحقول =====
+const fieldStyle: React.CSSProperties = {
+  width: '100%', background: S.navy2,
+  border: `1px solid rgba(255,255,255,0.1)`,
+  borderRadius: '8px', padding: '9px 12px',
+  fontSize: '13px', color: S.white,
+  outline: 'none', fontFamily: 'Tajawal, sans-serif',
+  boxSizing: 'border-box', direction: 'rtl', textAlign: 'right',
+}
 
-  // 3. حالات التحكم في النماذج (جهات الاتصال)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ 
-    name: '', 
-    role: '', 
-    email: '', 
-    phone: '', 
-    whatsapp: '', 
-    notes: '' 
-  })
+// ===== مكون نجوم =====
+function StarRating({ value, max = 5 }: { value: number; max?: number }) {
+  return (
+    <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+      {Array.from({ length: max }).map((_, i) => (
+        <svg key={i} width="14" height="14" viewBox="0 0 16 16"
+          style={{ fill: i < value ? S.gold : 'rgba(201,168,76,0.15)' }}>
+          <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z"/>
+        </svg>
+      ))}
+    </div>
+  )
+}
 
-  // 4. حالات البيانات الرسمية للمورد وإمكانية التعديل
+// ===================================================
+// تبويب: جهات التواصل
+// ===================================================
+function ContactTab({ customer, customerId }: { customer: any; customerId: string }) {
+  const [contacts, setContacts]         = useState<any[]>([])
+  const [showForm, setShowForm]         = useState(false)
   const [editOfficial, setEditOfficial] = useState(false)
   const [officialData, setOfficialData] = useState({
-    contact_email: customer?.contact_email || '',
-    contact_whatsapp: customer?.contact_whatsapp || '',
-    website: customer?.website || '',
-    last_contact_date: customer?.last_contact_date || '',
-    last_contact_method: customer?.last_contact_method || '',
+    email:    customer?.email || '',
+    phone:    customer?.phone || '',
+    website:  customer?.website || '',
   })
+  const [form, setForm] = useState({ name: '', role: '', email: '', phone: '', whatsapp: '', notes: '' })
 
   useEffect(() => {
-    const saved = localStorage.getItem(`contacts_${customerId}`)
-    if (saved) {
-      setContacts(JSON.parse(saved))
-    } else {
-      const defaults: any[] = []
-      if (customer.contact_name) {
-        defaults.push({ id: '1', name: customer.contact_name, role: 'مسؤول التصدير', email: customer.contact_email || '', phone: '', whatsapp: customer.contact_whatsapp || '', notes: '' })
-      }
-      setContacts(defaults)
+    const saved = localStorage.getItem(`cust_contacts_${customerId}`)
+    if (saved) { setContacts(JSON.parse(saved)); return }
+    const defaults: any[] = []
+    if (customer.full_name) {
+      defaults.push({ id: '1', name: customer.full_name, role: 'صاحب الحساب', email: customer.email || '', phone: customer.phone || '', whatsapp: customer.phone || '', notes: '' })
     }
+    setContacts(defaults)
   }, [customerId])
-
-  const fetchDocs = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customer_documents')
-        .select('*')
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false })
-      if (!error) setDocs(data || [])
-    } catch (err) {
-      console.error('Fetch Error:', err)
-    }
-  }
-useEffect(() => {
-  async function fetchCustomerRating() {
-    const { data } = await supabase
-       .from('customers')
-       .select('quality_rating, delivery_rating, comm_rating, price_rating, flex_rating')
-       .eq('id', customerId)
-       .single();
-
-    if (data) {
-      // هنا نقوم بتحديث الـ State لكي تظهر النجوم والارقام فوراً
-      setRatings({
-        quality: data.quality_rating || 0,
-        delivery: data.delivery_rating || 0,
-        communication: data.comm_rating || 0,
-        price: data.price_rating || 0,
-        flexibility: data.flex_rating || 0
-      });
-      // إذا كان لديك State خاص بالمتوسط العام (avg) سيتم تحديثه تلقائياً
-    }
-  }
-
-  if (customerId) {
-    fetchCustomerRating();
-  }
-}, [customerId]);
-
-  useEffect(() => { fetchDocs() }, [customerId])
-
-  const handleFinalUpload = async () => {
-    if (!fileToUpload || !docDetails.type) {
-      alert('برجاء اختيار النوع والملف')
-      return
-    }
-    setUploading(true)
-    try {
-      const fileExt = fileToUpload.name.split('.').pop();
-      const filePath = `${customerId}/${Date.now()}.${fileExt}`
-      const { error: upErr } = await supabase.storage.from('customer-docs').upload(filePath, fileToUpload)
-      if (upErr) throw upErr
-      const { error: dbErr } = await supabase.from('customer_documents').insert([{
-        customer_id: customerId,
-        doc_type: docDetails.type,
-        file_path: filePath,
-        expiry_date: docDetails.exp || null,
-        doc_name: fileToUpload.name,
-      }])
-      if (dbErr) throw dbErr
-      alert('تم الحفظ بنجاح ✅')
-      setSelectedDoc(null)
-      setFileToUpload(null)
-      await fetchDocs()
-    } catch (err: any) {
-      alert('حدث خطأ أثناء الرفع: ' + err.message)
-    } finally {
-      setUploading(false)
-    }
-  }
 
   function save(list: any[]) {
     setContacts(list)
-    localStorage.setItem(`contacts_${customerId}`, JSON.stringify(list))
+    localStorage.setItem(`cust_contacts_${customerId}`, JSON.stringify(list))
   }
 
   function addContact() {
@@ -208,561 +125,261 @@ useEffect(() => {
     setShowForm(false)
   }
 
-  function deleteContact(id: string) {
-    if (window.confirm('هل تريد حذف جهة التواصل هذه؟')) {
-      save(contacts.filter(c => c.id !== id))
-    }
-  }
-
   const initials = (n: string) => n?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??'
 
-  const inp: React.CSSProperties = {
-    width: '100%', background: S.navy, border: `1px solid rgba(255,255,255,0.1)`,
-    borderRadius: '8px', padding: '9px 12px', fontSize: '13px', color: S.white,
-    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', direction: 'rtl', textAlign: 'right',
-  }
-
   return (
-    
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, direction: 'rtl' }}>
 
       {/* جهات التواصل */}
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <button onClick={() => setShowForm(!showForm)}
-            style={{ width: '28px', height: '28px', borderRadius: '8px', background: S.gold, border: 'none', color: S.navy, fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>+</button>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, letterSpacing: '0.8px' }}>جهات التواصل</div>
+            style={{ width: 28, height: 28, borderRadius: 8, background: S.gold, border: 'none', color: S.navy, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>+</button>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.muted }}>جهات التواصل</div>
         </div>
 
         {showForm && (
-          <div style={{ background: S.navy2, border: `1px solid rgba(201,168,76,0.2)`, borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: S.gold, marginBottom: '14px', textAlign: 'right' }}>إضافة جهة تواصل جديدة</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+          <div style={{ background: S.navy2, border: `1px solid rgba(201,168,76,0.2)`, borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: S.gold, marginBottom: 14, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>إضافة جهة تواصل</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
               {[
-                { label: 'الاسم *', key: 'name', placeholder: 'اسم الشخص' },
-                { label: 'الوظيفة', key: 'role', placeholder: 'مثال: مدير التصدير' },
-                { label: 'الإيميل', key: 'email', placeholder: 'email@company.com' },
-                { label: 'رقم الموبايل', key: 'phone', placeholder: '+62 8xx xxx xxxx' },
-                { label: 'واتساب', key: 'whatsapp', placeholder: '+62 8xx xxx xxxx' },
-                { label: 'ملاحظات', key: 'notes', placeholder: 'أي ملاحظات...' },
+                { label: 'الاسم *',   key: 'name',     placeholder: 'اسم الشخص' },
+                { label: 'الوظيفة',   key: 'role',     placeholder: 'مدير الشراء' },
+                { label: 'الإيميل',   key: 'email',    placeholder: 'email@company.com' },
+                { label: 'الموبايل',  key: 'phone',    placeholder: '+966 5xx xxx xxxx' },
+                { label: 'واتساب',    key: 'whatsapp', placeholder: '+966 5xx xxx xxxx' },
+                { label: 'ملاحظات',   key: 'notes',    placeholder: 'ملاحظات...' },
               ].map(f => (
                 <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px', textAlign: 'right' }}>{f.label}</label>
-                  <input type="text" placeholder={f.placeholder} value={(form as any)[f.key]} onChange={e => setForm({ ...form, [f.key]: e.target.value })} style={inp} />
+                  <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>{f.label}</label>
+                  <input type="text" placeholder={f.placeholder} value={(form as any)[f.key]}
+                    onChange={e => setForm({ ...form, [f.key]: e.target.value })} style={fieldStyle}/>
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
-              <button onClick={addContact} style={{ background: S.gold, color: S.navy, border: 'none', padding: '7px 20px', borderRadius: '7px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>حفظ</button>
-              <button onClick={() => setShowForm(false)} style={{ background: 'transparent', color: S.muted, border: `1px solid ${S.border}`, padding: '7px 16px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={addContact} style={{ background: S.gold, color: S.navy, border: 'none', padding: '7px 20px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>حفظ</button>
+              <button onClick={() => setShowForm(false)} style={{ background: 'transparent', color: S.muted, border: `1px solid ${S.border}`, padding: '7px 16px', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>إلغاء</button>
             </div>
           </div>
         )}
 
-        {contacts.length === 0 ? (
-          <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: '13px' }}>لا توجد جهات تواصل — اضغط + لإضافة</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {contacts.map(c => (
-              <div key={c.id} style={{ background: S.card2, borderRadius: '10px', padding: '14px', display: 'flex', alignItems: 'flex-start', gap: '12px', flexDirection: 'row-reverse' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'linear-gradient(135deg,#1D9E75,#085041)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-                  {initials(c.name)}
+        {contacts.length === 0
+          ? <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: 13, fontFamily: 'Tajawal, sans-serif' }}>لا توجد جهات تواصل — اضغط + لإضافة</div>
+          : contacts.map(c => (
+            <div key={c.id} style={{ background: S.card2, borderRadius: 10, padding: 14, display: 'flex', alignItems: 'flex-start', gap: 12, flexDirection: 'row-reverse', marginBottom: 8 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg,#C9A84C,#0F2040)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', flexShrink: 0 }}>{initials(c.name)}</div>
+              <div style={{ flex: 1, textAlign: 'right' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <button onClick={() => save(contacts.filter(x => x.id !== c.id))} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: 14 }}>✕</button>
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Tajawal, sans-serif' }}>{c.name}</span>
+                    {c.role && <span style={{ fontSize: 10, color: S.muted, marginRight: 8, fontFamily: 'Tajawal, sans-serif' }}>{c.role}</span>}
+                  </div>
                 </div>
-                <div style={{ flex: 1, textAlign: 'right' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <button onClick={() => deleteContact(c.id)} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: '14px' }}>✕</button>
-                    <div>
-                      <span style={{ fontSize: '13px', fontWeight: 700 }}>{c.name}</span>
-                      {c.role && <span style={{ fontSize: '10px', color: S.muted, marginRight: '8px' }}>{c.role}</span>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    {c.whatsapp && <div style={{ fontSize: '11px', color: S.green }}>📱 {c.whatsapp}</div>}
-                    {c.phone && <div style={{ fontSize: '11px', color: S.muted }}>☎️ {c.phone}</div>}
-                    {c.email && <div style={{ fontSize: '11px', color: '#93C5FD' }}>✉️ {c.email}</div>}
-                  </div>
-                  {c.notes && <div style={{ fontSize: '11px', color: S.muted, marginTop: '6px', fontStyle: 'italic' }}>{c.notes}</div>}
+                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {c.whatsapp && <div style={{ fontSize: 11, color: S.green, fontFamily: 'Tajawal, sans-serif' }}>📱 {c.whatsapp}</div>}
+                  {c.phone    && <div style={{ fontSize: 11, color: S.muted,  fontFamily: 'Tajawal, sans-serif' }}>☎️ {c.phone}</div>}
+                  {c.email    && <div style={{ fontSize: 11, color: '#93C5FD', fontFamily: 'Tajawal, sans-serif' }}>✉️ {c.email}</div>}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
       </div>
 
-      {/* بيانات التواصل الرسمية */}
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>بيانات التواصل الرسمية</div>
-          <button
-            onClick={async () => {
-              if (editOfficial) {
-                await supabase.from('customers').update({
-                  contact_email: officialData.contact_email,
-                  contact_whatsapp: officialData.contact_whatsapp,
-                  website: officialData.website,
-                  last_contact_date: officialData.last_contact_date || null,
-                  last_contact_method: officialData.last_contact_method,
-                }).eq('id', customerId)
-              } else {
-                setOfficialData({
-                  contact_email: customer.contact_email || '',
-                  contact_whatsapp: customer.contact_whatsapp || '',
-                  website: customer.website || '',
-                  last_contact_date: customer.last_contact_date || '',
-                  last_contact_method: customer.last_contact_method || '',
-                })
-              }
-              setEditOfficial(!editOfficial)
-            }}
-            style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editOfficial ? S.gold : 'transparent', color: editOfficial ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+      {/* بيانات التواصل الرسمية — بدون آخر تواصل وطريقة التواصل */}
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <button onClick={async () => {
+            if (editOfficial) await supabase.from('customers').update(officialData).eq('id', customerId)
+            setEditOfficial(!editOfficial)
+          }} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, border: `1px solid ${S.border}`, background: editOfficial ? S.gold : 'transparent', color: editOfficial ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: 600 }}>
             {editOfficial ? 'حفظ' : 'تعديل'}
           </button>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>بيانات التواصل الرسمية</div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>الإيميل الرسمي</div>
-            {editOfficial ? (
-              <input type="email" value={officialData.contact_email} onChange={e => setOfficialData({ ...officialData, contact_email: e.target.value })}
-                style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: '#93C5FD' }}>{customer.contact_email || '—'}</div>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>واتساب</div>
-            {editOfficial ? (
-              <input type="text" value={officialData.contact_whatsapp} onChange={e => setOfficialData({ ...officialData, contact_whatsapp: e.target.value })}
-                style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: S.green }}>{customer.contact_whatsapp || '—'}</div>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>الموقع الإلكتروني</div>
-            {editOfficial ? (
-              <input type="text" value={officialData.website} onChange={e => setOfficialData({ ...officialData, website: e.target.value })}
-                style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: '#93C5FD' }}>{customer.website || '—'}</div>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>آخر تواصل</div>
-            {editOfficial ? (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input type="date" value={officialData.last_contact_date}
-                  onChange={e => setOfficialData({ ...officialData, last_contact_date: e.target.value })}
-                  style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as any, colorScheme: 'dark' as any }} />
-                <select value={officialData.last_contact_method}
-                  onChange={e => setOfficialData({ ...officialData, last_contact_method: e.target.value })}
-                  style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit' }}>
-                  <option value="">وسيلة التواصل</option>
-                  <option value="واتساب">واتساب</option>
-                  <option value="إيميل">إيميل</option>
-                  <option value="مكالمة">مكالمة</option>
-                  <option value="اجتماع">اجتماع</option>
-                </select>
-              </div>
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: S.white }}>
-                {customer.last_contact_date ? `${timeAgo(customer.last_contact_date)}${customer.last_contact_method ? ` — عبر ${customer.last_contact_method}` : ''}` : '—'}
-              </div>
-            )}
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[
+            { label: 'الإيميل الرسمي',    key: 'email' },
+            { label: 'رقم الهاتف',        key: 'phone' },
+            { label: 'الموقع الإلكتروني', key: 'website' },
+          ].map(f => (
+            <div key={f.key} style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, fontFamily: 'Tajawal, sans-serif' }}>{f.label}</div>
+              {editOfficial
+                ? <input type="text" value={(officialData as any)[f.key] || ''}
+                    onChange={e => setOfficialData({ ...officialData, [f.key]: e.target.value })}
+                    style={{ ...fieldStyle, border: `1px solid rgba(201,168,76,0.3)` }}/>
+                : <div style={{ fontSize: 13, color: S.white, fontFamily: 'Tajawal, sans-serif' }}>{(customer as any)[f.key] || '—'}</div>}
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* مودال رفع الملف */}
-      {selectedDoc !== null && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '20px' }}>
-          <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '24px', direction: 'rtl' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <button onClick={() => { setSelectedDoc(null); setFileToUpload(null) }}
-                style={{ background: 'none', border: 'none', color: S.muted, fontSize: '18px', cursor: 'pointer' }}>✕</button>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: S.white }}>رفع مستند جديد</div>
-            </div>
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '6px' }}>نوع المستند *</label>
-              <select value={docDetails.type} onChange={e => setDocDetails({ ...docDetails, type: e.target.value })}
-                style={{ width: '100%', background: S.navy, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '8px', padding: '9px 12px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', direction: 'rtl' }}>
-                <option value="">اختر نوع المستند</option>
-                <option value="عقد تجاري">عقد تجاري</option>
-                <option value="شهادة حلال">شهادة حلال</option>
-                <option value="شهادة ISO">شهادة ISO</option>
-                <option value="شهادة RSPO">شهادة RSPO</option>
-                <option value="فاتورة">فاتورة</option>
-                <option value="أخرى">أخرى</option>
-              </select>
-            </div>
-            <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '6px' }}>تاريخ الانتهاء (اختياري)</label>
-              <input type="date" value={docDetails.exp} onChange={e => setDocDetails({ ...docDetails, exp: e.target.value })}
-                style={{ width: '100%', background: S.navy, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '8px', padding: '9px 12px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', colorScheme: 'dark' as any, boxSizing: 'border-box' as any }} />
-            </div>
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '6px' }}>الملف *</label>
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                onChange={e => setFileToUpload(e.target.files?.[0] ?? null)}
-                style={{ width: '100%', background: S.navy, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '8px', padding: '9px 12px', fontSize: '12px', color: S.muted, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as any }} />
-              {fileToUpload && (
-                <div style={{ fontSize: '11px', color: S.green, marginTop: '6px' }}>✓ {fileToUpload.name}</div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => { setSelectedDoc(null); setFileToUpload(null) }}
-                style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'transparent', border: `1px solid ${S.border}`, color: S.muted, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
-              <button onClick={handleFinalUpload} disabled={uploading}
-                style={{ flex: 2, padding: '10px', borderRadius: '8px', background: uploading ? S.muted : S.gold, border: 'none', color: S.navy, fontSize: '13px', fontWeight: 800, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
-                {uploading ? '⏳ جاري الرفع...' : '📤 رفع المستند'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-// ===== مكون الوثائق =====
+// ===================================================
+// تبويب: الوثائق
+// ===================================================
 function DocsTab({ customerId }: { customerId: string }) {
+  const [docs, setDocs]               = useState<any[]>([])
   const [selectedDoc, setSelectedDoc] = useState<any>(null)
-  const [uploading, setUploading] = useState(false)
+  const [uploading, setUploading]     = useState(false)
   const [fileToUpload, setFileToUpload] = useState<File | null>(null)
-const [docDetails, setDocDetails] = useState<{ type: string; exp: string; customName: string }>({ 
-    type: '', 
-    exp: new Date().toISOString().split('T')[0], 
-    customName: '' 
-  })
-    const [docs, setDocs] = useState<any[]>([])
+  const [docDetails, setDocDetails]   = useState({ type: '', exp: new Date().toISOString().split('T')[0] })
 
   const fetchDocs = async () => {
-    const { data, error } = await supabase
-      .from('customer_documents')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
-    if (!error) setDocs(data || [])
+    const { data } = await supabase.from('customer_documents').select('*')
+      .eq('customer_id', customerId).order('created_at', { ascending: false })
+    setDocs(data || [])
   }
-
   useEffect(() => { fetchDocs() }, [customerId])
 
- const handleFinalUpload = async () => {
-    // التأكد من اختيار النوع، وإذا اختار "أخرى" يجب التأكد من كتابة اسم مخصص
-    const finalDocName = docDetails.type === 'أخرى' ? docDetails.customName : docDetails.type;
-
-    if (!fileToUpload || !finalDocName) { 
-      alert('برجاء اختيار النوع وإدخال اسم المستند'); 
-      return; 
-    }
-
+  const handleUpload = async () => {
+    if (!fileToUpload || !docDetails.type) { alert('اختر النوع والملف'); return }
     setUploading(true)
     try {
-      const fileExt = fileToUpload.name.split('.').pop()
-      // إنشاء مسار فريد للملف في التخزين (Storage)
-      const filePath = `${customerId}/${Date.now()}.${fileExt}`
-      
-      const { error: upErr } = await supabase.storage.from('customer-docs').upload(filePath, fileToUpload)
+      const ext  = fileToUpload.name.split('.').pop()
+      const path = `${customerId}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('customer-docs').upload(path, fileToUpload)
       if (upErr) throw upErr
-
-      // حفظ البيانات في جدول قاعدة البيانات
       const { error: dbErr } = await supabase.from('customer_documents').insert([{
-        customer_id: customerId, 
-        doc_type: docDetails.type, 
-        file_path: filePath,
-        expiry_date: docDetails.exp || null, 
-        doc_name: finalDocName, // هنا التعديل: سيتم حفظ الاسم الذي اخترته بدلاً من اسم الصورة
+        customer_id: customerId, doc_type: docDetails.type,
+        file_path: path, expiry_date: docDetails.exp || null, doc_name: fileToUpload.name,
       }])
-
       if (dbErr) throw dbErr
-
-      alert('تم حفظ المستند بنجاح ✅')
-      setSelectedDoc(null)
-      setFileToUpload(null)
-      setDocDetails({ type: '', exp: new Date().toISOString().split('T')[0], customName: '' }) // إعادة تهيئة الحقول
-      await fetchDocs()
-    } catch (err: any) {
-      alert('حدث خطأ: ' + err.message)
-    } finally {
-      setUploading(false)
-    }
+      alert('✅ تم حفظ الوثيقة'); setSelectedDoc(null); setFileToUpload(null); await fetchDocs()
+    } catch (err: any) { alert('خطأ: ' + err.message) }
+    finally { setUploading(false) }
   }
 
   return (
-<div style={{ display: 'flex', flexDirection: 'column', gap: '24px', direction: 'rtl', fontFamily: 'inherit' }}>
-  
-  {/* الجزء العلوي: بطاقة الدعوة للأرشفة */}
-  <div style={{ 
-    background: `linear-gradient(135deg, ${S.navy2} 0%, ${S.card} 100%)`, 
-    border: `1px solid ${S.border}`, 
-    borderRadius: '20px', 
-    padding: '30px', 
-    textAlign: 'center',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-    position: 'relative',
-    overflow: 'hidden'
-  }}>
-    <div style={{ position: 'absolute', top: '-10px', right: '-10px', fontSize: '80px', opacity: 0.05 }}>📂</div>
-    <div style={{ fontSize: '14px', color: S.muted, marginBottom: '16px', fontWeight: 500 }}>مركز إدارة مستندات الموردين الذكي</div>
-    <button onClick={() => {
-      setSelectedDoc({});
-      // ضبط تاريخ اليوم تلقائياً عند فتح النافذة
-      setDocDetails({ ...docDetails, exp: new Date().toISOString().split('T')[0], type: '', customName: '' });
-    }}
- style={{ 
-            background: S.gold, 
-            color: S.navy, 
-            border: 'none', 
-            padding: '14px 32px', 
-            borderRadius: '12px', 
-            fontSize: '14px', 
-            fontWeight: 800, 
-            cursor: 'pointer', 
-            boxShadow: `0 4px 20px ${S.gold}44`,
-            transition: 'all 0.3s',
-            fontFamily: "'Tajawal', sans-serif" // تأكد من وجود الفاصلة هنا إذا أضفت سطراً بعدها
-          }}>
-          أرشفة مستند جديد 📤
-        </button>
-      </div> {/* هذا القوس يغلق حاوية البطاقة (div) */}
-
-  {/* قائمة المستندات المؤرشفة */}
-  <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '20px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
-    <div style={{ 
-      padding: '18px 24px', 
-      borderBottom: `1px solid ${S.border}`, 
-      display: 'flex', 
-      justifyContent: 'space-between', 
-      alignItems: 'center', 
-      background: 'rgba(255,255,255,0.03)' 
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: S.gold }}></div>
-        <div style={{ fontSize: '14px', fontWeight: 800, color: S.white }}>الأرشيف الرقمي</div>
-      </div>
-      <span style={{ fontSize: '11px', color: S.gold, background: 'rgba(201,168,76,0.1)', padding: '4px 12px', borderRadius: '20px', fontWeight: 700 }}>
-        {docs.length} ملفات مؤرشفة
-      </span>
-    </div>
-
-    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {docs.length === 0 ? (
-        <div style={{ padding: '50px 20px', textAlign: 'center', color: S.muted, fontSize: '14px', border: `1px dashed ${S.border}`, borderRadius: '15px' }}>
-          لا توجد وثائق مؤرشفة حالياً في ملف المورد
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, direction: 'rtl' }}>
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <button onClick={() => setSelectedDoc('new')}
+            style={{ padding: '7px 18px', borderRadius: 8, background: S.gold, border: 'none', color: S.navy, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+            + رفع وثيقة
+          </button>
+          <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>الوثائق الرسمية — {docs.length} وثيقة</div>
         </div>
-      ) : (
-        docs.map((doc: any) => (
-          
-<div key={doc.id} style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-between', 
-            padding: '16px', 
-            background: S.card2, 
-            borderRadius: '15px', 
-            border: `1px solid rgba(255,255,255,0.03)`,
-            transition: 'transform 0.2s',
-            direction: 'rtl' // أضفنا هذا لضمان أن اليمين هو البداية
-          }}>
-            {/* 1. النصوص أصبحت أولاً لتظهر في اليمين */}
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: S.white, marginBottom: '4px' }}>{doc.doc_name}</div>
-<div style={{ 
-  fontSize: '11px', 
-  color: doc.expiry_date ? S.amber : S.green, 
-  display: 'flex', 
-  alignItems: 'center', 
-  gap: '6px', 
-  justifyContent: 'center' // تم التغيير من flex-end إلى center
-}}>
-   {doc.expiry_date ? `ينتهي في: ${doc.expiry_date}` : 'مستند دائم وساري'}
-   <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: doc.expiry_date ? S.amber : S.green }}></span>
-</div>
+        {docs.length === 0
+          ? <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: 13, fontFamily: 'Tajawal, sans-serif' }}>لا توجد وثائق بعد</div>
+          : docs.map(doc => (
+            <div key={doc.id} style={{ background: S.card2, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => window.open(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/customer-docs/${doc.file_path}`)}
+                  style={{ background: 'rgba(201,168,76,0.08)', border: `1px solid ${S.gold}`, color: S.gold, padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>معاينة 👁️</button>
+                <button onClick={async () => {
+                  if (!window.confirm('حذف الوثيقة نهائياً؟')) return
+                  await supabase.storage.from('customer-docs').remove([doc.file_path])
+                  await supabase.from('customer_documents').delete().eq('id', doc.id)
+                  await fetchDocs()
+                }} style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: S.red, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>✕</button>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'Tajawal, sans-serif' }}>{doc.doc_type}</div>
+                <div style={{ fontSize: 10, color: S.muted, marginTop: 2, fontFamily: 'Tajawal, sans-serif' }}>{doc.doc_name}</div>
+                <div style={{ fontSize: 10, color: doc.expiry_date ? S.amber : S.green, marginTop: 2, fontFamily: 'Tajawal, sans-serif' }}>
+                  {doc.expiry_date ? `ينتهي: ${doc.expiry_date}` : 'مستند دائم'}
+                </div>
+              </div>
             </div>
+          ))}
+      </div>
 
-            {/* 2. الزر أصبح ثانياً ليظهر في اليسار */}
-            {/* 2. الأزرار في جهة اليسار */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              
-              {/* زر معاينة المستند */}
-              <button
-                onClick={() => window.open(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/customer-docs/${doc.file_path}`)}
-                style={{ 
-                  background: 'rgba(201,168,76,0.05)', 
-                  border: `1px solid ${S.gold}`, 
-                  color: S.gold, 
-                  padding: '8px 18px', 
-                  borderRadius: '10px', 
-                  fontSize: '12px', 
-                  fontWeight: 700, 
-                  cursor: 'pointer',
-                  fontFamily: "'Tajawal', sans-serif"
-                }}>
-                معاينة 👁️
-              </button>
-
-              {/* زر حذف المستند */}
-              <button
-                onClick={async () => {
-                  const confirmDelete = window.confirm('هل أنت متأكد من حذف هذا المستند نهائياً؟');
-                  if (confirmDelete) {
-                    try {
-                      // 1. حذف من Storage
-                      await supabase.storage.from('customer-docs').remove([doc.file_path]);
-                      // 2. حذف من الجدول
-                      await supabase.from('customer_documents').delete().eq('id', doc.id);
-                      alert('تم الحذف بنجاح ✅');
-                      await fetchDocs(); // تحديث القائمة
-                    } catch (err) {
-                      alert('حدث خطأ أثناء الحذف');
-                    }
-                  }
-                }}
-                style={{ 
-                  background: 'rgba(255,82,82,0.05)', 
-                  border: '1px solid #ff5252', 
-                  color: '#ff5252', 
-                  padding: '8px 12px', 
-                  borderRadius: '10px', 
-                  fontSize: '12px', 
-                  fontWeight: 700, 
-                  cursor: 'pointer',
-                  fontFamily: "'Tajawal', sans-serif"
-                }}>
-                إلغاء ✕
+      {selectedDoc !== null && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
+          <div style={{ background: S.navy2, border: `1px solid ${S.gold}33`, borderRadius: 24, width: '100%', maxWidth: 420, padding: 32, direction: 'rtl', fontFamily: 'Tajawal, sans-serif' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: S.white }}>رفع وثيقة جديدة</div>
+              <button onClick={() => { setSelectedDoc(null); setFileToUpload(null) }} style={{ background: S.card2, border: 'none', color: S.muted, width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', fontSize: 14 }}>✕</button>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: S.muted, marginBottom: 8 }}>نوع الوثيقة *</label>
+              <select value={docDetails.type} onChange={e => setDocDetails({ ...docDetails, type: e.target.value })}
+                style={{ ...fieldStyle, cursor: 'pointer' }}>
+                <option value="">اختر النوع...</option>
+                {['السجل التجاري', 'البطاقة الضريبية', 'شهادة القيمة المضافة', 'عقد توريد', 'فاتورة', 'بوليصة شحن', 'خطاب اعتماد', 'أخرى'].map(t => (
+                  <option key={t} value={t} style={{ background: S.navy2 }}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: S.muted, marginBottom: 8 }}>تاريخ الانتهاء</label>
+              <input type="date" value={docDetails.exp} onChange={e => setDocDetails({ ...docDetails, exp: e.target.value })}
+                style={{ ...fieldStyle, colorScheme: 'dark' as any }}/>
+            </div>
+            <div style={{ marginBottom: 24, position: 'relative', background: S.navy, border: `2px dashed ${S.border}`, borderRadius: 12, padding: 24, textAlign: 'center' }}>
+              <input type="file" onChange={e => setFileToUpload(e.target.files?.[0] ?? null)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}/>
+              <div style={{ fontSize: 13, color: fileToUpload ? S.green : S.muted }}>{fileToUpload ? `✅ ${fileToUpload.name}` : 'اضغط أو اسحب الملف هنا'}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button onClick={() => { setSelectedDoc(null); setFileToUpload(null) }} style={{ flex: 1, padding: 12, borderRadius: 10, background: 'transparent', border: `1px solid ${S.border}`, color: S.white, fontSize: 13, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>إلغاء</button>
+              <button onClick={handleUpload} disabled={uploading} style={{ flex: 2, padding: 12, borderRadius: 10, background: uploading ? S.muted : S.gold, border: 'none', color: S.navy, fontSize: 13, fontWeight: 800, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+                {uploading ? '⏳ جاري الرفع...' : 'رفع الوثيقة'}
               </button>
             </div>
           </div>
-        ))
+        </div>
       )}
     </div>
-  </div>
-
-  {/* النافذة المنبثقة (Modal) بتصميم Glassmorphism */}
-  {selectedDoc !== null && (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-      <div style={{ background: S.navy2, border: `1px solid ${S.gold}33`, borderRadius: '24px', width: '100%', maxWidth: '420px', padding: '32px', direction: 'rtl', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
-        
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
-          <div style={{ fontSize: '18px', fontWeight: 800, color: S.white }}>أرشفة وثيقة جديدة</div>
-          <button onClick={() => { setSelectedDoc(null); setFileToUpload(null) }}
-            style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: S.muted, width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', fontSize: '14px' }}>✕</button>
-        </div>
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: S.muted, marginBottom: '10px' }}>نوع الوثيقة الرسمية *</label>
-          <select value={docDetails.type} onChange={e => setDocDetails({ ...docDetails, type: e.target.value })}
-            style={{ width: '100%', background: S.navy, border: `1px solid ${S.border}`,fontFamily: "'Tajawal', sans-serif", borderRadius: '12px', padding: '14px', fontSize: '14px', color: S.white, outline: 'none' }}>
-            <option value="">-- اختر من القائمة --</option>
-            <option value=" السجل التجاري">السجل التجاري </option>
-            <option value=" البطاقة الضريبية">البطاقة الضريبية </option>
-            <option value="شهادة القيمة المضافة">شهادة القيمة المضافة</option>
-            <option value="شهادة ISO">شهادة ISO</option>
-            <option value="شهادة RSPO">شهادة RSPO</option>
-            <option value="أخرى">نوع آخر (كتابة يدوية)</option>
-          </select>
-        </div>
-
-        {/* الحقل الإضافي الذكي */}
-        {docDetails.type === 'أخرى' && (
-          <div style={{ marginBottom: '20px', animation: 'fadeIn 0.3s ease' }}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: S.gold, marginBottom: '10px' }}>اسم الوثيقة المخصص *</label>
-            <input 
-              type="text" 
-              placeholder="مثال: ترخيص تصدير، سجل ضريبي..."
-              onChange={e => setDocDetails({ ...docDetails, customName: e.target.value })}
-              style={{ width: '100%', background: S.navy, border: `1px solid ${S.gold}66`, borderRadius: '12px', padding: '14px', fontSize: '14px', color: S.white, outline: 'none', boxSizing: 'border-box' }} 
-            />
-          </div>
-        )}
-
-        <div style={{ marginBottom: '20px' }}>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: S.muted, marginBottom: '10px' }}>تاريخ انتهاء الصلاحية</label>
-          <input type="date" value={docDetails.exp} onChange={e => setDocDetails({ ...docDetails, exp: e.target.value })}
-            style={{ width: '100%', background: S.navy, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px', fontSize: '14px', color: S.white, outline: 'none', colorScheme: 'dark' }} />
-        </div>
-
-        <div style={{ marginBottom: '28px' }}>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: S.muted, marginBottom: '10px' }}>اختيار الملف *</label>
-          <div style={{ position: 'relative', background: S.navy, border: `2px dashed ${S.border}`, borderRadius: '15px', padding: '25px', textAlign: 'center', transition: 'all 0.3s' }}>
-            <input type="file" onChange={e => setFileToUpload(e.target.files?.[0] ?? null)}
-              style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} />
-            <div style={{ fontSize: '13px', color: fileToUpload ? S.green : S.muted }}>
-              {fileToUpload ? `✅ تم اختيار: ${fileToUpload.name}` : 'اضغط هنا أو اسحب الملف للرفع'}
-            </div>
-            <div style={{ fontSize: '10px', color: S.muted, marginTop: '8px' }}>PDF, JPG, PNG (أقصى حجم 5MB)</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '15px' }}>
-          <button onClick={() => { setSelectedDoc(null); setFileToUpload(null) }}
-            style={{ flex: 1, padding: '14px', borderRadius: '12px', background: 'transparent', border: `1px solid ${S.border}`, color: S.white, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>إلغاء</button>
-          <button onClick={handleFinalUpload} disabled={uploading}
-            style={{ 
-              flex: 2, 
-              padding: '14px', 
-              borderRadius: '12px', 
-              background: uploading ? S.muted : S.gold, 
-              border: 'none', 
-              color: S.navy, 
-              fontSize: '14px', 
-              fontWeight: 800, 
-              cursor: uploading ? 'not-allowed' : 'pointer',
-              fontFamily: "'Tajawal', sans-serif",
-              boxShadow: uploading ? 'none' : `0 4px 15px ${S.gold}33`
-              
-            }}>
-            {uploading ? '⏳ جاري الحفظ...' : 'إتمام الأرشفة الآن'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )}
-</div>
   )
 }
 
-// ===== مكون التقييم =====
-function RatingTab({ customer, customerId, priceHistory }: { customer: any, customerId: string, priceHistory: any[] }) {
-  const [ratings, setRatings] = useState({ quality: 0, delivery: 0, communication: 0, price: 0, flexibility: 0 })
-  const [saving, setSaving] = useState(false)
-  const [loaded, setLoaded] = useState(false)
-  const [notes, setNotes] = useState<any[]>([])
-  const [newNote, setNewNote] = useState('')
+// ===================================================
+// تبويب: التقييم — يستخدم الأعمدة الفعلية
+// quality_rating, delivery_rating, comm_rating, price_rating, flex_rating
+// كل عمود = 0 أو 2، مجموع 5 أعمدة = 10 نقاط = 5 نجوم
+// ===================================================
+function RatingTab({ customer, customerId }: { customer: any; customerId: string }) {
+  const [ratings, setRatings] = useState({
+    quality_rating:  customer?.quality_rating  || 0,
+    delivery_rating: customer?.delivery_rating || 0,
+    comm_rating:     customer?.comm_rating     || 0,
+    price_rating:    customer?.price_rating    || 0,
+    flex_rating:     customer?.flex_rating     || 0,
+  })
+  const [notes, setNotes]           = useState<any[]>([])
+  const [newNote, setNewNote]       = useState('')
+  const [saving, setSaving]         = useState(false)
   const [savingNote, setSavingNote] = useState(false)
+  const [loaded, setLoaded]         = useState(false)
+
+  // عدد النجوم = عدد التقييمات المكتملة (كل تقييم > 0 = نجمة)
+  const completedCount = Object.values(ratings).filter(v => v > 0).length
+  const starRating     = completedCount          // 0-5 نجوم
+  const ratingOut10    = starRating * 2          // 0-10
 
   useEffect(() => {
-    async function fetchData() {
-      const { data: notesData } = await supabase
-        .from('customer_notes')
+    async function fetchNotes() {
+      const { data } = await supabase.from('customer_notes')
         .select('*, profiles:created_by (full_name, department)')
         .eq('customer_id', customerId)
         .order('created_at', { ascending: false })
-      setNotes(notesData || [])
+      setNotes(data || [])
       setLoaded(true)
     }
-    fetchData()
+    fetchNotes()
   }, [customerId])
 
-  const categories = [
-    { key: 'quality', label: 'الجودة', color: '#22C55E' },
-    { key: 'delivery', label: 'الالتزام بالمواعيد', color: '#22C55E' },
-    { key: 'communication', label: 'التواصل', color: '#C9A84C' },
-    { key: 'price', label: 'الأسعار', color: '#C9A84C' },
-    { key: 'flexibility', label: 'المرونة', color: '#F59E0B' },
-  ]
-
-const avg = Math.round(
-  ((ratings.quality || customer.quality_rating || 0) + 
-   (ratings.delivery || customer.delivery_rating || 0) + 
-   (ratings.communication || customer.comm_rating || 0) + 
-   (ratings.price || customer.price_rating || 0) + 
-   (ratings.flexibility || customer.flex_rating || 0)) / 5 * 10
-) / 10;
-
   async function saveRating() {
-    if (!window.confirm(`هل تريد حفظ التقييم الإجمالي ${avg}/10 ؟`)) return
+    if (!window.confirm(`حفظ تقييم ${starRating}/5 نجوم (${ratingOut10}/10) ؟`)) return
     setSaving(true)
-    await supabase.from('customers').update({ rating: avg, quality_rating: ratings.quality, delivery_rating: ratings.delivery, comm_rating: ratings.communication, price_rating: ratings.price, flex_rating: ratings.flexibility }).eq('id', customerId)
+    const { error } = await supabase.from('customers').update({
+      quality_rating:  ratings.quality_rating,
+      delivery_rating: ratings.delivery_rating,
+      comm_rating:     ratings.comm_rating,
+      price_rating:    ratings.price_rating,
+      flex_rating:     ratings.flex_rating,
+    }).eq('id', customerId)
+
+    if (error) {
+      alert('خطأ في الحفظ: ' + error.message)
+      setSaving(false)
+      return
+    }
     setSaving(false)
     alert('✅ تم حفظ التقييم بنجاح')
     sessionStorage.setItem('activeTab', 'rating')
@@ -773,113 +390,128 @@ const avg = Math.round(
     if (!newNote.trim()) return
     setSavingNote(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: noteRes } = await supabase
-      .from('customer_notes')
+    const { data: res } = await supabase.from('customer_notes')
       .insert([{ customer_id: customerId, note: newNote.trim(), created_by: user?.id }])
-      .select('*, profiles:created_by (full_name, department)')
-      .single()
-    if (noteRes) setNotes([noteRes, ...notes])
+      .select('*, profiles:created_by (full_name, department)').single()
+    if (res) setNotes([res, ...notes])
     setNewNote('')
     setSavingNote(false)
   }
 
   async function deleteNote(noteId: string) {
-    if (!window.confirm('هل تريد حذف هذه الملاحظة نهائياً؟')) return
-    const { error } = await supabase.from('customer_notes').delete().eq('id', noteId)
-    if (error) { alert('عذراً، لم يتم الحذف: ' + error.message) }
-    else { setNotes(notes.filter(n => n.id !== noteId)) }
+    if (!window.confirm('حذف الملاحظة؟')) return
+    await supabase.from('customer_notes').delete().eq('id', noteId)
+    setNotes(notes.filter(n => n.id !== noteId))
   }
 
-  if (!loaded) return <div style={{ textAlign: 'center', color: S.muted, padding: '40px 0' }}>جاري التحميل...</div>
+  if (!loaded) return <div style={{ textAlign: 'center', color: S.muted, padding: '40px 0', fontFamily: 'Tajawal, sans-serif' }}>جاري التحميل...</div>
+
+  const dealLabels = [
+    { key: 'quality_rating',  label: 'عملية الشراء الأولى',  desc: 'أول صفقة ناجحة' },
+    { key: 'delivery_rating', label: 'عملية الشراء الثانية', desc: 'صفقة متكررة' },
+    { key: 'comm_rating',     label: 'عملية الشراء الثالثة', desc: 'عميل منتظم' },
+    { key: 'price_rating',    label: 'عملية الشراء الرابعة', desc: 'عميل وفي' },
+    { key: 'flex_rating',     label: 'عملية الشراء الخامسة', desc: 'عميل مميز ⭐' },
+  ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '16px', textAlign: 'right' }}>تقييم   المورد</div>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '24px', marginBottom: '20px' }}>
-          <div style={{ textAlign: 'center', flexShrink: 0, background: S.card2, borderRadius: '12px', padding: '16px 20px', minWidth: '100px' }}>
-            <div style={{ fontSize: '36px', fontWeight: 700, color: S.white, lineHeight: 1 }}>{avg}</div>
-            <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', marginTop: '6px' }}>
-              {[1, 2, 3, 4, 5].map(i => (
-                <svg key={i} width="13" height="13" viewBox="0 0 16 16" style={{ fill: i <= Math.round(avg / 2) ? S.gold : 'rgba(201,168,76,0.15)' }}>
-                  <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z" />
-                </svg>
-              ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, direction: 'rtl' }}>
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, marginBottom: 20, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>
+          تقييم العميل — كل عملية شراء = نجمة (2 نقطة) — المجموع {ratingOut10}/10
+        </div>
+
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', marginBottom: 20 }}>
+          {/* عرض التقييم الكلي */}
+          <div style={{ textAlign: 'center', background: S.card2, borderRadius: 14, padding: '20px 24px', minWidth: 120, flexShrink: 0 }}>
+            <div style={{ fontSize: 40, fontWeight: 900, color: starRating >= 4 ? S.green : starRating >= 2 ? S.gold : S.muted, lineHeight: 1 }}>
+              {starRating}
             </div>
-            <div style={{ fontSize: '11px', color: S.muted, marginTop: '6px' }}>{customer.total_deals || 0} صفقة</div>
+            <div style={{ fontSize: 11, color: S.muted, margin: '4px 0 8px', fontFamily: 'Tajawal, sans-serif' }}>من 5 نجوم</div>
+            <StarRating value={starRating}/>
+            <div style={{ fontSize: 10, color: S.muted, marginTop: 8, fontFamily: 'Tajawal, sans-serif' }}>{ratingOut10}/10 نقطة</div>
           </div>
+
+          {/* عمليات الشراء */}
           <div style={{ flex: 1 }}>
-            {categories.map(cat => (
-              <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: S.white, width: '28px', textAlign: 'left', flexShrink: 0 }}>{(ratings as any)[cat.key]}</div>
-                <div style={{ flex: 1, height: '8px', background: S.border, borderRadius: '4px', overflow: 'hidden', cursor: 'pointer' }}
-                  onClick={e => {
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                    const val = Math.round((e.clientX - rect.left) / rect.width * 10)
-                    setRatings({ ...ratings, [cat.key]: Math.max(0, Math.min(10, val)) })
-                  }}>
-                  <div style={{ height: '100%', width: `${(ratings as any)[cat.key] * 10}%`, background: cat.color, borderRadius: '4px', transition: 'width 0.2s' }} />
+            {dealLabels.map(d => {
+              const isActive = (ratings as any)[d.key] > 0
+              return (
+                <div key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, direction: 'rtl' }}>
+                  <button
+                    onClick={() => setRatings({ ...ratings, [d.key]: isActive ? 0 : 2 })}
+                    style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, background: isActive ? S.gold : S.card2, border: `2px solid ${isActive ? S.gold : S.border}`, color: isActive ? S.navy : S.muted, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .2s' }}>
+                    {isActive ? '★' : '☆'}
+                  </button>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: isActive ? S.gold : S.muted, fontFamily: 'Tajawal, sans-serif' }}>{isActive ? '+2 نقطة' : 'لم تتم بعد'}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: isActive ? S.white : S.muted, fontFamily: 'Tajawal, sans-serif' }}>{d.label}</span>
+                    </div>
+                    <div style={{ height: 6, background: S.border, borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: isActive ? '100%' : '0%', background: isActive ? `linear-gradient(90deg,${S.gold},${S.gold2})` : 'transparent', borderRadius: 3, transition: 'width .3s' }}/>
+                    </div>
+                    <div style={{ fontSize: 10, color: S.muted, marginTop: 3, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>{d.desc}</div>
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', color: S.muted, width: '130px', textAlign: 'right', flexShrink: 0 }}>{cat.label}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
+
         <button onClick={saveRating} disabled={saving}
-          style={{ background: S.gold, color: S.navy, border: 'none', padding: '10px 24px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+          style={{ background: saving ? S.muted : S.gold, color: S.navy, border: 'none', padding: '10px 28px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
           {saving ? '⏳ جاري الحفظ...' : '💾 حفظ التقييم'}
         </button>
       </div>
 
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>الملاحظات الداخلية</div>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      {/* الملاحظات الداخلية */}
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, marginBottom: 14, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>الملاحظات الداخلية</div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <button onClick={addNote} disabled={savingNote}
-            style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+            style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', flexShrink: 0 }}>
             {savingNote ? '...' : 'إضافة'}
           </button>
-          <textarea value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="اكتب ملاحظة هنا..." rows={2}
-            style={{ flex: 1, background: S.navy2, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any, resize: 'none' }} />
+          <textarea value={newNote} onChange={e => setNewNote(e.target.value)}
+            placeholder="اكتب ملاحظة عن العميل..." rows={2}
+            style={{ ...fieldStyle, resize: 'none' } as React.CSSProperties}/>
         </div>
-        {notes.length === 0 ? (
-          <div style={{ textAlign: 'center', color: S.muted, padding: '20px 0', fontSize: '13px' }}>لا توجد ملاحظات بعد</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {notes.map((n, idx) => (
-              <div key={n.id || idx} style={{ background: S.card2, borderRadius: '8px', padding: '12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
-                <button onClick={() => deleteNote(n.id)} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: '13px', flexShrink: 0 }}>✕</button>
-                <div style={{ flex: 1, textAlign: 'right' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: S.gold, marginBottom: '2px' }}>
-                    {n.profiles?.full_name || 'موظف'}{n.profiles?.department ? ` (${n.profiles.department})` : ''}
-                  </div>
-                  <div style={{ fontSize: '12px', color: S.white, lineHeight: '1.6', marginBottom: '4px' }}>{n.note}</div>
-                  <div style={{ fontSize: '10px', color: S.muted }}>
-                    {n.created_at ? new Date(n.created_at).toLocaleDateString('ar-EG') : ''} — {n.created_at ? new Date(n.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'الآن'}
-                  </div>
+        {notes.length === 0
+          ? <div style={{ textAlign: 'center', color: S.muted, padding: '20px 0', fontSize: 13, fontFamily: 'Tajawal, sans-serif' }}>لا توجد ملاحظات بعد</div>
+          : notes.map((n, idx) => (
+            <div key={n.id || idx} style={{ background: S.card2, borderRadius: 8, padding: 12, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+              <button onClick={() => deleteNote(n.id)} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: 13, flexShrink: 0 }}>✕</button>
+              <div style={{ flex: 1, textAlign: 'right' }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: S.gold, marginBottom: 2, fontFamily: 'Tajawal, sans-serif' }}>
+                  {n.profiles?.full_name || 'موظف'}{n.profiles?.department ? ` (${n.profiles.department})` : ''}
+                </div>
+                <div style={{ fontSize: 12, color: S.white, lineHeight: '1.6', marginBottom: 4, fontFamily: 'Tajawal, sans-serif' }}>{n.note}</div>
+                <div style={{ fontSize: 10, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>
+                  {n.created_at ? new Date(n.created_at).toLocaleDateString('ar-EG') : ''}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
       </div>
     </div>
   )
 }
-// ===== مكون المنتجات =====
-function ProductsTab({ customerId, mainProducts }: { customerId: string, mainProducts: string }) {
-  const [products, setProducts] = useState<any[]>(
-    mainProducts ? mainProducts.split('،').map(p => p.trim()).filter(Boolean) : []
-  )
+
+// ===================================================
+// تبويب: المنتجات
+// ===================================================
+function ProductsTab({ customerId, mainProducts, onUpdate }: { customerId: string; mainProducts: string; onUpdate: (val: string) => void }) {
+  const [products, setProducts]     = useState<string[]>(mainProducts ? mainProducts.split('،').map(p => p.trim()).filter(Boolean) : [])
   const [newProduct, setNewProduct] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving]         = useState(false)
 
   async function addProduct() {
     if (!newProduct.trim()) return
     const updated = [...products, newProduct.trim()]
-    setProducts(updated)
-    setNewProduct('')
-    setSaving(true)
+    setProducts(updated); setNewProduct(''); setSaving(true)
     await supabase.from('customers').update({ main_products: updated.join('، ') }).eq('id', customerId)
+    onUpdate(updated.join('، '))  // تحديث الـ state في الصفحة الرئيسية
     setSaving(false)
   }
 
@@ -887,517 +519,626 @@ function ProductsTab({ customerId, mainProducts }: { customerId: string, mainPro
     const updated = products.filter(x => x !== p)
     setProducts(updated)
     await supabase.from('customers').update({ main_products: updated.join('، ') }).eq('id', customerId)
+    onUpdate(updated.join('، '))
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>إضافة منتج جديد</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={addProduct} disabled={saving}
-            style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-            {saving ? '...' : '+ إضافة'}
-          </button>
-          <input type="text" value={newProduct} onChange={e => setNewProduct(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addProduct()}
-            placeholder="اسم المنتج..."
-            style={{ flex: 1, background: S.navy2, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '8px', padding: '9px 12px', fontSize: '13px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right' }} />
-        </div>
+    <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16, direction: 'rtl' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, marginBottom: 14, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>المنتجات التي يطلبها العميل</div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button onClick={addProduct} disabled={saving}
+          style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', flexShrink: 0 }}>
+          {saving ? '...' : '+ إضافة'}
+        </button>
+        <input type="text" value={newProduct} onChange={e => setNewProduct(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addProduct()}
+          placeholder="اسم المنتج المطلوب..."
+          style={fieldStyle}/>
       </div>
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>المنتجات — {products.length} منتج</div>
-        {products.length === 0 ? (
-          <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: '13px' }}>لم تُضف منتجات بعد</div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
-            {products.map((p, i) => (
-              <div key={i} style={{ background: S.card2, borderRadius: '10px', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <button onClick={() => deleteProduct(p)} style={{ background: 'none', border: 'none', color: S.red, cursor: 'pointer', fontSize: '13px' }}>✕</button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 500 }}>{p}</span>
-                  <span>📦</span>
-                </div>
+      {products.length === 0
+        ? <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: 13, fontFamily: 'Tajawal, sans-serif' }}>لم تُضف منتجات بعد</div>
+        : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+          {products.map((p, i) => (
+            <div key={i} style={{ background: S.card2, borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <button onClick={() => deleteProduct(p)} style={{ background: 'none', border: 'none', color: S.red, cursor: 'pointer', fontSize: 13 }}>✕</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, fontFamily: 'Tajawal, sans-serif' }}>{p}</span>
+                <span>🛒</span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            </div>
+          ))}
+        </div>}
     </div>
   )
 }
 
-// ===== الصفحة الرئيسية =====
+// ===================================================
+// الصفحة الرئيسية
+// ===================================================
 export default function CustomerDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const [customer, setCustomer] = useState<Customer | null>(null)
-  const [priceHistory, setPriceHistory] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [aiAnalysis, setAiAnalysis] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [showAiModal, setShowAiModal] = useState(false)
-  const [tab, setTab] = useState(() => {
-    if (typeof window !== 'undefined') return sessionStorage.getItem('activeTab') || 'overview'
-    return 'overview'
-  })
-  const [editMode, setEditMode] = useState(false)
-  const [editData, setEditData] = useState({ company_name: '', registration_number: '', country: '', city: '', website: '' })
-  const [editMode2, setEditMode2] = useState(false)
-  const [editData2, setEditData2] = useState({ main_products: '', notes: '' })
 
+  // ── كل الـ State ──
+  const [customer,        setCustomer]       = useState<Customer | null>(null)
+  const [loading,         setLoading]        = useState(true)
+  const [aiAnalysis,      setAiAnalysis]     = useState('')
+  const [aiLoading,       setAiLoading]      = useState(false)
+  const [showAiModal,     setShowAiModal]    = useState(false)
+  const [tab,             setTab]            = useState('overview')
+  const [editMode,        setEditMode]       = useState(false)
+  const [editData,        setEditData]       = useState({ full_name: '', company_name: '', country: '', city: '', website: '' })
+  const [editMode2,       setEditMode2]      = useState(false)
+  const [editData2,       setEditData2]      = useState({ notes: '' })
+  // ── سجل التواصل ──
+  const [contacts2,       setContacts2]      = useState<any[]>([])
+  const [showContactForm, setShowContactForm]= useState(false)
+  const [contactPage,     setContactPage]    = useState(1)
+  const [savingContact,   setSavingContact]  = useState(false)
+  const [newContact,      setNewContact]     = useState({ date: new Date().toISOString().split('T')[0], method: 'whatsapp', notes: '' })
+  // ── سجل الصفقات ──
+  const [deals,           setDeals]          = useState<any[]>([])
+  const [showDealForm,    setShowDealForm]   = useState(false)
+  const [savingDeal,      setSavingDeal]     = useState(false)
+  const [newDeal,         setNewDeal]        = useState({ date: new Date().toISOString().split('T')[0], name: '', amount: '', notes: '' })
+
+  // ── تحميل البيانات ──
   useEffect(() => {
-    async function fetchPriceHistory(){
-
-const { data } = await supabase
-.from('customer_prices_history')
-.select('*')
-.eq('customer_id', id)
-.order('created_at',{ascending:false})
-
-setPriceHistory(data || [])
-
-}
-
-fetchPriceHistory()
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('activeTab')
+      if (saved) setTab(saved)
+    }
     async function fetchCustomer() {
       const { data } = await supabase.from('customers').select('*').eq('id', id).single()
       setCustomer(data)
-      if (data) setEditData({ company_name: data.company_name || '', registration_number: data.registration_number || '', country: data.country || '', city: data.city || '', website: data.website || '' })
+      if (data) {
+        setEditData({ full_name: data.full_name || '', company_name: data.company_name || '', country: data.country || '', city: data.city || '', website: data.website || '' })
+        setEditData2({ notes: data.notes || '' })
+      }
       setLoading(false)
     }
     fetchCustomer()
   }, [id])
 
-  if (loading) return <div style={{ minHeight: '100vh', background: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', color: S.muted, fontFamily: 'Tajawal,sans-serif' }}>جاري التحميل...</div>
-  if (!customer) return <div style={{ minHeight: '100vh', background: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', color: S.muted, fontFamily: 'Tajawal,sans-serif' }}>لم يتم العثور على المورد</div>
+  // ── تحميل سجل التواصل ──
+  useEffect(() => {
+    supabase.from('customer_contacts').select('*').eq('customer_id', id)
+      .order('contact_date', { ascending: false })
+      .then(({ data }) => setContacts2(data || []))
+  }, [id])
+
+  // ── تحميل سجل الصفقات ──
+  useEffect(() => {
+    supabase.from('customer_deals').select('*').eq('customer_id', id)
+      .order('deal_date', { ascending: false })
+      .then(({ data }) => setDeals(data || []))
+  }, [id])
+
+  // ── حفظ تواصل جديد ──
+  async function saveContact() {
+    if (!newContact.notes.trim()) { alert('اكتب ملاحظة'); return }
+    setSavingContact(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: res } = await supabase.from('customer_contacts').insert([{
+      customer_id: id, contact_date: newContact.date,
+      method: newContact.method, notes: newContact.notes, created_by: user?.id,
+    }]).select().single()
+    if (res) {
+      setContacts2([res, ...contacts2])
+      await supabase.from('customers').update({ last_contact_date: newContact.date }).eq('id', id)
+      setCustomer(prev => prev ? { ...prev, last_contact_date: newContact.date } : prev)
+    }
+    setNewContact({ date: new Date().toISOString().split('T')[0], method: 'whatsapp', notes: '' })
+    setShowContactForm(false); setSavingContact(false)
+  }
+
+  // ── حفظ صفقة جديدة ──
+  async function saveDeal() {
+    if (!newDeal.name.trim()) { alert('أدخل اسم الصفقة'); return }
+    setSavingDeal(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: res } = await supabase.from('customer_deals').insert([{
+      customer_id: id, deal_date: newDeal.date,
+      deal_name: newDeal.name, amount: newDeal.amount || '0', notes: newDeal.notes, created_by: user?.id,
+    }]).select().single()
+    if (res) {
+      setDeals([res, ...deals])
+      // تحديث إجمالي الصفقات والمبلغ
+      const newTotal  = (parseInt(customer?.total_deals  || '0') + 1).toString()
+      const newAmount = (parseFloat(customer?.total_amount || '0') + parseFloat(newDeal.amount || '0')).toString()
+      await supabase.from('customers').update({ total_deals: newTotal, total_amount: newAmount }).eq('id', id)
+      setCustomer(prev => prev ? { ...prev, total_deals: newTotal, total_amount: newAmount } : prev)
+    }
+    setNewDeal({ date: new Date().toISOString().split('T')[0], name: '', amount: '', notes: '' })
+    setShowDealForm(false); setSavingDeal(false)
+  }
+
+  if (loading)   return <div style={{ minHeight: '100vh', background: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>جاري التحميل...</div>
+  if (!customer) return <div style={{ minHeight: '100vh', background: S.navy, display: 'flex', alignItems: 'center', justifyContent: 'center', color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>لم يتم العثور على العميل</div>
 
   const initials = (n: string) => n?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??'
 
+  // ── اكتمال الملف ──
   const scoreFields = [
-    { label: 'اسم الشركة', key: 'company_name', points: 10 },
-    { label: 'الدولة', key: 'country', points: 5 },
-    { label: 'المدينة', key: 'city', points: 5 },
-    { label: 'المنتجات', key: 'main_products', points: 15 },
-    { label: 'المسؤول', key: 'contact_name', points: 10 },
-    { label: 'واتساب', key: 'contact_whatsapp', points: 15 },
-    { label: 'الإيميل', key: 'contact_email', points: 10 },
-    { label: 'المبيعات', key: 'annual_sales', points: 10 },
-    { label: 'الموقع', key: 'website', points: 5 },
-    { label: 'التسجيل', key: 'registration_number', points: 10 },
-    { label: 'تعاقد', key: '_contract', points: 5 },
+    { label: 'الاسم',     key: 'full_name',    points: 15 },
+    { label: 'الشركة',    key: 'company_name', points: 10 },
+    { label: 'الدولة',    key: 'country',      points: 5  },
+    { label: 'المنتجات',  key: 'main_products',points: 15 },
+    { label: 'الموبايل',  key: 'phone',        points: 15 },
+    { label: 'الإيميل',   key: 'email',        points: 10 },
+    { label: 'الاهتمام',  key: 'interest',     points: 10 },
+    { label: 'الموقع',    key: 'website',      points: 5  },
+    { label: 'ملاحظات',   key: 'notes',        points: 15 },
   ]
+  const comp       = scoreFields.reduce((total, f) => total + ((customer as any)[f.key] ? f.points : 0), 0)
+  const compFields = scoreFields.map(f => ({ label: f.label, done: !!(customer as any)[f.key] }))
 
-  const comp = scoreFields.reduce((total, f) => {
-    if (f.key === '_contract') return total
-    return total + ((customer as any)[f.key] ? f.points : 0)
-  }, 0)
+  // ── التقييم من الأعمدة الفعلية ──
+  const completedCount = [customer.quality_rating, customer.delivery_rating, customer.comm_rating, customer.price_rating, customer.flex_rating].filter(v => v && v > 0).length
+  const starRating     = completedCount
+  const ratingDisplay  = starRating * 2
 
-  const compFields = scoreFields.map(f => ({
-    label: f.label, points: f.points,
-    done: f.key === '_contract' ? false : !!(customer as any)[f.key],
-  }))
+  // ── حالة العميل ──
+  const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
+    active:      { label: 'عميل نشط ✓',  color: S.green, bg: 'rgba(34,197,94,0.08)'  },
+    pending:     { label: 'قيد الانتظار', color: S.amber, bg: 'rgba(245,158,11,0.08)' },
+    inactive:    { label: 'غير نشط',      color: S.red,   bg: 'rgba(239,68,68,0.08)'  },
+    negotiating: { label: 'قيد التفاوض',  color: S.blue,  bg: 'rgba(59,130,246,0.08)' },
+    completed:   { label: 'صفقة مكتملة', color: S.gold,  bg: 'rgba(201,168,76,0.08)' },
+  }
+  const statusInfo = STATUS_MAP[customer.status] || STATUS_MAP.active
 
-  const avg = Math.round(
-    ((customer.quality_rating || 0) + (customer.delivery_rating || 0) + (customer.comm_rating || 0) + (customer.price_rating || 0) + (customer.flex_rating || 0)) / 5 * 10
-  ) / 10
+  // ── Pagination سجل التواصل ──
+  const perPage     = 5
+  const totalPages2 = Math.ceil(contacts2.length / perPage)
+  const paginated   = contacts2.slice((contactPage - 1) * perPage, contactPage * perPage)
+  const firstContact = contacts2[contacts2.length - 1]
 
   const tabs = [
-    { key: 'overview', label: 'نظرة عامة' },
-    { key: 'contact', label: 'جهات التواصل' },
-    { key: 'trading', label: 'قدرات التجارة' },
-    { key: 'products', label: 'المنتجات' },
-    { key: 'deals', label: 'سجل الصفقات' },
-    { key: 'docs', label: 'الوثائق' },
-    { key: 'rating', label: 'التقييم' },
+    { key: 'overview', label: '🏠 نظرة عامة' },
+    { key: 'journey',  label: '🗺️ رحلة العميل' },
+    { key: 'contact',  label: '📞 التواصل' },
+    { key: 'products', label: '🛒 المنتجات' },
+    { key: 'deals',    label: '📋 الصفقات' },
+    { key: 'docs',     label: '📁 الوثائق' },
+    { key: 'rating',   label: '⭐ التقييم' },
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal,sans-serif', direction: 'rtl' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal, sans-serif', direction: 'rtl' }}>
 
       {/* شريط الأدوات */}
-      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '12px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={() => router.push('/customers')}
-            style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)` }}>← رجوع</button>
+            style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', background: S.card2, color: S.white, border: `1px solid rgba(255,255,255,0.18)` }}>
+            ← رجوع
+          </button>
           <button onClick={async () => {
             setShowAiModal(true); setAiLoading(true); setAiAnalysis('')
             try {
               const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}` },
-                body: JSON.stringify({
-                  model: 'openrouter/auto',
-                  messages: [{ role: 'user', content: `أنت مستشار تجاري متخصص. حلل هذا المورد:\n- الاسم: ${customer.company_name}\n- الدولة: ${customer.country}\n- المنتجات: ${customer.main_products}\n- التقييم: ${customer.rating}/10\n- الصفقات: ${customer.total_deals}\n\nقدم:\n## التقييم العام\n## نقاط القوة\n## نقاط الضعف\n## المخاطر\n## التوصيات` }],
-                  max_tokens: 800
-                })
+                body: JSON.stringify({ model: 'openrouter/auto', messages: [{ role: 'user', content: `حلل هذا العميل:\n- الاسم: ${customer.full_name}\n- الشركة: ${customer.company_name}\n- الدولة: ${customer.country}\n- المنتجات: ${customer.main_products}\n- التقييم: ${ratingDisplay}/10\n- الصفقات: ${customer.total_deals}\n- الاهتمام: ${customer.interest}\n\nقدم: تقييم العميل، الفرص التجارية، المخاطر، استراتيجية التعامل` }], max_tokens: 800 })
               })
               const data = await res.json()
               setAiAnalysis(data?.choices?.[0]?.message?.content || 'تعذر التحليل')
-            } catch { setAiAnalysis('تعذر الاتصال') } finally { setAiLoading(false) }
-          }}
-            style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: S.gold, color: S.navy }}>
+            } catch { setAiAnalysis('تعذر الاتصال') }
+            finally { setAiLoading(false) }
+          }} style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', border: 'none', background: S.gold, color: S.navy }}>
             ✨ تحليل AI
           </button>
-          <button style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'rgba(59,130,246,0.15)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}>تصدير PDF</button>
+          <button style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', background: 'rgba(59,130,246,0.15)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}>
+            تصدير PDF
+          </button>
         </div>
       </div>
 
       {/* المحتوى */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 22px' }}>
 
-        {/* بطاقة المورد */}
-        <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '14px', padding: '20px', marginBottom: '12px', display: 'flex', flexDirection: 'row-reverse', alignItems: 'flex-start', gap: '16px' }}>
-          <div style={{ textAlign: 'center', background: S.card2, borderRadius: '10px', padding: '14px', minWidth: '148px', flexShrink: 0 }}>
-            <div style={{ fontSize: '28px', fontWeight: 700, color: comp >= 80 ? S.green : comp >= 50 ? S.gold : S.red, lineHeight: 1 }}>{comp}%</div>
-            <div style={{ fontSize: '10px', color: S.muted, marginTop: '3px' }}>اكتمال الملف</div>
-            <div style={{ height: '4px', background: S.border, borderRadius: '2px', margin: '8px 0', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${comp}%`, background: comp >= 80 ? S.green : `linear-gradient(90deg,${S.gold},${S.gold2})`, borderRadius: '2px' }} />
+        {/* بطاقة العميل */}
+        <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 14, padding: 20, marginBottom: 12, display: 'flex', flexDirection: 'row-reverse', alignItems: 'flex-start', gap: 16 }}>
+          {/* اكتمال الملف */}
+          <div style={{ textAlign: 'center', background: S.card2, borderRadius: 12, padding: '14px 18px', minWidth: 140, flexShrink: 0 }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: comp >= 80 ? S.green : comp >= 50 ? S.gold : S.red, lineHeight: 1 }}>{comp}%</div>
+            <div style={{ fontSize: 10, color: S.muted, margin: '3px 0 8px', fontFamily: 'Tajawal, sans-serif' }}>اكتمال الملف</div>
+            <div style={{ height: 4, background: S.border, borderRadius: 2, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ height: '100%', width: `${comp}%`, background: comp >= 80 ? S.green : `linear-gradient(90deg,${S.gold},${S.gold2})`, borderRadius: 2 }}/>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, justifyContent: 'center' }}>
               {compFields.map(f => (
-                <span key={f.label} style={{ fontSize: '9px', padding: '2px 5px', borderRadius: '6px', fontWeight: 600, background: f.done ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.08)', color: f.done ? S.green : S.red }}>
+                <span key={f.label} style={{ fontSize: 9, padding: '2px 5px', borderRadius: 5, fontFamily: 'Tajawal, sans-serif', background: f.done ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.08)', color: f.done ? S.green : S.red }}>
                   {f.label} {f.done ? '✓' : '✗'}
                 </span>
               ))}
             </div>
           </div>
-          <div style={{ flex: 1, textAlign: 'right' }}>
-            <div style={{ fontSize: '18px', fontWeight: 700, marginBottom: '6px' }}>{customer.company_name}</div>
-            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '8px', justifyContent: 'flex-start' }}>
-              <span style={{ fontSize: '10px', padding: '3px 10px', borderRadius: '20px', fontWeight: 600, background: S.gold3, color: S.gold, border: `1px solid rgba(201,168,76,0.2)` }}>Manufacturer</span>
-              <span style={{ fontSize: '10px', padding: '3px 10px', borderRadius: '20px', fontWeight: 600, background: S.gold3, color: S.gold, border: `1px solid rgba(201,168,76,0.2)` }}>Exporter</span>
-            </div>
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
-              {customer.country && <div style={{ fontSize: '11px', color: S.muted }}>{customer.country}{customer.city ? ` / ${customer.city}` : ''}</div>}
-              <div style={{ fontSize: '11px', color: S.muted }}>تسجيل: {new Date(customer.created_at).toLocaleDateString('ar-EG')}</div>
-              <div style={{ fontSize: '11px', color: S.muted }}>{formatSupNum(customer.customer_number)}</div>
-              {customer.last_contact_date && <div style={{ fontSize: '11px', color: S.gold }}>آخر تواصل: {timeAgo(customer.last_contact_date)}</div>}
-            </div>
-          </div>
-          <div style={{ width: '58px', height: '58px', borderRadius: '12px', background: 'linear-gradient(135deg,#1D9E75,#085041)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-            {initials(customer.company_name)}
-          </div>
-        </div>
 
-        {/* شريط الحالة */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.14)', borderRadius: '8px', padding: '8px 14px', marginBottom: '12px' }}>
-          <span style={{ fontSize: '10px', padding: '2px 9px', borderRadius: '20px', fontWeight: 600, background: 'rgba(34,197,94,0.12)', color: S.green }}>مورد موثّق ✓</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: S.green, fontWeight: 500 }}>
-            {customer.last_contact_date ? `آخر تواصل: ${timeAgo(customer.last_contact_date)}` : 'لم يتم التواصل بعد'}
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: S.green }} />
+          {/* معلومات العميل */}
+          <div style={{ flex: 1, textAlign: 'right' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'Tajawal, sans-serif' }}>{customer.full_name}</div>
+              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: statusInfo.bg, color: statusInfo.color, fontWeight: 700, fontFamily: 'Tajawal, sans-serif' }}>{statusInfo.label}</span>
+            </div>
+            {customer.company_name && <div style={{ fontSize: 14, color: S.gold2, fontWeight: 600, marginBottom: 6, fontFamily: 'Tajawal, sans-serif' }}>🏢 {customer.company_name}</div>}
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', justifyContent: 'flex-start', marginBottom: 8 }}>
+              {customer.country && <div style={{ fontSize: 11, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>📍 {customer.country}{customer.city ? ` / ${customer.city}` : ''}</div>}
+              <div style={{ fontSize: 11, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>تسجيل: {new Date(customer.created_at).toLocaleDateString('ar-EG')}</div>
+              <div style={{ fontSize: 11, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>{formatCustNum(customer.customer_number)}</div>
+              {customer.last_contact_date && <div style={{ fontSize: 11, color: S.gold, fontFamily: 'Tajawal, sans-serif' }}>آخر تواصل: {timeAgo(customer.last_contact_date)}</div>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 10, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>{starRating} نجمة من 5 ({ratingDisplay}/10)</span>
+              <StarRating value={starRating}/>
+            </div>
+          </div>
+
+          {/* الأفاتار */}
+          <div style={{ width: 58, height: 58, borderRadius: 14, background: 'linear-gradient(135deg,#C9A84C,#0A1628)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+            {initials(customer.full_name || customer.company_name)}
           </div>
         </div>
 
         {/* الإحصائيات */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 12 }}>
           {[
-            { label: 'إجمالي الصفقات', val: customer.total_deals || 0, color: S.gold },
-            { label: 'إجمالي المبلغ', val: customer.total_amount ? `$${customer.total_amount.toLocaleString()}` : '$0', color: S.green },
-{ label: 'التقييم', val: `${avg > 0 ? avg : (customer?.rating || 0)}/10`, color: S.blue },            { label: 'المبيعات السنوية', val: customer.annual_sales || '—', color: S.amber },
+            { label: 'إجمالي الصفقات', val: customer.total_deals  || '0', color: S.gold  },
+            { label: 'إجمالي المبلغ',  val: customer.total_amount ? `$${parseFloat(customer.total_amount).toLocaleString()}` : '$0', color: S.green },
+            { label: 'التقييم',        val: `${starRating} ★ (${ratingDisplay}/10)`, color: S.blue },
+            { label: 'الاهتمام',       val: customer.interest || '—', color: S.amber },
           ].map((m, i) => (
-            <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px', textAlign: 'right' }}>
-              <div style={{ fontSize: '22px', fontWeight: 700, color: m.color, marginBottom: '4px' }}>{m.val}</div>
-              <div style={{ fontSize: '11px', color: S.muted }}>{m.label}</div>
+            <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 14, textAlign: 'right' }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: m.color, marginBottom: 4, fontFamily: 'Tajawal, sans-serif' }}>{m.val}</div>
+              <div style={{ fontSize: 11, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>{m.label}</div>
             </div>
           ))}
         </div>
 
         {/* التبويبات */}
-        <div style={{ display: 'flex', gap: '2px', background: S.card, border: `1px solid ${S.border}`, borderRadius: '10px', padding: '3px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', gap: 2, background: S.card, border: `1px solid ${S.border}`, borderRadius: 10, padding: 3, marginBottom: 14, overflowX: 'auto' }}>
           {tabs.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              style={{ flex: 1, padding: '8px 4px', textAlign: 'center', fontSize: '12px', fontWeight: 600, color: tab === t.key ? S.white : S.muted, borderRadius: '7px', cursor: 'pointer', border: tab === t.key ? `1px solid ${S.border}` : 'none', background: tab === t.key ? S.navy2 : 'transparent', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+            <button key={t.key} onClick={() => { setTab(t.key); sessionStorage.setItem('activeTab', t.key) }}
+              style={{ flex: 1, padding: '8px 4px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: tab === t.key ? S.white : S.muted, borderRadius: 7, cursor: 'pointer', border: tab === t.key ? `1px solid ${S.border}` : 'none', background: tab === t.key ? S.navy2 : 'transparent', fontFamily: 'Tajawal, sans-serif', transition: 'all .15s', whiteSpace: 'nowrap' }}>
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* نظرة عامة */}
+        {/* ══ نظرة عامة ══ */}
         {tab === 'overview' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>معلومات الشركة</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+            {/* معلومات العميل */}
+            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <button onClick={async () => {
-                  if (editMode) { await supabase.from('customers').update(editData).eq('id', id); window.location.reload() }
+                  if (editMode) { await supabase.from('customers').update(editData).eq('id', id); setCustomer(prev => prev ? { ...prev, ...editData } : prev) }
                   setEditMode(!editMode)
-                }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editMode ? S.gold : 'transparent', color: editMode ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                }} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, border: `1px solid ${S.border}`, background: editMode ? S.gold : 'transparent', color: editMode ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: 600 }}>
                   {editMode ? 'حفظ' : 'تعديل'}
                 </button>
+                <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>معلومات العميل</div>
               </div>
               {[
-                { label: 'الاسم الرسمي', key: 'company_name' },
-                { label: 'رقم التسجيل', key: 'registration_number' },
-                { label: '', key: 'country' },
-                { label: 'المدينة', key: 'city' },
-                { label: 'الموقع الإلكتروني', key: 'website' },
+                { label: 'الاسم الكامل',  key: 'full_name' },
+                { label: 'اسم الشركة',    key: 'company_name' },
+                { label: 'الدولة',        key: 'country' },
+                { label: 'المدينة',       key: 'city' },
+                { label: 'الموقع',        key: 'website' },
+                { label: 'الاهتمام',      key: 'interest' },
               ].map(f => (
-                <div key={f.key} style={{ marginBottom: '12px' }}>
-                  <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '3px' }}>{f.label}</div>
-                  {editMode ? (
-                    <input type="text" value={(editData as any)[f.key] || ''} onChange={e => setEditData({ ...editData, [f.key]: e.target.value })}
-                      style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '13px', color: S.white, outline: 'none', textAlign: 'right', boxSizing: 'border-box' as any }} />
-                  ) : (
-                    <div style={{ fontSize: '13px', fontWeight: 500, color: S.white }}>
-                      {f.key === 'website' && (customer as any)[f.key] ? (
-                        <a href={(customer as any)[f.key].startsWith('http') ? (customer as any)[f.key] : `https://${(customer as any)[f.key]}`}
-                          target="_blank" rel="noopener noreferrer"
-                          style={{ color: S.gold, textDecoration: 'none', borderBottom: `1px solid ${S.gold}`, display: 'inline-block', paddingBottom: '1px' }}>
-                          {(customer as any)[f.key]}
-                        </a>
-                      ) : ((customer as any)[f.key] || '—')}
+                <div key={f.key} style={{ marginBottom: 12, textAlign: 'right' }}>
+                  <div style={{ fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 3, fontFamily: 'Tajawal, sans-serif' }}>{f.label}</div>
+                  {editMode
+                    ? <input type="text" value={(editData as any)[f.key] || ''} onChange={e => setEditData({ ...editData, [f.key]: e.target.value })} style={{ ...fieldStyle, border: `1px solid rgba(201,168,76,0.3)` }}/>
+                    : <div style={{ fontSize: 13, color: S.white, fontFamily: 'Tajawal, sans-serif' }}>{(customer as any)[f.key] || '—'}</div>}
+                </div>
+              ))}
+            </div>
+
+            {/* العمود الأيسر */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+              {/* المنتجات المطلوبة — تتحدث تلقائياً عند الإضافة */}
+              <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, marginBottom: 12, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>🛒 المنتجات المطلوبة</div>
+                {(customer.main_products || customer.interest) ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' }}>
+                    {(customer.main_products || customer.interest || '').split('،').map((p: string, i: number) => (
+                      <span key={i} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 20, background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 500, fontFamily: 'Tajawal, sans-serif' }}>
+                        {p.trim()}
+                      </span>
+                    ))}
+                  </div>
+                ) : <div style={{ color: S.muted, fontSize: 12, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>لم تُضف منتجات بعد</div>}
+              </div>
+
+              {/* سجل التواصل */}
+              <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <button onClick={() => setShowContactForm(!showContactForm)}
+                    style={{ padding: '6px 14px', borderRadius: 7, background: S.gold, border: 'none', color: S.navy, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+                    + تواصل جديد
+                  </button>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>📋 سجل التواصل</div>
+                    {firstContact && (
+                      <div style={{ fontSize: 10, color: S.gold, marginTop: 2, fontFamily: 'Tajawal, sans-serif' }}>
+                        أول اتصال: {new Date(firstContact.contact_date).toLocaleDateString('ar-EG')} عبر {METHODS[firstContact.method]?.label || firstContact.method}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {showContactForm && (
+                  <div style={{ background: S.navy2, border: `1px solid rgba(201,168,76,0.2)`, borderRadius: 10, padding: 14, marginBottom: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>التاريخ</label>
+                        <input type="date" value={newContact.date} onChange={e => setNewContact({ ...newContact, date: e.target.value })}
+                          style={{ ...fieldStyle, colorScheme: 'dark' as any }}/>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>وسيلة التواصل</label>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          {Object.entries(METHODS).map(([key, m]) => (
+                            <button key={key} onClick={() => setNewContact({ ...newContact, method: key })}
+                              style={{ padding: '5px 10px', borderRadius: 6, border: `1px solid ${newContact.method === key ? m.color : S.border}`, background: newContact.method === key ? `${m.color}22` : 'transparent', color: newContact.method === key ? m.color : S.muted, fontSize: 11, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: newContact.method === key ? 700 : 400 }}>
+                              {m.icon} {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '3px' }}>تاريخ التسجيل</div>
-                <div style={{ fontSize: '13px', fontWeight: 500 }}>{new Date(customer.created_at).toLocaleDateString('ar-EG')}</div>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>ملاحظات *</label>
+                      <textarea value={newContact.notes} onChange={e => setNewContact({ ...newContact, notes: e.target.value })}
+                        placeholder="ما الذي تم مناقشته..." rows={3}
+                        style={{ ...fieldStyle, resize: 'none' } as React.CSSProperties}/>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={saveContact} disabled={savingContact}
+                        style={{ background: S.gold, color: S.navy, border: 'none', padding: '8px 20px', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+                        {savingContact ? '⏳...' : '💾 حفظ'}
+                      </button>
+                      <button onClick={() => setShowContactForm(false)}
+                        style={{ background: 'transparent', color: S.muted, border: `1px solid ${S.border}`, padding: '8px 14px', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>إلغاء</button>
+                    </div>
+                  </div>
+                )}
+
+                {contacts2.length === 0
+                  ? <div style={{ textAlign: 'center', color: S.muted, padding: '24px 0', fontSize: 13, fontFamily: 'Tajawal, sans-serif' }}>لا يوجد سجل تواصل بعد</div>
+                  : <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {paginated.map((c, i) => {
+                        const m = METHODS[c.method] || { label: c.method, icon: '📌', color: S.muted }
+                        return (
+                          <div key={c.id || i} style={{ background: S.card2, borderRadius: 9, padding: '10px 14px', display: 'flex', alignItems: 'flex-start', gap: 10, flexDirection: 'row-reverse' }}>
+                            <div style={{ width: 34, height: 34, borderRadius: '50%', background: `${m.color}22`, border: `1px solid ${m.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{m.icon}</div>
+                            <div style={{ flex: 1, textAlign: 'right' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <span style={{ fontSize: 10, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>{new Date(c.contact_date).toLocaleDateString('ar-EG')}</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: m.color, fontFamily: 'Tajawal, sans-serif' }}>{m.icon} {m.label}</span>
+                              </div>
+                              <div style={{ fontSize: 12, color: S.white, lineHeight: '1.6', fontFamily: 'Tajawal, sans-serif' }}>{c.notes}</div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    {totalPages2 > 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: `1px solid ${S.border}` }}>
+                        <div style={{ fontSize: 11, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>{(contactPage-1)*perPage+1} – {Math.min(contactPage*perPage, contacts2.length)} من {contacts2.length}</div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => setContactPage(p => Math.max(1, p-1))} disabled={contactPage === 1} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${S.border}`, background: 'transparent', color: contactPage === 1 ? S.muted : S.white, cursor: contactPage === 1 ? 'not-allowed' : 'pointer', fontSize: 11, fontFamily: 'Tajawal, sans-serif' }}>→ السابق</button>
+                          <button onClick={() => setContactPage(p => Math.min(totalPages2, p+1))} disabled={contactPage === totalPages2} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${S.border}`, background: 'transparent', color: contactPage === totalPages2 ? S.muted : S.white, cursor: contactPage === totalPages2 ? 'not-allowed' : 'pointer', fontSize: 11, fontFamily: 'Tajawal, sans-serif' }}>← التالي</button>
+                        </div>
+                      </div>
+                    )}
+                  </>}
               </div>
-            </div>
-{/* بداية قسم جلب عروض الاسعار*/} 
-   
-            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-  {/* الهيدر الجديد للقسم */}
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-    <div style={{ fontSize: '10px', color: S.gold, background: 'rgba(201,168,76,0.1)', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>تحديث تلقائي</div>
-    <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>سجل عروض الأسعار (من المقارنات)</div>
-  </div>
 
-  {/* جدول عرض الأسعار */}
-  <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
-    <table style={{ width: '100%', borderCollapse: 'collapse', direction: 'rtl', textAlign: 'right' }}>
-      <thead>
-        <tr style={{ borderBottom: `1px solid ${S.border}`, color: S.muted, fontSize: '11px' }}>
-          <th style={{ padding: '8px' }}>المنتج</th>
-          <th style={{ padding: '8px' }}>السعر</th>
-          <th style={{ padding: '8px' }}>الحالة</th>
-          <th style={{ padding: '8px' }}>التاريخ</th>
-        </tr>
-      </thead>
-      <tbody>
-        {priceHistory && priceHistory.length > 0 ? (
-          priceHistory.map((item, index) => (
-            <tr key={index} style={{ borderBottom: `1px solid ${S.border}44`, fontSize: '12px' }}>
-              <td style={{ padding: '10px', color: S.white }}>{item.product_name}</td>
-              <td style={{ padding: '10px', fontWeight: 700, color: S.gold }}>${item.price?.toLocaleString()}</td>
-              <td style={{ padding: '10px' }}>
-                <span style={{ 
-                  padding: '2px 8px', borderRadius: '4px', fontSize: '10px',
-                  background: item.status === 'مقبول' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                  color: item.status === 'مقبول' ? S.green : S.red 
-                }}>
-                  {item.status}
-                </span>
-              </td>
-              <td style={{ padding: '10px', color: S.muted, fontSize: '11px' }}>
-                {new Date(item.created_at).toLocaleDateString('ar-EG')}
-              </td>
-            </tr>
-          ))
-        ) : (
-          <tr>
-            <td colSpan={4} style={{ textAlign: 'center', padding: '30px', color: S.muted, fontSize: '12px' }}>
-              لا توجد عروض أسعار مسجلة لهذا المورد حتى الآن.
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-<div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '18px', marginTop: '20px', fontFamily: "'Tajawal', sans-serif" }}>
-  
-  {/* الهيدر: العنوان يميناً والزر يساراً */}
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px', borderBottom: `1px solid ${S.border}44`, paddingBottom: '12px' }}>
-    
-    {/* الزر جهة اليسار */}
-    <div style={{ fontSize: '10px', fontWeight: 800, color: S.muted, letterSpacing: '0.5px', fontFamily: "'Tajawal', sans-serif" }}>
-      التقرير الإستراتيجي للمورد
-    </div>
-<button 
-      onClick={async () => {
-        if (editMode2) {
-          const { error } = await supabase.from('customers').update({ notes: editData2.notes }).eq('id', id);
-          if (!error) setCustomer({ ...customer, notes: editData2.notes });
-        } else {
-          setEditData2({ ...editData2, notes: customer.notes || '' });
-        }
-        setEditMode2(!editMode2);
-      }}
-      style={{ 
-        fontSize: '10px', 
-        padding: '6px 16px', 
-        borderRadius: '8px', 
-        border: `1px solid ${S.gold}66`, 
-        background: editMode2 ? S.gold : 'transparent', 
-        color: editMode2 ? S.navy : S.gold, 
-        cursor: 'pointer', 
-        fontWeight: 700,
-        fontFamily: "'Tajawal', sans-serif", // توحيد الخط
-        transition: 'all 0.3s ease'
-      }}
-    >
-      {editMode2 ? 'حفظ التقرير' : 'تعديل / إضافة'}
-    </button>
-
-  </div>
-
-  {/* محتوى التقرير */}
-  <div style={{ marginTop: '10px' }}>
-    {editMode2 ? (
-      <textarea 
-        value={editData2.notes} 
-        onChange={(e) => setEditData2({ ...editData2, notes: e.target.value })}
-        placeholder="اكتب ملاحظاتك هنا... استخدم ** لتمييز النقاط الهامة"
-        rows={5}
-        style={{ 
-          width: '100%', 
-          background: S.navy2, 
-          border: `1px solid ${S.gold}33`, 
-          borderRadius: '10px', 
-          padding: '12px', 
-          fontSize: '10px', 
-          color: S.white, 
-          outline: 'none', 
-          fontFamily: "'Tajawal', sans-serif", // توحيد الخط
-          textAlign: 'right', 
-          lineHeight: '1.6',
-          resize: 'none' 
-        }}
-      />
-    ) : (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-        {customer.notes ? (
-          customer.notes.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => {
-            const isCritical = line.trim().startsWith('**');
-            const cleanText = line.replace(/\*\*/g, '').trim();
-
-            return (
-              <div key={i} style={{ 
-                padding: isCritical ? '12px 15px' : '4px 0',
-                background: isCritical ? 'rgba(201, 168, 76, 0.07)' : 'transparent',
-                borderRight: isCritical ? `4px solid ${S.gold}` : 'none',
-                borderRadius: '8px'
-              }}>
-                <div style={{ 
-                  fontSize: isCritical ? '14px' : '13px', 
-                  fontWeight: isCritical ? 700 : 400, 
-                  color: isCritical ? S.gold : S.white,
-                  lineHeight: '1.8',
-                  textAlign: 'right',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  fontFamily: "'Tajawal', sans-serif" // توحيد الخط
-                }}>
-                  {isCritical && <span style={{ fontSize: '15px' }}>📌</span>}
-                  <span style={{ flex: 1 }}>{cleanText}</span>
+              {/* التقرير الاستراتيجي */}
+              <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <button onClick={async () => {
+                    if (editMode2) {
+                      await supabase.from('customers').update({ notes: editData2.notes }).eq('id', id)
+                      setCustomer(prev => prev ? { ...prev, notes: editData2.notes } : prev)
+                    } else { setEditData2({ notes: customer.notes || '' }) }
+                    setEditMode2(!editMode2)
+                  }} style={{ fontSize: 10, padding: '4px 12px', borderRadius: 6, border: `1px solid ${S.gold}66`, background: editMode2 ? S.gold : 'transparent', color: editMode2 ? S.navy : S.gold, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: 700 }}>
+                    {editMode2 ? 'حفظ' : 'تعديل'}
+                  </button>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>📌 التقرير الاستراتيجي</div>
                 </div>
+                {editMode2
+                  ? <textarea value={editData2.notes} onChange={e => setEditData2({ ...editData2, notes: e.target.value })}
+                      placeholder="اكتب ملاحظاتك... استخدم ** للنقاط المهمة" rows={4}
+                      style={{ ...fieldStyle, border: `1px solid ${S.gold}33`, lineHeight: '1.6', resize: 'none' } as React.CSSProperties}/>
+                  : <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {customer.notes ? customer.notes.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => {
+                      const isBold = line.trim().startsWith('**'); const text = line.replace(/\*\*/g, '').trim()
+                      return (
+                        <div key={i} style={{ padding: isBold ? '10px 12px' : '3px 0', background: isBold ? 'rgba(201,168,76,0.07)' : 'transparent', borderRight: isBold ? `3px solid ${S.gold}` : 'none', borderRadius: 6, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          {isBold && <span>📌</span>}
+                          <span style={{ fontSize: isBold ? 13 : 12, fontWeight: isBold ? 700 : 400, color: isBold ? S.gold : S.white, lineHeight: '1.7', flex: 1, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>{text}</span>
+                        </div>
+                      )
+                    }) : <div style={{ color: S.muted, fontSize: 12, textAlign: 'center', padding: '20px 0', fontFamily: 'Tajawal, sans-serif' }}>لا توجد بيانات. اضغط تعديل.</div>}
+                  </div>}
               </div>
-            );
-          })
-        ) : (
-          <div style={{ color: S.muted, fontSize: '13px', textAlign: 'center', padding: '25px', fontFamily: "'Tajawal', sans-serif" }}>
-            لا توجد بيانات في التقرير حالياً. اضغط تعديل للبدء.
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-</div>
-</div>
-
-{/* نهاية قسم جلب عروض الاسعار*/}     
-     </div>
-        )}
-
-        {tab === 'contact' && <ContactTab customer={customer} customerId={id} setCustomer={setCustomer} />}
-        {tab === 'products' && <ProductsTab customerId={id} mainProducts={customer.main_products} />}
-
-        {tab === 'trading' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>القدرات التجارية</div>
-              {[
-                { label: 'المبيعات السنوية', val: customer.annual_sales || '—', big: true },
-                { label: 'الصفقات معنا', val: `${customer.total_deals || 0} صفقة` },
-                { label: 'إجمالي المبلغ', val: customer.total_amount ? `$${customer.total_amount.toLocaleString()}` : '$0' },
-              ].map(f => (
-                <div key={f.label} style={{ marginBottom: '14px', textAlign: 'right' }}>
-                  <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '3px' }}>{f.label}</div>
-                  <div style={{ fontSize: f.big ? '22px' : '13px', fontWeight: 700, color: f.big ? S.gold : S.white }}>{f.val}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>المنتجات</div>
-              {customer.main_products ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' }}>
-                  {customer.main_products.split('،').map((p, i) => (
-                    <span key={i} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 500 }}>{p.trim()}</span>
-                  ))}
-                </div>
-              ) : <div style={{ color: S.muted, fontSize: '12px', textAlign: 'right' }}>لم تُضف منتجات بعد</div>}
             </div>
           </div>
         )}
 
-        {tab === 'deals' && (
-          <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '16px', textAlign: 'right' }}>سجل الصفقات</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '16px' }}>
+        {/* ══ رحلة العميل ══ */}
+        {tab === 'journey' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, marginBottom: 20, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>🗺️ الخط الزمني لرحلة العميل</div>
+              <div style={{ position: 'relative', paddingRight: 32 }}>
+                <div style={{ position: 'absolute', right: 12, top: 0, bottom: 0, width: 2, background: S.border }}/>
+                {[
+                  { title: 'أول اتصال',  done: !!customer.last_contact_date,                   icon: '📞', val: customer.last_contact_date ? timeAgo(customer.last_contact_date) : 'لم يتم بعد' },
+                  { title: 'عرض أسعار',  done: !!customer.interest,                             icon: '📋', val: customer.interest || 'لم يتم بعد' },
+                  { title: 'أول صفقة',   done: parseInt(customer.total_deals || '0') >= 1,      icon: '🤝', val: parseInt(customer.total_deals || '0') >= 1 ? `${customer.total_deals} صفقة` : 'لم تتم بعد' },
+                  { title: 'عميل متكرر', done: parseInt(customer.total_deals || '0') >= 3,      icon: '🔄', val: parseInt(customer.total_deals || '0') >= 3 ? 'عميل منتظم ✓' : 'مطلوب 3 صفقات' },
+                  { title: 'عميل مميز',  done: parseInt(customer.total_deals || '0') >= 5,      icon: '⭐', val: parseInt(customer.total_deals || '0') >= 5 ? 'عميل VIP ✓' : 'مطلوب 5 صفقات' },
+                ].map((step, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20, flexDirection: 'row-reverse' }}>
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: step.done ? S.gold : S.card2, border: `2px solid ${step.done ? S.gold : S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0, zIndex: 1 }}>{step.icon}</div>
+                    <div style={{ flex: 1, textAlign: 'right' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: step.done ? S.white : S.muted, marginBottom: 3, fontFamily: 'Tajawal, sans-serif' }}>{step.title}</div>
+                      <div style={{ fontSize: 11, color: step.done ? S.gold : S.muted, fontFamily: 'Tajawal, sans-serif' }}>{step.val}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
               {[
-                { label: 'إجمالي الصفقات', val: customer.total_deals || 0, color: S.gold },
-                { label: 'إجمالي المبلغ', val: customer.total_amount ? `$${customer.total_amount.toLocaleString()}` : '$0', color: S.green },
-                { label: 'متوسط الصفقة', val: customer.total_deals ? `$${Math.round((customer.total_amount || 0) / customer.total_deals).toLocaleString()}` : '—', color: S.blue },
-                { label: 'نسبة الالتزام', val: '100%', color: S.green },
+                { label: 'مدة التعامل', val: `${Math.floor((Date.now() - new Date(customer.created_at).getTime()) / (1000*60*60*24*30))} شهر`, icon: '📅', color: S.blue },
+                { label: 'آخر تواصل',   val: customer.last_contact_date ? timeAgo(customer.last_contact_date) || '—' : '—', icon: '📞', color: S.gold },
+                { label: 'متوسط الصفقة', val: parseInt(customer.total_deals||'0') ? `$${Math.round(parseFloat(customer.total_amount||'0')/parseInt(customer.total_deals||'1')).toLocaleString()}` : '—', icon: '💰', color: S.green },
               ].map((m, i) => (
-                <div key={i} style={{ background: S.card2, borderRadius: '10px', padding: '12px', textAlign: 'right' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: m.color, marginBottom: '3px' }}>{m.val}</div>
-                  <div style={{ fontSize: '10px', color: S.muted }}>{m.label}</div>
+                <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16, textAlign: 'center' }}>
+                  <div style={{ fontSize: 24, marginBottom: 6 }}>{m.icon}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: m.color, marginBottom: 4, fontFamily: 'Tajawal, sans-serif' }}>{m.val}</div>
+                  <div style={{ fontSize: 11, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>{m.label}</div>
                 </div>
               ))}
             </div>
-            <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: '13px' }}>سيتم إضافة تفاصيل الصفقات قريباً</div>
           </div>
         )}
 
-        {tab === 'docs' && <DocsTab customerId={id} />}
-{tab === 'rating' && (
-  <RatingTab 
-    customer={customer} 
-    customerId={id} 
-    priceHistory={priceHistory} 
-  />
-)}
+        {tab === 'contact' && <ContactTab customer={customer} customerId={id}/>}
+
+        {/* ── المنتجات — مع onUpdate لتحديث نظرة عامة ── */}
+        {tab === 'products' && (
+          <ProductsTab
+            customerId={id}
+            mainProducts={customer.main_products}
+            onUpdate={(val) => setCustomer(prev => prev ? { ...prev, main_products: val } : prev)}
+          />
+        )}
+
+        {/* ══ سجل الصفقات ══ */}
+        {tab === 'deals' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, direction: 'rtl' }}>
+
+            {/* الإحصائيات */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+              {[
+                { label: 'إجمالي الصفقات', val: customer.total_deals  || '0', color: S.gold  },
+                { label: 'إجمالي المبلغ',  val: customer.total_amount ? `$${parseFloat(customer.total_amount).toLocaleString()}` : '$0', color: S.green },
+                { label: 'متوسط الصفقة',  val: parseInt(customer.total_deals||'0') ? `$${Math.round(parseFloat(customer.total_amount||'0')/parseInt(customer.total_deals||'1')).toLocaleString()}` : '—', color: S.blue },
+              ].map((m, i) => (
+                <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 14, textAlign: 'right' }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: m.color, marginBottom: 4, fontFamily: 'Tajawal, sans-serif' }}>{m.val}</div>
+                  <div style={{ fontSize: 11, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>{m.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* زر إضافة صفقة */}
+            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <button onClick={() => setShowDealForm(!showDealForm)}
+                  style={{ padding: '8px 18px', borderRadius: 8, background: S.gold, border: 'none', color: S.navy, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+                  + إضافة صفقة
+                </button>
+                <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>📋 سجل الصفقات — {deals.length} صفقة</div>
+              </div>
+
+              {/* فورم الصفقة */}
+              {showDealForm && (
+                <div style={{ background: S.navy2, border: `1px solid rgba(201,168,76,0.2)`, borderRadius: 10, padding: 16, marginBottom: 14 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: S.gold, marginBottom: 14, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>إضافة صفقة جديدة</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>تاريخ الصفقة</label>
+                      <input type="date" value={newDeal.date} onChange={e => setNewDeal({ ...newDeal, date: e.target.value })}
+                        style={{ ...fieldStyle, colorScheme: 'dark' as any }}/>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>اسم الصفقة *</label>
+                      <input type="text" value={newDeal.name} onChange={e => setNewDeal({ ...newDeal, name: e.target.value })}
+                        placeholder="مثال: توريد زيت نخيل 20 طن" style={fieldStyle}/>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>المبلغ ($)</label>
+                      <input type="number" value={newDeal.amount} onChange={e => setNewDeal({ ...newDeal, amount: e.target.value })}
+                        placeholder="0.00" style={fieldStyle}/>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 4, textAlign: 'right', fontFamily: 'Tajawal, sans-serif' }}>ملاحظات</label>
+                      <input type="text" value={newDeal.notes} onChange={e => setNewDeal({ ...newDeal, notes: e.target.value })}
+                        placeholder="ملاحظات الصفقة..." style={fieldStyle}/>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={saveDeal} disabled={savingDeal}
+                      style={{ background: S.gold, color: S.navy, border: 'none', padding: '8px 24px', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+                      {savingDeal ? '⏳ جاري الحفظ...' : '💾 حفظ الصفقة'}
+                    </button>
+                    <button onClick={() => setShowDealForm(false)}
+                      style={{ background: 'transparent', color: S.muted, border: `1px solid ${S.border}`, padding: '8px 16px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>إلغاء</button>
+                  </div>
+                </div>
+              )}
+
+              {/* قائمة الصفقات */}
+              {deals.length === 0
+                ? <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: 13, fontFamily: 'Tajawal, sans-serif' }}>لا توجد صفقات مسجلة بعد</div>
+                : deals.map((d, i) => (
+                  <div key={d.id || i} style={{ background: S.card2, borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: S.gold, fontFamily: 'Tajawal, sans-serif' }}>
+                        ${parseFloat(d.amount || '0').toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: 10, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>
+                        {d.deal_date ? new Date(d.deal_date).toLocaleDateString('ar-EG') : ''}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: S.white, fontFamily: 'Tajawal, sans-serif' }}>🤝 {d.deal_name}</div>
+                      {d.notes && <div style={{ fontSize: 11, color: S.muted, marginTop: 2, fontFamily: 'Tajawal, sans-serif' }}>{d.notes}</div>}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'docs'   && <DocsTab customerId={id}/>}
+        {tab === 'rating' && <RatingTab customer={customer} customerId={id}/>}
+
       </div>
 
       {/* AI Modal */}
       {showAiModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '20px' }}>
-          <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '16px', width: '100%', maxWidth: '600px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', direction: 'rtl' }}>
-            <div style={{ padding: '20px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button onClick={() => setShowAiModal(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: '20px', cursor: 'pointer' }}>✕</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 16, width: '100%', maxWidth: 600, maxHeight: '80vh', display: 'flex', flexDirection: 'column', direction: 'rtl', fontFamily: 'Tajawal, sans-serif' }}>
+            <div style={{ padding: 20, borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <button onClick={() => setShowAiModal(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: 20, cursor: 'pointer' }}>✕</button>
               <div>
-                <div style={{ fontSize: '15px', fontWeight: 700 }}>✨ تحليل AI</div>
-                <div style={{ fontSize: '11px', color: S.muted, marginTop: '2px' }}>{customer.company_name}</div>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>✨ تحليل AI للعميل</div>
+                <div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>{customer.full_name} — {customer.company_name}</div>
               </div>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
-              {aiLoading ? (
-                <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '16px' }}>⏳</div>
-                  <div style={{ color: S.muted, fontSize: '14px' }}>جاري التحليل...</div>
-                </div>
-              ) : (
-                <div style={{ fontSize: '13px', lineHeight: '2', color: S.white, whiteSpace: 'pre-wrap' }}>{aiAnalysis}</div>
-              )}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+              {aiLoading
+                ? <div style={{ textAlign: 'center', padding: '40px 0' }}><div style={{ fontSize: 32, marginBottom: 16 }}>⏳</div><div style={{ color: S.muted, fontSize: 14 }}>جاري التحليل...</div></div>
+                : <div style={{ fontSize: 13, lineHeight: '2', color: S.white, whiteSpace: 'pre-wrap' }}>{aiAnalysis}</div>}
             </div>
           </div>
-          
         </div>
-        
       )}
+
     </div>
   )
 }

@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "BidLX | نظام إدارة الشركات ",
-  description: "نظام سحابي متطور لإدارة سلاسل الإمداد العالمية",
+  description: "نظام سحابي متطور لإدارة الشركات ",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

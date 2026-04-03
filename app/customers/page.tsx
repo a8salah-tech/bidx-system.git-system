@@ -224,9 +224,9 @@ export default function CustomersPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
           {[
             { label: 'إجمالي العملاء',  val: customers.length,                                              color: S.gold  },
-            { label: 'نشطون',           val: customers.filter(c => c.status === 'active').length,            color: S.green },
-            { label: 'قيد الانتظار',    val: customers.filter(c => c.status === 'pending').length,           color: S.amber },
-            { label: 'إجمالي الصفقات',  val: customers.reduce((a, b) => a + (b.total_deals || 0), 0),       color: S.blue  },
+            { label: 'قيد التفاوض',           val: customers.filter(c => c.status === 'active').length,            color: S.green },
+            { label: 'قيد التنفيذ',    val: customers.filter(c => c.status === 'pending').length,           color: S.amber },
+            { label: 'العمليات المكتملة ',  val: customers.reduce((a, b) => a + (b.total_deals || 0), 0),       color: S.blue  },
           ].map((stat, i) => (
             <div key={i} style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
               <div style={{ fontSize: '28px', fontWeight: 700, color: stat.color, marginBottom: '4px' }}>{stat.val}</div>

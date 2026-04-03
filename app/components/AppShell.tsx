@@ -25,6 +25,7 @@ const pageTitles: Record<string, string> = {
   '/products': 'إدارة المنتجات',
   '/profile': 'ملف المدير التنفيذي',
   '/pricing/compare': 'مقارنة أسعار',
+  '/customers': ' إدارة العملاء',
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
