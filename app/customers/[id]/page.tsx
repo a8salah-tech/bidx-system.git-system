@@ -663,7 +663,7 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
     { label: 'الاسم',     key: 'full_name',    points: 15 },
     { label: 'الشركة',    key: 'company_name', points: 10 },
     { label: 'الدولة',    key: 'country',      points: 5  },
-    { label: 'المنتجات',  key: 'main_products',points: 15 },
+    { label: 'المنتجات',  key: 'interest', points: 15 },
     { label: 'الموبايل',  key: 'phone',        points: 15 },
     { label: 'الإيميل',   key: 'email',        points: 10 },
     { label: 'الاهتمام',  key: 'interest',     points: 10 },
