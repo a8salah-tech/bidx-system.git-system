@@ -64,13 +64,14 @@ useEffect(() => {
   // --- جلب المستخدم وتثبيت الصورة ---
   useEffect(() => {
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser()
-      if (data?.user) {
-        setUser(data.user)
+      const { data } = await supabase.auth.getSession()
+const user = data?.session?.user
+      if (user) {
+        setUser(user)
         // تثبيت صورة Avatar مرة واحدة
         if (!localStorage.getItem('avatarUrl')) {
-          const url = data.user.user_metadata?.avatar_url ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(data.user.user_metadata?.full_name || data.user.email || 'User')}&background=0A1628&color=fff`
+          const url = user.user_metadata?.avatar_url ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(user.user_metadata?.full_name || user.email || 'User')}&background=0A1628&color=fff`
           setAvatarUrl(url)
           localStorage.setItem('avatarUrl', url)
         }
@@ -148,9 +149,9 @@ useEffect(() => {
         <div style={{ marginTop: 'auto', padding: '16px', borderTop: `1px solid ${S.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexDirection: 'row-reverse' }}>
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: S.navy }}>BE</div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: 700 }}>bidlx.com</div>
-              <div style={{ fontSize: '10px', color: S.muted }}>مدير النظام</div>
+              <div style={{ fontSize: '10px', color: S.muted }}> V 1.3.04</div>
             </div>
           </div>
         </div>

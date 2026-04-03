@@ -567,7 +567,7 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
   const [showAiModal,     setShowAiModal]    = useState(false)
   const [tab,             setTab]            = useState('overview')
   const [editMode,        setEditMode]       = useState(false)
-  const [editData,        setEditData]       = useState({ full_name: '', company_name: '', country: '', city: '', website: '' })
+  const [editData, setEditData] = useState({ full_name: '', company_name: '', country: '', city: '', website: '', customer_type: '' })
   const [editMode2,       setEditMode2]      = useState(false)
   const [editData2,       setEditData2]      = useState({ notes: '' })
   // ── سجل التواصل ──
@@ -592,7 +592,7 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
       const { data } = await supabase.from('customers').select('*').eq('id', id).single()
       setCustomer(data)
       if (data) {
-        setEditData({ full_name: data.full_name || '', company_name: data.company_name || '', country: data.country || '', city: data.city || '', website: data.website || '' })
+        setEditData({ full_name: data.full_name || '', company_name: data.company_name || '', country: data.country || '', city: data.city || '', website: data.website || '' ,customer_type: data.customer_type})
         setEditData2({ notes: data.notes || '' })
       }
       setLoading(false)
@@ -659,19 +659,18 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
   const initials = (n: string) => n?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??'
 
   // ── اكتمال الملف ──
-  const scoreFields = [
-    { label: 'الاسم',     key: 'full_name',    points: 15 },
-    { label: 'الشركة',    key: 'company_name', points: 10 },
-    { label: 'الدولة',    key: 'country',      points: 5  },
-    { label: 'المنتجات',  key: 'interest', points: 15 },
-    { label: 'الموبايل',  key: 'phone',        points: 15 },
-    { label: 'الإيميل',   key: 'email',        points: 10 },
-    { label: 'الاهتمام',  key: 'interest',     points: 10 },
-    { label: 'الموقع',    key: 'website',      points: 5  },
-    { label: 'ملاحظات',   key: 'notes',        points: 15 },
+const scoreFields = [
+    { label: 'الاسم',       key: 'full_name',      points: 15, done: !!customer.full_name },
+    { label: 'نوع العميل',  key: 'customer_type',  points: 15, done: !!(customer as any).customer_type },
+    { label: 'الدولة',      key: 'country',        points: 10, done: !!customer.country },
+    { label: 'المنتجات',    key: 'interest',       points: 15, done: !!customer.interest },
+    { label: 'الموبايل',    key: 'phone',          points: 15, done: !!customer.phone },
+    { label: 'الإيميل',     key: 'email',          points: 10, done: !!customer.email },
+    { label: 'أول صفقة',    key: '_deal',          points: 15, done: parseInt(customer.total_deals || '0') >= 1 },
+    { label: 'الوثائق',     key: '_docs',          points: 15, done: false }, // يتحدث عند رفع وثيقة
   ]
-  const comp       = scoreFields.reduce((total, f) => total + ((customer as any)[f.key] ? f.points : 0), 0)
-  const compFields = scoreFields.map(f => ({ label: f.label, done: !!(customer as any)[f.key] }))
+  const comp       = scoreFields.reduce((total, f) => total + (f.done ? f.points : 0), 0)
+  const compFields = scoreFields.map(f => ({ label: f.label, done: f.done }))
 
   // ── التقييم من الأعمدة الفعلية ──
   const completedCount = [customer.quality_rating, customer.delivery_rating, customer.comm_rating, customer.price_rating, customer.flex_rating].filter(v => v && v > 0).length
@@ -811,6 +810,7 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
             {/* معلومات العميل */}
+            
             <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <button onClick={async () => {
@@ -821,6 +821,24 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
                 </button>
                 <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>معلومات العميل</div>
               </div>
+              {/* نوع العميل */}
+              <div style={{ marginBottom: 12, textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 3, fontFamily: 'Tajawal, sans-serif' }}>نوع العميل</div>
+                {editMode ? (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {['شركة', 'فرد'].map(type => (
+                      <button key={type} onClick={() => setEditData({ ...editData, customer_type: type })}
+                        style={{ padding: '6px 18px', borderRadius: 8, border: `1px solid ${editData.customer_type === type ? S.gold : S.border}`, background: editData.customer_type === type ? S.gold3 : 'transparent', color: editData.customer_type === type ? S.gold2 : S.muted, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+                        {type === 'شركة' ? '🏢 شركة' : '👤 فرد'}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: S.white, fontFamily: 'Tajawal, sans-serif' }}>
+                    {(customer as any).customer_type === 'شركة' ? '🏢 شركة' : (customer as any).customer_type === 'فرد' ? '👤 فرد' : '—'}
+                  </div>
+                )}
+              </div>
               {[
                 { label: 'الاسم الكامل',  key: 'full_name' },
                 { label: 'اسم الشركة',    key: 'company_name' },
@@ -829,6 +847,7 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
                 { label: 'الموقع',        key: 'website' },
                 { label: 'الاهتمام',      key: 'interest' },
               ].map(f => (
+              
                 <div key={f.key} style={{ marginBottom: 12, textAlign: 'right' }}>
                   <div style={{ fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 3, fontFamily: 'Tajawal, sans-serif' }}>{f.label}</div>
                   {editMode
