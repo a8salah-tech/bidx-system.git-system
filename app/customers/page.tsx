@@ -17,7 +17,7 @@ interface Customer {
   country: string
   city: string
   interest: string        // المنتج المطلوب
-  status: 'active' | 'pending' | 'inactive'
+  status: | "active" | "pending" | "inactive" | "negotiate" | "execute" | "completed";
   total_deals: number
   total_amount: number
   notes: string
@@ -51,6 +51,7 @@ const S = {
   blue:   '#3B82F6',
   amber:  '#F59E0B',
   card2:  'rgba(255,255,255,0.08)',
+  purple: "#8b5cf6",
 }
 
 // ===== قائمة الدول =====
@@ -61,10 +62,12 @@ const COUNTRIES = [
 ]
 
 // ===== حالات العميل =====
-const STATUS_MAP = {
-  active:   { label: 'نشط',          color: '#22C55E', bg: 'rgba(34,197,94,0.12)' },
-  pending:  { label: 'قيد الانتظار', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)' },
-  inactive: { label: 'غير نشط',      color: '#EF4444', bg: 'rgba(239,68,68,0.12)' },
+const STATUS_MAP: Record<string, { label: string, color: string, bg: string }> = {
+  new:       { label: 'جديد',              color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'  },
+  negotiate: { label: 'قيد التفاوض',       color: '#F59E0B', bg: 'rgba(245,158,11,0.12)'  },
+  execute:   { label: 'قيد التنفيذ',       color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)'  },
+  completed: { label: 'العمليات المكتملة', color: '#22C55E', bg: 'rgba(34,197,94,0.12)'   },
+  inactive:  { label: 'غير نشط',           color: '#EF4444', bg: 'rgba(239,68,68,0.12)'   },
 }
 
 // ===== القيمة الافتراضية لنموذج الإضافة =====
@@ -224,9 +227,9 @@ export default function CustomersPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
           {[
             { label: 'إجمالي العملاء',  val: customers.length,                                              color: S.gold  },
-            { label: 'قيد التفاوض',           val: customers.filter(c => c.status === 'active').length,            color: S.green },
-            { label: 'قيد التنفيذ',    val: customers.filter(c => c.status === 'pending').length,           color: S.amber },
-            { label: 'العمليات المكتملة ',  val: customers.reduce((a, b) => a + (b.total_deals || 0), 0),       color: S.blue  },
+            { label: 'قيد التفاوض',        val: customers.filter(c => c.status === 'negotiate').length, color: S.amber },
+            { label: 'قيد التنفيذ',         val: customers.filter(c => c.status === 'execute').length,   color: S.purple || '#8B5CF6' },
+            { label: 'العمليات المكتملة',   val: customers.filter(c => c.status === 'completed').length, color: S.green },
           ].map((stat, i) => (
             <div key={i} style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
               <div style={{ fontSize: '28px', fontWeight: 700, color: stat.color, marginBottom: '4px' }}>{stat.val}</div>
@@ -260,10 +263,12 @@ export default function CustomersPage() {
           {/* فلتر الحالة */}
           <div style={{ display: 'flex', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '10px', overflow: 'hidden' }}>
             {[
-              { key: 'all',      label: 'الكل' },
-              { key: 'active',   label: 'نشطون' },
-              { key: 'pending',  label: 'انتظار' },
-              { key: 'inactive', label: 'غير نشط' },
+              { key: 'all',       label: 'الكل' },
+              { key: 'new',       label: 'جديد' },
+              { key: 'negotiate', label: 'تفاوض' },
+              { key: 'execute',   label: 'تنفيذ' },
+              { key: 'completed', label: 'مكتمل' },
+              { key: 'inactive',  label: 'غير نشط' },
             ].map(t => (
               <button
                 key={t.key}
@@ -455,9 +460,21 @@ export default function CustomersPage() {
                           )}
                           {/* تغيير الحالة */}
                           <button
-                            onClick={() => toggleStatus(c.id, c.status)}
-                            style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: `1px solid rgba(255,255,255,0.15)`, background: 'transparent', color: c.status === 'active' ? S.red : S.green, cursor: 'pointer', fontFamily: 'inherit' }}>
-                            {c.status === 'active' ? 'إيقاف' : 'تفعيل'}
+                            style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: `1px solid rgba(255,255,255,0.15)`, background: 'transparent', color: S.muted, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            <select
+                              value={c.status}
+                              onChange={async e => {
+                                e.stopPropagation()
+                                const next = e.target.value
+                                await supabase.from('customers').update({ status: next }).eq('id', c.id)
+                                setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, status: next as any } : x))
+                              }}
+                              onClick={e => e.stopPropagation()}
+                              style={{ background: S.navy2, color: STATUS_MAP[c.status]?.color || S.muted, border: `1px solid ${S.border}`, borderRadius: '6px', padding: '3px 6px', fontSize: '10px', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
+                              {Object.entries(STATUS_MAP).map(([key, val]) => (
+                                <option key={key} value={key} style={{ background: S.navy2 }}>{val.label}</option>
+                              ))}
+                            </select>
                           </button>
                         </div>
                       </td>
