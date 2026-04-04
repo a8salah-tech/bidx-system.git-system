@@ -319,7 +319,38 @@ export default function CustomersPage() {
                           </div>
                           <div>
                             <div style={{ fontSize: '13px', fontWeight: 700 }}>{c.full_name}</div>
-                            <div style={{ fontSize: '10px', color: S.muted, marginTop: '2px' }}>{c.email || '—'}</div>
+                            {/* التقييم واكتمال الملف */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                              {/* نجوم التقييم */}
+                              <div style={{ display: 'flex', gap: 1 }}>
+                                {(() => {
+                                  const cAny = c as any
+                                  const stars = [cAny.quality_rating, cAny.delivery_rating, cAny.comm_rating, cAny.price_rating, cAny.flex_rating].filter(v => v && v > 0).length
+                                  return [1,2,3,4,5].map(i => (
+                                    <svg key={i} width="10" height="10" viewBox="0 0 16 16"
+                                      style={{ fill: i <= stars ? '#C9A84C' : 'rgba(201,168,76,0.15)' }}>
+                                      <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z"/>
+                                    </svg>
+                                  ))
+                                })()}
+                              </div>
+                              {/* اكتمال الملف */}
+                              {(() => {
+                                const cAny = c as any
+                                const fields = [c.full_name, cAny.customer_type, c.country, c.interest, c.phone, c.email]
+                                const done   = fields.filter(Boolean).length
+                                const pct    = Math.round((done / fields.length) * 100)
+                                const color  = pct >= 80 ? '#22C55E' : pct >= 50 ? '#C9A84C' : '#EF4444'
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <div style={{ width: '36px', height: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                                      <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '2px' }}/>
+                                    </div>
+                                    <span style={{ fontSize: '9px', color: color, fontWeight: 700 }}>{pct}%</span>
+                                  </div>
+                                )
+                              })()}
+                            </div>
                           </div>
                         </div>
                       </td>
