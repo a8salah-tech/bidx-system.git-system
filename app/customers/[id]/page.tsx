@@ -29,6 +29,7 @@ interface Customer {
   comm_rating: number      // عملية الشراء الثالثة
   price_rating: number     // عملية الشراء الرابعة
   flex_rating: number      // عملية الشراء الخامسة
+  customer_type: string
 }
 
 // ===== دوال مساعدة =====
@@ -660,14 +661,14 @@ export default function CustomerDetail({ params }: { params: Promise<{ id: strin
 
   // ── اكتمال الملف ──
 const scoreFields = [
-    { label: 'الاسم',       key: 'full_name',      points: 15, done: !!customer.full_name },
-    { label: 'نوع العميل',  key: 'customer_type',  points: 15, done: !!(customer as any).customer_type },
-    { label: 'الدولة',      key: 'country',        points: 10, done: !!customer.country },
-    { label: 'المنتجات',    key: 'interest',       points: 15, done: !!customer.interest },
-    { label: 'الموبايل',    key: 'phone',          points: 15, done: !!customer.phone },
-    { label: 'الإيميل',     key: 'email',          points: 10, done: !!customer.email },
-    { label: 'أول صفقة',    key: '_deal',          points: 15, done: parseInt(customer.total_deals || '0') >= 1 },
-    { label: 'الوثائق',     key: '_docs',          points: 15, done: false }, // يتحدث عند رفع وثيقة
+    { label: 'الاسم',       key: 'full_name',      points: 13, done: !!customer.full_name },
+    { label: 'نوع العميل',  key: 'customer_type',  points: 12, done: !!(customer as any).customer_type },
+    { label: 'الدولة',      key: 'country',        points: 12, done: !!customer.country },
+    { label: 'المنتجات',    key: 'interest',       points: 13, done: !!customer.interest },
+    { label: 'الموبايل',    key: 'phone',          points: 13, done: !!customer.phone },
+    { label: 'الإيميل',     key: 'email',          points: 12, done: !!customer.email },
+    { label: 'أول صفقة',    key: '_deal',          points: 13, done: parseInt(customer.total_deals || '0') >= 1 },
+    { label: 'الوثائق', key: '_docs', points: 12, done: parseInt(customer.total_deals || '0') >= 0 && contacts2.length >= 0 },
   ]
   const comp       = scoreFields.reduce((total, f) => total + (f.done ? f.points : 0), 0)
   const compFields = scoreFields.map(f => ({ label: f.label, done: f.done }))
@@ -688,7 +689,7 @@ const scoreFields = [
   const statusInfo = STATUS_MAP[customer.status] || STATUS_MAP.active
 
   // ── Pagination سجل التواصل ──
-  const perPage     = 5
+  const perPage     = 3
   const totalPages2 = Math.ceil(contacts2.length / perPage)
   const paginated   = contacts2.slice((contactPage - 1) * perPage, contactPage * perPage)
   const firstContact = contacts2[contacts2.length - 1]
@@ -813,13 +814,13 @@ const scoreFields = [
             
             <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>معلومات العميل</div>
                 <button onClick={async () => {
                   if (editMode) { await supabase.from('customers').update(editData).eq('id', id); setCustomer(prev => prev ? { ...prev, ...editData } : prev) }
                   setEditMode(!editMode)
                 }} style={{ fontSize: 11, padding: '4px 12px', borderRadius: 6, border: `1px solid ${S.border}`, background: editMode ? S.gold : 'transparent', color: editMode ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: 600 }}>
                   {editMode ? 'حفظ' : 'تعديل'}
                 </button>
-                <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>معلومات العميل</div>
               </div>
               {/* نوع العميل */}
               <div style={{ marginBottom: 12, textAlign: 'right' }}>
@@ -877,18 +878,18 @@ const scoreFields = [
               {/* سجل التواصل */}
               <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <button onClick={() => setShowContactForm(!showContactForm)}
-                    style={{ padding: '6px 14px', borderRadius: 7, background: S.gold, border: 'none', color: S.navy, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
-                    + تواصل جديد
-                  </button>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>📋 سجل التواصل</div>
+                                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}> سجل التواصل</div>
                     {firstContact && (
                       <div style={{ fontSize: 10, color: S.gold, marginTop: 2, fontFamily: 'Tajawal, sans-serif' }}>
                         أول اتصال: {new Date(firstContact.contact_date).toLocaleDateString('ar-EG')} عبر {METHODS[firstContact.method]?.label || firstContact.method}
                       </div>
                     )}
                   </div>
+                  <button onClick={() => setShowContactForm(!showContactForm)}
+                    style={{ padding: '6px 14px', borderRadius: 7, background: S.gold, border: 'none', color: S.navy, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
+                    + تواصل جديد
+                  </button>
                 </div>
 
                 {showContactForm && (
@@ -963,6 +964,7 @@ const scoreFields = [
               {/* التقرير الاستراتيجي */}
               <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}> التقرير الاستراتيجي</div>
                   <button onClick={async () => {
                     if (editMode2) {
                       await supabase.from('customers').update({ notes: editData2.notes }).eq('id', id)
@@ -972,7 +974,6 @@ const scoreFields = [
                   }} style={{ fontSize: 10, padding: '4px 12px', borderRadius: 6, border: `1px solid ${S.gold}66`, background: editMode2 ? S.gold : 'transparent', color: editMode2 ? S.navy : S.gold, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontWeight: 700 }}>
                     {editMode2 ? 'حفظ' : 'تعديل'}
                   </button>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}>📌 التقرير الاستراتيجي</div>
                 </div>
                 {editMode2
                   ? <textarea value={editData2.notes} onChange={e => setEditData2({ ...editData2, notes: e.target.value })}
