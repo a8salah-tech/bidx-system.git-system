@@ -151,7 +151,7 @@ const user = data?.session?.user
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: S.navy }}>BE</div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: 700 }}>bidlx.com</div>
-              <div style={{ fontSize: '10px', color: S.muted }}> V 1.3.05</div>
+              <div style={{ fontSize: '10px', color: S.muted }}> V 1.3.06</div>
             </div>
           </div>
         </div>
