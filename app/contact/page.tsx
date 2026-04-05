@@ -104,7 +104,7 @@ export default function ContactPage() {
               <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '12px' }}>
 <div style={{ textAlign: 'center', marginBottom: '20px' }}>
   <h3 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '5px', color: S.white }}>
-    حجز استشارة تقنية
+    
   </h3>
   <a 
     href="mailto:support@bidlx.com" 

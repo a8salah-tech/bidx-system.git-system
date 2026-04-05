@@ -70,24 +70,32 @@ function nextVoucherNumber(existing: any[]): string {
 // ===================================================
 function CurrencyBar({ currency, setCurrency }: { currency: string; setCurrency: (c: string) => void }) {
   const [open, setOpen] = useState(false)
-  const sym = CURRENCY_SYMBOLS[currency] || currency
+  const sym  = CURRENCY_SYMBOLS[currency] || currency
   const curr = CURRENCIES.find(c => c.value === currency)
 
+  // إغلاق القائمة عند الضغط خارجها
+  useEffect(() => {
+    if (!open) return
+    function handleClick() { setOpen(false) }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [open])
+
   return (
-    <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(!open)}
+    <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+      <button onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 8, background: S.gold3, border: `1px solid ${S.borderG}`, color: S.gold2, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontSize: 13, fontWeight: 700 }}>
-        <span style={{ fontSize: 16 }}>{sym}</span>
-        <span>{curr?.label || currency}</span>
         <span style={{ fontSize: 10, color: S.muted }}>{open ? '▲' : '▼'}</span>
+        <span>{curr?.label || currency}</span>
+        <span style={{ fontSize: 15, fontWeight: 800 }}>{sym}</span>
       </button>
       {open && (
-        <div style={{ position: 'absolute', top: '110%', right: 0, background: S.navy2, border: `1px solid ${S.borderG}`, borderRadius: 12, width: 280, maxHeight: 320, overflowY: 'auto', zIndex: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+        <div style={{ position: 'absolute', top: '110%', left: 0, background: S.navy2, border: `1px solid ${S.borderG}`, borderRadius: 12, width: 300, maxHeight: 340, overflowY: 'auto', zIndex: 9999, boxShadow: '0 8px 40px rgba(0,0,0,0.7)' }}>
           {CURRENCIES.map(c => (
             <button key={c.id} onClick={() => { setCurrency(c.value); setOpen(false) }}
-              style={{ width: '100%', textAlign: 'right', padding: '10px 16px', background: currency === c.value ? S.gold3 : 'transparent', border: 'none', borderBottom: `1px solid ${S.border}`, color: currency === c.value ? S.gold2 : S.white, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: S.muted }}>{CURRENCY_SYMBOLS[c.value] || c.value}</span>
+              style={{ width: '100%', padding: '10px 16px', background: currency === c.value ? S.gold3 : 'transparent', border: 'none', borderBottom: `1px solid ${S.border}`, color: currency === c.value ? S.gold2 : S.white, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', direction: 'rtl' }}>
               <span>{c.label}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: S.gold, minWidth: 40, textAlign: 'right' }}>{CURRENCY_SYMBOLS[c.value] || c.value}</span>
             </button>
           ))}
         </div>
@@ -135,8 +143,6 @@ export default function AccountingPage() {
     description:    '',
     payment_method: 'نقداً',
   })
-
-  const sym = CURRENCY_SYMBOLS[currency] || currency
 
   // ── تحميل البيانات ──
   const loadAll = useCallback(async () => {
@@ -246,6 +252,9 @@ export default function AccountingPage() {
     .filter(a => typeFilter === 'all' || a.account_type === typeFilter)
     .filter(a => a.account_name?.includes(search) || a.account_code?.includes(search))
 
+  // ── رمز العملة الحالية ──
+  const sym = CURRENCY_SYMBOLS[currency] || currency
+
   const TABS = [
     { key: 'dashboard', label: '📊 لوحة المالية' },
     { key: 'accounts',  label: '📁 دليل الحسابات' },
@@ -271,6 +280,7 @@ export default function AccountingPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {/* اختيار العملة */}
           <CurrencyBar currency={currency} setCurrency={saveCurrency}/>
+          <div style={{ fontSize: '16px', fontWeight: 800, color: S.gold2 }}>إدارة الحسابات المالية</div>
         </div>
       </div>
 
@@ -543,66 +553,83 @@ export default function AccountingPage() {
             <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 14, padding: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 800, color: S.white, marginBottom: 16, textAlign: 'right' }}>📊 قائمة الدخل</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(59,130,246,0.08)', borderRadius: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: S.blue }}>{fmt(totalIncome, sym)}</span>
-                  <span style={{ fontSize: 12, color: S.white, fontWeight: 600 }}>إجمالي الإيرادات</span>
-                </div>
-                {accounts.filter(a => a.account_type === 'income').map(a => (
-                  <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px' }}>
-                    <span style={{ fontSize: 13, color: S.green, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
-                    <span style={{ fontSize: 12, color: S.muted }}>{a.account_name}</span>
-                  </div>
-                ))}
-                <div style={{ height: 1, background: S.border, margin: '4px 0' }}/>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: S.red }}>{fmt(totalExpenses, sym)}</span>
-                  <span style={{ fontSize: 12, color: S.white, fontWeight: 600 }}>إجمالي المصروفات</span>
-                </div>
-                {accounts.filter(a => a.account_type === 'expense').map(a => (
-                  <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px' }}>
-                    <span style={{ fontSize: 13, color: S.red, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
-                    <span style={{ fontSize: 12, color: S.muted }}>{a.account_name}</span>
-                  </div>
-                ))}
+
+                {/* إجمالي الإيرادات */}
+                     <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(59,130,246,0.08)', borderRadius: 8, textAlign: 'right' }}>
+                       <span style={{ fontSize: 12, color: S.white, fontWeight: 600 }}>إجمالي الإيرادات</span>
+                       <span style={{ fontSize: 16, fontWeight: 800, color: S.blue }}>{fmt(totalIncome, sym)}</span>
+                      </div>
+                            {accounts.filter(a => a.account_type === 'income').map(a => (
+                      <div key={a.id} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '5px 12px', textAlign: 'right' }}>
+                        <span style={{ fontSize: 11, color: S.muted }}>{a.account_name}</span>
+                        <span style={{ fontSize: 13, color: S.green, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
+                      </div>
+                      ))}
+
+  <div style={{ height: 1, background: S.border, margin: '4px 0' }}/>
+
+{/* إجمالي المصروفات */}
+<div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 8, textAlign: 'right' }}>
+  <span style={{ fontSize: 12, color: S.white, fontWeight: 600 }}>إجمالي المصروفات</span>
+  <span style={{ fontSize: 16, fontWeight: 800, color: S.red }}>{fmt(totalExpenses, sym)}</span>
+</div>
+
+{accounts.filter(a => a.account_type === 'expense').map(a => (
+  <div key={a.id} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '5px 12px', textAlign: 'right' }}>
+    <span style={{ fontSize: 11, color: S.muted }}>{a.account_name}</span>
+    <span style={{ fontSize: 13, color: S.red, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
+  </div>
+))}
+
                 <div style={{ height: 2, background: S.border, margin: '4px 0' }}/>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 16px', background: `${profitColor}18`, borderRadius: 10, border: `1px solid ${profitColor}40` }}>
-                  <span style={{ fontSize: 18, fontWeight: 900, color: profitColor, fontFamily: 'monospace' }}>
-                    {netProfit >= 0 ? '+' : ''}{fmt(netProfit, sym)}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: profitColor }}>
-                    {netProfit > 0 ? '📈 صافي ربح' : netProfit < 0 ? '📉 صافي خسارة' : '⚖️ تعادل'}
-                  </span>
-                </div>
+
+                {/* صافي الربح */}
+<div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '14px 16px', background: `${profitColor}18`, borderRadius: 10, border: `1px solid ${profitColor}40`, textAlign: 'right' }}>
+  <span style={{ fontSize: 13, fontWeight: 700, color: profitColor }}>
+    {netProfit > 0 ? '📈 صافي ربح' : netProfit < 0 ? '📉 صافي خسارة' : '⚖️ تعادل'}
+  </span>
+  <span style={{ fontSize: 20, fontWeight: 900, color: profitColor, fontFamily: 'monospace' }}>
+    {netProfit >= 0 ? '+' : ''}{fmt(netProfit, sym)}
+  </span>
+</div>
               </div>
             </div>
 
             {/* الميزانية العمومية */}
-            <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 14, padding: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 800, color: S.white, marginBottom: 16, textAlign: 'right' }}>⚖️ الميزانية العمومية</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: S.green, textAlign: 'right', marginBottom: 4 }}>الأصول</div>
-                {accounts.filter(a => a.account_type === 'asset').map(a => (
-                  <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: S.card, borderRadius: 6 }}>
-                    <span style={{ fontSize: 13, color: S.green, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
-                    <span style={{ fontSize: 12, color: S.muted }}>{a.account_code} — {a.account_name}</span>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(34,197,94,0.08)', borderRadius: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: S.green, fontFamily: 'monospace' }}>{fmt(totalAssets, sym)}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>إجمالي الأصول</span>
-                </div>
-                <div style={{ height: 1, background: S.border, margin: '8px 0' }}/>
-                <div style={{ fontSize: 11, fontWeight: 700, color: S.amber, textAlign: 'right', marginBottom: 4 }}>الخصوم وحقوق الملكية</div>
-                {accounts.filter(a => ['liability', 'equity'].includes(a.account_type)).map(a => (
-                  <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: S.card, borderRadius: 6 }}>
-                    <span style={{ fontSize: 13, color: S.amber, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
-                    <span style={{ fontSize: 12, color: S.muted }}>{a.account_code} — {a.account_name}</span>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(245,158,11,0.08)', borderRadius: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: S.amber, fontFamily: 'monospace' }}>{fmt(totalLiabilities + Math.max(0, totalAssets - totalLiabilities), sym)}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>إجمالي الخصوم + حقوق الملكية</span>
-                </div>
+<div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 14, padding: 20 }}>
+  <div style={{ fontSize: 14, fontWeight: 800, color: S.white, marginBottom: 16, textAlign: 'right' }}>⚖️ الميزانية العمومية</div>
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+    <div style={{ fontSize: 11, fontWeight: 700, color: S.green, textAlign: 'right', marginBottom: 2 }}>الأصول</div>
+
+    {accounts.filter(a => a.account_type === 'asset').map(a => (
+      <div key={a.id} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '5px 12px', background: S.card, borderRadius: 6, textAlign: 'right' }}>
+        <span style={{ fontSize: 11, color: S.muted }}>{a.account_code} — {a.account_name}</span>
+        <span style={{ fontSize: 13, color: S.green, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
+      </div>
+    ))}
+
+    <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(34,197,94,0.08)', borderRadius: 8, textAlign: 'right' }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>إجمالي الأصول</span>
+      <span style={{ fontSize: 16, fontWeight: 800, color: S.green, fontFamily: 'monospace' }}>{fmt(totalAssets, sym)}</span>
+    </div>
+<div style={{ height: 1, background: S.border, margin: '4px 0' }}/>
+
+<div style={{ fontSize: 11, fontWeight: 700, color: S.amber, textAlign: 'right', marginBottom: 2 }}>الخصوم وحقوق الملكية</div>
+
+{accounts.filter(a => ['liability', 'equity'].includes(a.account_type)).map(a => (
+  <div key={a.id} style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '5px 12px', background: S.card, borderRadius: 6, textAlign: 'right' }}>
+    <span style={{ fontSize: 11, color: S.muted }}>{a.account_code} — {a.account_name}</span>
+    <span style={{ fontSize: 13, color: S.amber, fontFamily: 'monospace' }}>{fmt(a.balance || 0, sym)}</span>
+  </div>
+))}
+
+<div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(245,158,11,0.08)', borderRadius: 8, textAlign: 'right' }}>
+  <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>إجمالي الخصوم + حقوق الملكية</span>
+  <span style={{ fontSize: 16, fontWeight: 800, color: S.amber, fontFamily: 'monospace' }}>
+    {fmt(totalLiabilities + Math.max(0, totalAssets - totalLiabilities), sym)}
+  </span>
+</div>
               </div>
             </div>
 
