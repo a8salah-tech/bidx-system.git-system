@@ -445,7 +445,7 @@ export default function PurchaseOrderPage() {
                     {COUNTRIES.find(c => c.id === buyMarket)?.label || '...'}
                   </span>
                   <span style={{ flex: 1, textAlign: 'center', color: S.gold, fontSize: '18px' }}>→→→</span>
-                  <span style={{ fontSize: '11px', color: S.muted }}>TradeFlow OS</span>
+                  <span style={{ fontSize: '11px', color: S.muted }}> BidLx OS </span>
                   <span style={{ flex: 1, textAlign: 'center', color: S.gold, fontSize: '18px' }}>→→→</span>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: S.gold2 }}>
                     {COUNTRIES.find(c => c.id === sellMarket)?.label || '...'}

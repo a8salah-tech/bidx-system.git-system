@@ -209,7 +209,7 @@ export default function Home() {
             <div style={{ background: 'rgba(201,168,76,0.05)', borderBottom: `1px solid ${C.borderG}`, padding: '13px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 24, height: 24, borderRadius: 5, background: `linear-gradient(135deg,${C.gold},${C.gold2})`, display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 900, color: C.navy }}>TF</div>
-                <span style={{ fontSize: 12, fontWeight: 800, color: C.gold2 }}>TradeFlow OS</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: C.gold2 }}>BidLx OS</span>
               </div>
               <span style={{ fontSize: 12, fontWeight: 700, color: C.white }}>ملف المورد</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: C.green }}>
