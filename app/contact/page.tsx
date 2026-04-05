@@ -102,8 +102,26 @@ export default function ContactPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '12px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 800, textAlign: 'center', marginBottom: '5px', color: S.white }}>حجز استشارة تقنية</h3>
-                
+<div style={{ textAlign: 'center', marginBottom: '20px' }}>
+  <h3 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '5px', color: S.white }}>
+    حجز استشارة تقنية
+  </h3>
+  <a 
+    href="mailto:support@bidlx.com" 
+    style={{ 
+      fontSize: '13px', 
+      color: S.gold, 
+      textDecoration: 'none', 
+      fontWeight: 600,
+      opacity: 0.9,
+      transition: 'opacity 0.2s'
+    }}
+    onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+    onMouseOut={(e) => e.currentTarget.style.opacity = '0.9'}
+  >
+    support@bidlx.com
+  </a>
+</div>                
                 <input required placeholder="الاسم الكامل" style={{ width: '100%', padding: '12px', borderRadius: '10px', background: '#0A1628', border: `1px solid ${S.borderG}`, color: 'white', fontFamily: 'inherit', fontSize: '13px', outline: 'none' }} />
                 
                 <input required placeholder="اسم الشركة" style={{ width: '100%', padding: '12px', borderRadius: '10px', background: '#0A1628', border: `1px solid ${S.borderG}`, color: 'white', fontFamily: 'inherit', fontSize: '13px', outline: 'none' }} />
