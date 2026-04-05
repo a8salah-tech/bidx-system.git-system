@@ -547,7 +547,7 @@ const [docDetails, setDocDetails] = useState<{ type: string; exp: string; custom
     <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
       {docs.length === 0 ? (
         <div style={{ padding: '50px 20px', textAlign: 'center', color: S.muted, fontSize: '14px', border: `1px dashed ${S.border}`, borderRadius: '15px' }}>
-          لا توجد وثائق مؤرشفة حالياً في ملف المورد
+          لا توجد وثائق مؤرشفة حالياً في 
         </div>
       ) : (
         docs.map((doc: any) => (

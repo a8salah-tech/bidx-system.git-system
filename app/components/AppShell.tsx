@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import Link from 'next/link';
 
+
 const S = {
   navy: '#0A1628', navy2: '#0F2040',
   gold: '#C9A84C', gold2: '#E8C97A', gold3: 'rgba(201,168,76,0.12)',
@@ -17,7 +18,7 @@ const navItems = [
   { label: 'إدارة الموردين', href: '/suppliers', color: '#7F77DD' },
   { label: 'إدرة المنتجات', href: '/products', color: S.gold },
   { label: 'إدرة العملاء', href: '/customers', color: '#FAFAF8' },
-
+  { label: 'إدرة الحسابات', href: '/accounting', color: '#EF4444' },
 ]
 
 const pageTitles: Record<string, string> = {
@@ -26,7 +27,9 @@ const pageTitles: Record<string, string> = {
   '/profile': 'ملف المدير التنفيذي',
   '/pricing/compare': 'مقارنة أسعار',
   '/customers': ' إدارة العملاء',
+  '/accounting': ' إدارة الحسابات',
 }
+
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -122,8 +125,9 @@ const user = data?.session?.user
     fetchAlerts()
   }, [])
 
-  const pageTitle = pageTitles[pathname] || (pathname.startsWith('/suppliers/') ? 'ملف المورد' : 'TradeFlow')
-
+const pageTitle = pageTitles[pathname] || 
+    (pathname.includes('/customers/') ? 'إدارة العميل' : 
+     pathname.startsWith('/suppliers/') ? 'إدارة المورد' : 'BidLx')
   return (
     <div style={{ height: '100vh', background: S.navy, color: S.white, fontFamily: 'Tajawal,sans-serif', direction: 'rtl', display: 'flex', overflow: 'hidden' }}>
 
