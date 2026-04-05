@@ -27,7 +27,7 @@ const pageTitles: Record<string, string> = {
   '/profile': 'ملف المدير التنفيذي',
   '/pricing/compare': 'مقارنة أسعار',
   '/customers': ' إدارة العملاء',
-  '/accounting': ' إدارة الحسابات',
+  '/accounting': ' إدارة الحسابات المالية ',
 }
 
 
@@ -127,7 +127,7 @@ const user = data?.session?.user
 
 const pageTitle = pageTitles[pathname] || 
     (pathname.includes('/customers/') ? 'إدارة العميل' : 
-     pathname.startsWith('/suppliers/') ? 'إدارة المورد' : 'BidLx')
+     pathname.startsWith('/suppliers/') ? 'ملف المورد' : 'BidLx')
   return (
     <div style={{ height: '100vh', background: S.navy, color: S.white, fontFamily: 'Tajawal,sans-serif', direction: 'rtl', display: 'flex', overflow: 'hidden' }}>
 
