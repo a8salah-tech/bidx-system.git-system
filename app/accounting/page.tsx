@@ -280,7 +280,6 @@ export default function AccountingPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           {/* اختيار العملة */}
           <CurrencyBar currency={currency} setCurrency={saveCurrency}/>
-          <div style={{ fontSize: '16px', fontWeight: 800, color: S.gold2 }}>إدارة الحسابات المالية</div>
         </div>
       </div>
 
