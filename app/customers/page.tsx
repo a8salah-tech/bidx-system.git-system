@@ -99,12 +99,18 @@ export default function CustomersPage() {
   }, [])
 
   // ===== 1. جلب العملاء من Supabase =====
-  async function fetchCustomers() {
+async function fetchCustomers() {
     setLoading(true)
     try {
+      // 1. جلب المستخدم الحالي
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // 2. جلب العملاء الخاصين بهذا المستخدم فقط 🔒
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('user_id', user.id) // القفل الأمني
         .order('created_at', { ascending: false })
 
       if (error) { console.error('خطأ جلب العملاء:', error.message); return }
@@ -117,8 +123,7 @@ export default function CustomersPage() {
   }
 
   // ===== 2. إضافة عميل جديد =====
-  async function handleAddCustomer() {
-    // التحقق من الحقول الإلزامية
+ async function handleAddCustomer() {
     if (!form.full_name) { alert('يرجى إدخال اسم العميل'); return }
 
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -128,6 +133,7 @@ export default function CustomersPage() {
     try {
       const { error } = await supabase.from('customers').insert([{
         ...form,
+        user_id: user.id, // ربط العميل بالمستخدم الحالي ✅
         status: 'active',
         total_deals: 0,
         total_amount: 0,
@@ -138,7 +144,7 @@ export default function CustomersPage() {
       alert('✅ تم إضافة العميل بنجاح')
       setForm(EMPTY_FORM)
       setShowForm(false)
-      fetchCustomers()
+      fetchCustomers() // ستجلب الآن البيانات المفلترة تلقائياً
 
     } catch (err: any) {
       console.error('خطأ إضافة العميل:', err.message)
