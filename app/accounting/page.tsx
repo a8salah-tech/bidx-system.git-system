@@ -151,7 +151,7 @@ export default function AccountingPage() {
     const [accRes, vchRes, custRes, suppRes, settRes] = await Promise.all([
       supabase.from('accounts').select('*').order('account_code'),
       supabase.from('vouchers').select('*').order('created_at', { ascending: false }),
-      supabase.from('customers').select('id, full_name, company_name').eq('created_by', user?.id).order('full_name'),
+      supabase.from('customers').select('id, full_name, company_name').eq('user_id', user?.id).order('full_name'),
       supabase.from('suppliers').select('id, company_name').order('company_name'),
       supabase.from('company_settings').select('default_currency').limit(1).single(),
     ])
