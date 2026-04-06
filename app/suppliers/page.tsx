@@ -396,7 +396,7 @@ export default function SuppliersPage() {
               <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>
                 <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
                 <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px', color: S.white }}>لا يوجد موردون</div>
-                    <div style={{ fontSize: '14px', marginTop: '8px' }}>ابدأ بإضافة أول مور ليظهر هنا</div>
+                    <div style={{ fontSize: '14px', marginTop: '8px' }}>ابدأ بإضافة أول مورد ليظهر هنا</div>
               </div>
             ) : (
               <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>

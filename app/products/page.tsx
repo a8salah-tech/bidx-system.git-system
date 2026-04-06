@@ -453,7 +453,7 @@ const fetchProducts = async () => {
   <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>
     <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
     <div style={{ fontSize: '16px', fontWeight: 700, color: S.white }}>لا يوجد منتجات</div>
-    <div style={{ fontSize: '14px', marginTop: '8px' }}>ابدأ بإضافة أول منتج لتظهر هنا</div>
+    <div style={{ fontSize: '14px', marginTop: '8px' }}>ابدأ بإضافة أول منتج ليظهر هنا</div>
   </div>
 ) : (
   <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>

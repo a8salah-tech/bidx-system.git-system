@@ -302,6 +302,8 @@ async function fetchCustomers() {
           <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>👥</div>
             <div style={{ fontSize: '16px', fontWeight: 700, color: S.white }}>لا يوجد عملاء</div>
+                <div style={{ fontSize: '14px', marginTop: '8px' }}>ابدأ بإضافة أول عميل ليظهر هنا</div>
+
           </div>
         ) : (
           <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>
