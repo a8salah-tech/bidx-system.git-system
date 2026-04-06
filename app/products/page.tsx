@@ -445,33 +445,40 @@ const fetchProducts = async () => {
           </div>
         </div>
 
-        {loading ? (
-          <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>جاري التحميل...</div>
-        ) : (
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-
-            {/* الجدول */}
-            {viewMode === 'table' && (
-              <div style={{ flex: selectedProduct ? '0 0 55%' : '1', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
-                      {['#', 'المنتج', 'عدد الموردين', 'بلد المنشأ', 'سوق البيع', 'التوزيع', 'متوسط التقييم', 'الدول'].map(h => (
-                        <th key={h} style={{ padding: '12px 14px', textAlign: 'right', fontSize: '10px', color: S.muted, fontWeight: 700 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedProducts.map(([name, sups], i) => {
-                      const safeSups = Array.isArray(sups) ? sups : []
-                      const count = safeSups.length
-                      const avgRating = count > 0
-                        ? (safeSups.reduce((a, s) => a + (s.rating || 0), 0) / count).toFixed(1)
-                        : 0
-                      const allCountries = [...new Set(safeSups.map(s => getCountryLabel(s.origin_country)).filter(c => c !== '—'))]
-                      const isSelected = selectedProduct === name
-                      const totalSupsCount = suppliers.length || 1
-                      const firstSup = safeSups[0] || {}
+{loading ? (
+  <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>
+    جاري التحميل...
+  </div>
+) : (sortedProducts || []).length === 0 ? (
+  <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>
+    <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
+    <div style={{ fontSize: '16px', fontWeight: 700, color: S.white }}>لا يوجد منتجات</div>
+    <div style={{ fontSize: '14px', marginTop: '8px' }}>ابدأ بإضافة أول منتج لتظهر هنا</div>
+  </div>
+) : (
+  <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+    {/* الجدول */}
+    {viewMode === 'table' && (
+      <div style={{ flex: selectedProduct ? '0 0 55%' : '1', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
+              {['#', 'المنتج', 'عدد الموردين', 'بلد المنشأ', 'سوق البيع', 'التوزيع', 'متوسط التقييم', 'الدول'].map(h => (
+                <th key={h} style={{ padding: '12px 14px', textAlign: 'right', fontSize: '10px', color: S.muted, fontWeight: 700 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedProducts.map(([name, sups], i) => {
+              const safeSups = Array.isArray(sups) ? sups : []
+              const count = safeSups.length
+              const avgRating = count > 0
+                ? (safeSups.reduce((a, s) => a + (s.rating || 0), 0) / count).toFixed(1)
+                : 0
+              const allCountries = [...new Set(safeSups.map(s => getCountryLabel(s.origin_country)).filter(c => c !== '—'))]
+              const isSelected = selectedProduct === name
+              const totalSupsCount = suppliers.length || 1
+              const firstSup = safeSups[0] || {}
 
                       return (
                         <tr key={name} onClick={() => setSelectedProduct(isSelected ? null : name)}
