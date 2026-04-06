@@ -78,33 +78,51 @@ export default function ProductsPage() {
   })
 
   // ===== تحميل البيانات =====
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
+useEffect(() => {
+  async function fetchData() {
+    setLoading(true)
+    
+    // 1. جلب بيانات المستخدم الحالي
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return; // حماية إضافية
 
-      let query = supabase
-        .from('suppliers')
-        .select('id,company_name,main_products,rating,country,city,status')
+    // 2. جلب الموردين الخاصين بالمستخدم فقط
+    let query = supabase
+      .from('suppliers')
+      .select('id,company_name,main_products,rating,country,city,status')
+      .eq('user_id', user.id) // ⬅️ الإضافة هنا
 
-      if (statusFilter === 'active') {
-        query = query.eq('status', 'active')
-      }
-
-      const { data: suppliersData } = await query
-      const { data: productsData } = await supabase.from('supplier_products').select('*')
-
-      setSuppliers(suppliersData || [])
-      setProducts(productsData || [])
-      setLoading(false)
+    if (statusFilter === 'active') {
+      query = query.eq('status', 'active')
     }
-    fetchData()
-  }, [statusFilter])
+
+    const { data: suppliersData } = await query
+    
+    // 3. جلب المنتجات الخاصة بالمستخدم فقط
+    const { data: productsData } = await supabase
+      .from('supplier_products')
+      .select('*')
+      .eq('user_id', user.id) // ⬅️ الإضافة هنا
+
+    setSuppliers(suppliersData || [])
+    setProducts(productsData || [])
+    setLoading(false)
+  }
+  fetchData()
+}, [statusFilter])
 
   // ===== جلب المنتجات فقط =====
-  const fetchProducts = async () => {
-    const { data, error } = await supabase.from('supplier_products').select('*')
-    if (!error) setProducts(data || [])
-  }
+const fetchProducts = async () => {
+  const { data: { user } } = await supabase.auth.getUser() // ⬅️ جلب المستخدم أولاً
+  if (!user) return
+
+  const { data, error } = await supabase
+    .from('supplier_products')
+    .select('*')
+    .eq('user_id', user.id) // ⬅️ الإضافة هنا لضمان الخصوصية
+    
+  if (!error) setProducts(data || [])
+}
 
   // ===== إضافة منتج — مع حفظ origin_country و market_country =====
   const handleAddProduct = async () => {
