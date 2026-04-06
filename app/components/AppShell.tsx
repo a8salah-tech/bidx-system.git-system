@@ -19,7 +19,9 @@ const navItems = [
   { label: 'إدرة المنتجات', href: '/products', color: S.gold },
   { label: 'إدرة العملاء', href: '/customers', color: '#FAFAF8' },
   { label: 'إدرة الحسابات', href: '/accounting', color: '#EF4444' },
-    { label: 'إدرة الموارد البشرية', href: '/hr', color: '#22C55E' },
+  { label: 'إدرة الموارد البشرية', href: '/hr', color: '#22C55E' },
+    { label: 'إدرة التسويق', href: '/marketing', color: '#F59E0B' },
+
 
 ]
 
@@ -30,7 +32,8 @@ const pageTitles: Record<string, string> = {
   '/pricing/compare': 'مقارنة أسعار',
   '/customers': ' إدارة العملاء',
   '/accounting': ' إدارة الحسابات المالية ',
-    '/hr': ' إدارة  الموارد البشرية ',
+  '/hr': ' إدارة  الموارد البشرية ',
+  '/marketing': ' إدارة  التسويق  ',
 
 }
 
@@ -159,7 +162,7 @@ const pageTitle = pageTitles[pathname] ||
             <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: S.navy }}>BE</div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: 700 }}>bidlx.com</div>
-              <div style={{ fontSize: '10px', color: S.muted }}> V 1.05.07</div>
+              <div style={{ fontSize: '10px', color: S.muted }}> V 1.06.01</div>
             </div>
           </div>
         </div>
