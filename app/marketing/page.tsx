@@ -378,6 +378,7 @@ function KanbanColumn({stage,leads,stages,templates,currentUser,onMove,onDelete,
         {justAdded&&(
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'10px 0',animation:'fadeIn .3s ease'}}>
             <span style={{fontSize:20,color:S.green}}>✅</span>
+            <span style={{fontSize:20,color:S.green}}>✅</span>
             <div style={{fontSize:11,color:S.green,fontWeight:700,marginTop:2}}>تمت الإضافة بنجاح</div>
           </div>
         )}
@@ -615,12 +616,11 @@ export default function MarketingPage() {
             {icon:'✨',label:'مضافون اليوم',    val:todayLeads, color:S.gold},
           ].map((s,i)=>(
             <div key={i} style={{background:S.card,border:`1px solid ${S.border}`,borderRadius:9,padding:'9px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:18}}>{s.icon}</span>
               <div style={{textAlign:'right'}}>
                 <div style={{fontSize:18,fontWeight:900,color:s.color,fontFamily:'monospace'}}>{s.val}</div>
                 <div style={{fontSize:9,color:S.muted}}>{s.label}</div>
               </div>
-                            <span style={{fontSize:18}}>{s.icon}</span>
-
             </div>
           ))}
         </div>

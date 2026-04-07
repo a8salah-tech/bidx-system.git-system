@@ -148,27 +148,46 @@ export default function HREmployeePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { setLoading(false); return }
 
-      const [empR, reqR, payR, teamR, dirR, attR, todayR] = await Promise.all([
-        supabase.from('employees').select('*').eq('user_id', user.id).single(),
+      // جلب بيانات الموظف (قد لا يكون موجوداً)
+      const { data: empData } = await supabase.from('employees').select('*').eq('user_id', user.id).single()
+      setEmployee(empData)
+
+      // جلب باقي البيانات بشكل مستقل
+      const [reqR, payR, teamR, dirR] = await Promise.all([
         supabase.from('hr_requests').select('*').order('created_at', { ascending: false }).limit(20),
         supabase.from('payroll').select('*').order('created_at', { ascending: false }).limit(12),
         supabase.from('employees').select('id, full_name, job_title, department, manager_id').eq('status', 'active'),
         supabase.from('hr_directives').select('*').order('created_at', { ascending: false }).limit(10),
-        supabase.from('attendance').select('*').order('date', { ascending: false }).limit(30),
-        supabase.from('attendance').select('*').eq('date', todayISO()).limit(1),
       ])
 
-      setEmployee(empR.data)
       setRequests(reqR.data || [])
       setPayroll(payR.data || [])
       setTeamMembers(teamR.data || [])
       setDirectives(dirR.data || [])
-      setAttendance(attR.data || [])
 
-      const today = todayR.data?.[0]
-      setTodayAttendance(today || null)
-      if (today?.check_in) setCheckInDone(true)
-      if (today?.check_out) setCheckOutDone(true)
+      // جلب سجل الحضور — يحاول من جدولين
+      if (empData) {
+        const { data: attAll } = await supabase.from('attendance').select('*')
+          .eq('employee_id', empData.id).order('date', { ascending: false }).limit(30)
+        const { data: todayAtt } = await supabase.from('attendance').select('*')
+          .eq('employee_id', empData.id).eq('date', todayISO()).limit(1)
+        setAttendance(attAll || [])
+        const today = todayAtt?.[0]
+        setTodayAttendance(today || null)
+        if (today?.check_in) setCheckInDone(true)
+        if (today?.check_out) setCheckOutDone(true)
+      } else {
+        // fallback: attendance_simple
+        const { data: attAll } = await supabase.from('attendance_simple').select('*')
+          .eq('user_id', user.id).order('date', { ascending: false }).limit(30)
+        const { data: todayAtt } = await supabase.from('attendance_simple').select('*')
+          .eq('user_id', user.id).eq('date', todayISO()).limit(1)
+        setAttendance(attAll || [])
+        const today = todayAtt?.[0]
+        setTodayAttendance(today || null)
+        if (today?.check_in) setCheckInDone(true)
+        if (today?.check_out) setCheckOutDone(true)
+      }
     } catch (e) { console.error(e) }
     setLoading(false)
   }, [])
@@ -177,17 +196,35 @@ export default function HREmployeePage() {
 
   // ── تسجيل الحضور ──
   async function handleCheckIn() {
-    if (!employee || checkInDone) return
+    if (checkInDone) return
     setSaving(true)
-    const now = new Date().toISOString()
-    const { data } = await supabase.from('attendance').insert([{
-      employee_id: employee.id,
-      company_id: employee.company_id,
-      date: todayISO(),
-      check_in: now,
-      status: 'present',
-    }]).select().single()
-    if (data) { setTodayAttendance(data); setCheckInDone(true) }
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { alert('يرجى تسجيل الدخول أولاً'); setSaving(false); return }
+
+      const now = new Date().toISOString()
+      const table = employee ? 'attendance' : 'attendance_simple'
+      const payload = employee
+        ? { employee_id: employee.id, date: todayISO(), check_in: now, status: 'present' }
+        : { user_id: user.id, date: todayISO(), check_in: now }
+
+      // تحقق إذا في سجل اليوم
+      const { data: existing } = employee
+        ? await supabase.from('attendance').select('*').eq('employee_id', employee.id).eq('date', todayISO()).single()
+        : await supabase.from('attendance_simple').select('*').eq('user_id', user.id).eq('date', todayISO()).single()
+
+      if (existing) {
+        setTodayAttendance(existing)
+        setCheckInDone(true)
+        if (existing.check_out) setCheckOutDone(true)
+        setSaving(false)
+        return
+      }
+
+      const { data, error } = await supabase.from(table).insert([payload]).select().single()
+      if (error) { console.error(error); alert('خطأ في تسجيل الحضور: ' + error.message) }
+      else if (data) { setTodayAttendance(data); setCheckInDone(true) }
+    } catch (e: any) { console.error(e); alert('خطأ غير متوقع') }
     setSaving(false)
   }
 
@@ -195,21 +232,24 @@ export default function HREmployeePage() {
   async function handleCheckOut() {
     if (!todayAttendance || checkOutDone) return
     setSaving(true)
-    const now = new Date().toISOString()
-    const checkIn  = new Date(todayAttendance.check_in)
-    const checkOut = new Date(now)
-    const hours    = Math.round((checkOut.getTime() - checkIn.getTime()) / 36000) / 100
+    try {
+      const now      = new Date().toISOString()
+      const checkIn  = new Date(todayAttendance.check_in)
+      const hours    = Math.round((new Date(now).getTime() - checkIn.getTime()) / 36000) / 100
+      const table    = employee ? 'attendance' : 'attendance_simple'
 
-    await supabase.from('attendance').update({
-      check_out: now,
-      work_hours: hours,
-      notes: todayTasks,
-    }).eq('id', todayAttendance.id)
+      const { error } = await supabase.from(table).update({
+        check_out: now, work_hours: hours, notes: todayTasks,
+      }).eq('id', todayAttendance.id)
 
-    setCheckOutDone(true)
-    setTodayAttendance({ ...todayAttendance, check_out: now, work_hours: hours })
+      if (error) { alert('خطأ في تسجيل الانصراف: ' + error.message) }
+      else {
+        setCheckOutDone(true)
+        setTodayAttendance({ ...todayAttendance, check_out: now, work_hours: hours })
+        await loadData()
+      }
+    } catch (e: any) { alert('خطأ غير متوقع') }
     setSaving(false)
-    await loadData()
   }
 
   // ── تقديم طلب ──
@@ -305,11 +345,11 @@ export default function HREmployeePage() {
               sub: 'شهر', color: S.gold },
           ].map((s, i) => (
             <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 20 }}>{s.icon}</span>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 16, fontWeight: 900, color: s.color, fontFamily: 'monospace' }}>{s.val} <span style={{ fontSize: 10, fontFamily: 'Tajawal, sans-serif', color: S.muted }}>{s.sub}</span></div>
                 <div style={{ fontSize: 10, color: S.muted, marginTop: 2 }}>{s.label}</div>
               </div>
-                <span style={{ fontSize: 20 }}>{s.icon}</span>
             </div>
           ))}
         </div>
@@ -347,7 +387,7 @@ export default function HREmployeePage() {
             )}
 
             {/* بطاقات أنواع الطلبات */}
-            <div style={{ display: 'flex', justifyContent: 'flex-start' ,direction: 'rtl' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button onClick={() => setShowForm(true)}
                 style={{ background: S.gold, color: S.navy, border: 'none', padding: '10px 24px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
                 + تقديم طلب جديد
@@ -358,11 +398,11 @@ export default function HREmployeePage() {
               {Object.entries(REQUEST_TYPES).slice(0, 6).map(([key, t]) => (
                 <button key={key} onClick={() => { setReqForm(p => ({ ...p, request_type: key })); setShowForm(true) }}
                   style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 12, padding: '12px 16px', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all .2s' }}>
+                  <span style={{ fontSize: 18 }}>{t.icon}</span>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{t.label}</div>
                     <div style={{ fontSize: 10, color: S.muted, marginTop: 2 }}>اضغط للتقديم</div>
                   </div>
-                   <span style={{ fontSize: 18 }}>{t.icon}</span>
                 </button>
               ))}
             </div>
@@ -370,8 +410,8 @@ export default function HREmployeePage() {
             {/* جدول الطلبات */}
             <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ padding: '12px 18px', borderBottom: `1px solid ${S.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, fontWeight: 700 }}>سجل طلباتي</span>
                 <span style={{ fontSize: 11, color: S.muted }}>{requests.length} طلب</span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>سجل طلباتي</span>
               </div>
               {requests.length === 0 ? (
                 <div style={{ padding: '50px', textAlign: 'center', color: S.muted }}>
@@ -410,7 +450,7 @@ export default function HREmployeePage() {
               <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 10, textAlign: 'right', padding: '0 6px' }}>محتويات الدليل</div>
               {HANDBOOK.map(sec => (
                 <button key={sec.id} onClick={() => setHandbookSection(sec.id)}
-                  style={{ width: '100%', textAlign: 'right', padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontSize: 12, fontWeight: handbookSection === sec.id ? 700 : 400, background: handbookSection === sec.id ? S.gold3 : 'transparent', color: handbookSection === sec.id ? S.gold2 : S.muted, borderRight: handbookSection === sec.id ? `3px solid ${S.gold}` : '3px solid transparent', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between', transition: 'all .15s' }}>
+                  style={{ width: '100%', textAlign: 'right', padding: '9px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', fontSize: 12, fontWeight: handbookSection === sec.id ? 700 : 400, background: handbookSection === sec.id ? S.gold3 : 'transparent', color: handbookSection === sec.id ? S.gold2 : S.muted, borderRight: handbookSection === sec.id ? `3px solid ${S.gold}` : '3px solid transparent', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end', transition: 'all .15s' }}>
                   <span style={{ fontSize: 11 }}>{sec.title}</span>
                   <span>{sec.icon}</span>
                 </button>
@@ -419,7 +459,7 @@ export default function HREmployeePage() {
             <div>
               {HANDBOOK.filter(s => s.id === handbookSection).map(sec => (
                 <div key={sec.id}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexDirection: 'row' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexDirection: 'row-reverse' }}>
                     <span style={{ fontSize: 28 }}>{sec.icon}</span>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 18, fontWeight: 800 }}>{sec.title}</div>
@@ -465,13 +505,13 @@ export default function HREmployeePage() {
                     { label: 'بدلات أخرى',       val: employee?.other_allowances || 0 },
                   ].map((row, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < 3 ? `1px solid ${S.green}15` : 'none' }}>
-                      <span style={{ fontSize: 11, color: S.muted, textAlign: 'right' }}>{row.label}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: S.green, fontFamily: 'monospace' }}>{fmtMoney(row.val)}</span>
+                      <span style={{ fontSize: 11, color: S.muted, textAlign: 'right' }}>{row.label}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 0', borderTop: `2px solid ${S.green}30`, marginTop: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>الإجمالي</span>
                     <span style={{ fontSize: 14, fontWeight: 900, color: S.green, fontFamily: 'monospace' }}>{fmtMoney(gross)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>الإجمالي</span>
                   </div>
                 </div>
 
@@ -485,20 +525,20 @@ export default function HREmployeePage() {
                     { label: 'خصومات أخرى',  val: lastPayroll?.deduction_other || 0 },
                   ].map((row, i) => (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: i < 3 ? `1px solid ${S.red}15` : 'none' }}>
-                      <span style={{ fontSize: 11, color: S.muted, textAlign: 'right' }}>{row.label}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: S.red, fontFamily: 'monospace' }}>{fmtMoney(row.val)}</span>
+                      <span style={{ fontSize: 11, color: S.muted, textAlign: 'right' }}>{row.label}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 0', borderTop: `2px solid ${S.red}30`, marginTop: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>الإجمالي</span>
                     <span style={{ fontSize: 14, fontWeight: 900, color: S.red, fontFamily: 'monospace' }}>{fmtMoney(lastPayroll?.total_deductions || 0)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: S.white }}>الإجمالي</span>
                   </div>
                 </div>
               </div>
 
               <div style={{ marginTop: 14, background: S.card, borderRadius: 9, padding: '10px 14px', border: `1px solid ${S.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: S.muted, textAlign: 'right' }}>🔗 يُرحَّل إلى حساب 5001 — رواتب وأجور</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: S.gold, fontFamily: 'monospace' }}>{fmtMoney(gross)}</span>
+                <span style={{ fontSize: 11, color: S.muted, textAlign: 'right' }}>🔗 يُرحَّل إلى حساب 5001 — رواتب وأجور</span>
               </div>
             </div>
 
@@ -544,11 +584,11 @@ export default function HREmployeePage() {
             {/* تاريخ ووقت اليوم */}
             <div style={{ background: S.navy2, border: `1px solid ${S.borderG}`, borderRadius: 14, padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                <div style={{ fontFamily: 'monospace', fontSize: 24, fontWeight: 900, color: S.gold2 }}>{currentTime}</div>
                 <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: S.muted }}>اليوم</div>
+                  <div style={{ fontSize: 11, color: S.muted }}>اليوم</div>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
                 </div>
-                <div style={{ fontFamily: 'monospace', fontSize: 24, fontWeight: 900, color: S.gold2 }}>{currentTime}</div>
               </div>
 
               {/* تبويبي الحضور */}
