@@ -345,7 +345,7 @@ function KanbanColumn({stage,leads,stages,templates,currentUser,onMove,onDelete,
 
       {/* رأس العمود */}
       <div style={{background:S.navy2,borderRadius:'12px 12px 0 0',padding:'10px 12px',border:`1px solid ${S.border}`,borderBottom:`2px solid ${stage.color}`}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexDirection:'row-reverse'}}>
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             {urgentCount>0&&(
               <span style={{background:S.red,color:S.white,borderRadius:'50%',width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700}}>{urgentCount}</span>
@@ -377,7 +377,6 @@ function KanbanColumn({stage,leads,stages,templates,currentUser,onMove,onDelete,
         {/* علامتا الصح عند الإضافة */}
         {justAdded&&(
           <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,padding:'10px 0',animation:'fadeIn .3s ease'}}>
-            <span style={{fontSize:20,color:S.green}}>✅</span>
             <span style={{fontSize:20,color:S.green}}>✅</span>
             <div style={{fontSize:11,color:S.green,fontWeight:700,marginTop:2}}>تمت الإضافة بنجاح</div>
           </div>
@@ -446,7 +445,7 @@ export default function MarketingPage() {
 
   // ── مهام: إدارة ──
   const [showTaskForm, setShowTaskForm]= useState(false)
-  const [taskForm,     setTaskForm]    = useState({icon:'📌',label:'',desc:'',priority:'medium'})
+  const [taskForm,     setTaskForm]    = useState({icon:'📌',label:'',description:'',priority:'medium'})
   const [savingTask,   setSavingTask]  = useState(false)
 
   // ── Social stats (قابلة للتعديل اليدوي) ──
@@ -556,7 +555,7 @@ export default function MarketingPage() {
       ...taskForm, created_by:currentUser?.id,
     }]).select().single()
     if (res) setTasks(prev=>[...prev,res])
-    setTaskForm({icon:'📌',label:'',desc:'',priority:'medium'})
+    setTaskForm({icon:'📌',label:'',description:'',priority:'medium'})
     setShowTaskForm(false)
     setSavingTask(false)
   }
@@ -616,11 +615,11 @@ export default function MarketingPage() {
             {icon:'✨',label:'مضافون اليوم',    val:todayLeads, color:S.gold},
           ].map((s,i)=>(
             <div key={i} style={{background:S.card,border:`1px solid ${S.border}`,borderRadius:9,padding:'9px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <span style={{fontSize:18}}>{s.icon}</span>
               <div style={{textAlign:'right'}}>
                 <div style={{fontSize:18,fontWeight:900,color:s.color,fontFamily:'monospace'}}>{s.val}</div>
                 <div style={{fontSize:9,color:S.muted}}>{s.label}</div>
               </div>
+               <span style={{fontSize:18}}>{s.icon}</span>
             </div>
           ))}
         </div>
@@ -795,7 +794,7 @@ export default function MarketingPage() {
                 </div>
                 <div style={{marginBottom:14}}>
                   <label style={{display:'block',fontSize:10,color:S.muted,fontWeight:700,marginBottom:5,textAlign:'right'}}>التفاصيل والتوجيهات</label>
-                  <textarea value={taskForm.desc} onChange={e=>setTaskForm(p=>({...p,desc:e.target.value}))}
+                  <textarea value={taskForm.description} onChange={e=>setTaskForm(p=>({...p,desc:e.target.value}))}
                     placeholder="اشرح للموظف كيفية تنفيذ المهمة..." rows={3}
                     style={{...inp,resize:'none'} as React.CSSProperties}/>
                 </div>
