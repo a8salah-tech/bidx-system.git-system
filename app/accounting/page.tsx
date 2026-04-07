@@ -183,13 +183,22 @@ export default function AccountingPage() {
   }
 
   // ── حفظ حساب جديد ──
-  async function handleSaveAccount() {
+async function handleSaveAccount() {
     if (!accountForm.account_code || !accountForm.account_name) { alert('أدخل الكود والاسم'); return }
     setSaving(true)
+    
+    // جلب معرف المستخدم الحالي
+    const { data: { user } } = await supabase.auth.getUser()
+    
     const bal = parseFloat(accountForm.opening_balance) || 0
     const { error } = await supabase.from('accounts').insert([{
-      ...accountForm, balance: bal, opening_balance: bal, currency,
+      ...accountForm, 
+      balance: bal, 
+      opening_balance: bal, 
+      currency,
+      user_id: user?.id // ربط الحساب بالمستخدم فوراً
     }])
+    
     if (error) { alert('خطأ: ' + error.message) }
     else {
       setShowAccountForm(false)
@@ -200,19 +209,21 @@ export default function AccountingPage() {
   }
 
   // ── حفظ سند جديد ──
-  async function handleSaveVoucher() {
+async function handleSaveVoucher() {
     if (!voucherForm.amount || !voucherForm.account_id) { alert('أدخل المبلغ والحساب'); return }
     setSaving(true)
+    
+    const { data: { user } } = await supabase.auth.getUser()
     const amount = parseFloat(voucherForm.amount)
 
-    // تحديث رصيد الحساب
+    // تحديث رصيد الحساب (يحافظ على المنطق الحسابي الخاص بك)
     const acc = accounts.find(a => a.id === voucherForm.account_id)
     if (acc) {
       const newBal = voucherForm.voucher_type === 'receipt' ? acc.balance + amount : acc.balance - amount
+      // التحديث يتم بناءً على ID الحساب المعزول مسبقاً
       await supabase.from('accounts').update({ balance: newBal }).eq('id', acc.id)
     }
 
-    // تحديد رقم السند التالي
     const nextNum = nextVoucherNumber(vouchers)
 
     const { error } = await supabase.from('vouchers').insert([{
@@ -227,6 +238,7 @@ export default function AccountingPage() {
       currency:       voucherForm.currency,
       description:    voucherForm.description,
       payment_method: voucherForm.payment_method,
+      user_id:        user?.id // ربط السند بالمستخدم لضمان العزل
     }])
 
     if (error) { alert('خطأ: ' + error.message) }
