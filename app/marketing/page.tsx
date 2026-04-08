@@ -895,7 +895,7 @@ export default function MarketingPage() {
                 <div style={{fontSize:13}}>أضف المهام اليومية التي تريد من موظفيك تنفيذها</div>
               </div>
             ):(
-<div style={{display:'flex',flexDirection:'row',gap:10}}>
+<div style={{display:'flex',flexDirection:'column',gap:10}}>
   {tasks.map((task:any)=>{
     const pc=task.priority==='high'?S.red:task.priority==='medium'?S.amber:S.muted
     const done=tasksDone.includes(task.id)
