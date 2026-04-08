@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
 import { CURRENCIES } from '../components/options'
 
@@ -301,41 +301,107 @@ export default function AccountingPage() {
     setSaving(false)
   }
 
-  async function handleSaveVoucher() {
-    if (!voucherForm.amount||!voucherForm.account_id) { alert('أدخل المبلغ والحساب'); return }
-    setSaving(true)
-    const {data:{user}} = await supabase.auth.getUser()
-    const amount = parseFloat(voucherForm.amount)
-    const acc = accounts.find(a=>a.id===voucherForm.account_id)
-    if (acc) {
-      const newBal = voucherForm.voucher_type==='receipt'?acc.balance+amount:acc.balance-amount
-      await supabase.from('accounts').update({balance:newBal}).eq('id',acc.id)
+async function handleSaveVoucher() {
+    if (!voucherForm.amount || !voucherForm.account_id) { 
+      alert('يرجى إدخال المبلغ وتحديد الحساب أولاً'); 
+      return;
     }
-    const {error} = await supabase.from('vouchers').insert([{
-      voucher_type:voucherForm.voucher_type,
-      voucher_number:voucherForm.voucher_number,
-      voucher_date:voucherForm.voucher_date,
-      account_id:voucherForm.account_id,
-      party_type:voucherForm.party_type,
-      party_id:voucherForm.party_id||null,
-      party_name:voucherForm.party_name,
-      amount,currency:voucherForm.currency,
-      description:voucherForm.description,
-      payment_method:voucherForm.payment_method,
-      user_id:user?.id,
-    }])
-    if (error) alert('خطأ: '+error.message)
-    else {
-      setShowVoucherForm(false)
-      // FIX 1: الرقم التالي حسب النوع
-      const updatedVouchers = [...vouchers,{voucher_type:voucherForm.voucher_type,voucher_number:voucherForm.voucher_number}]
-      const nextNum = getNextVoucherNumber(voucherForm.voucher_type, updatedVouchers)
-      setVoucherForm(prev=>({...prev,amount:'',description:'',party_id:'',party_name:'',voucher_number:nextNum,currency}))
-      await loadAll()
-    }
-    setSaving(false)
-  }
+    
+    setSaving(true);
+    try {
+      // استخدام getSession بدلاً من getUser لتجنب خطأ Lock steal
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      const amount = parseFloat(voucherForm.amount);
 
+      // 1. حفظ السند في جدول السندات
+      const { data: voucher, error: vError } = await supabase
+        .from('vouchers')
+        .insert([{
+          voucher_type: voucherForm.voucher_type,
+          voucher_number: voucherForm.voucher_number,
+          voucher_date: voucherForm.voucher_date,
+          account_id: voucherForm.account_id,
+          party_type: voucherForm.party_type,
+          party_id: voucherForm.party_id || null,
+          party_name: voucherForm.party_name,
+          amount,
+          currency: voucherForm.currency,
+          description: voucherForm.description,
+          payment_method: voucherForm.payment_method,
+          user_id: user?.id,
+        }])
+        .select().single();
+
+      if (vError) throw vError;
+
+      // 2. ترحيل القيد لدفتر اليومية
+      const { data: entry, error: eError } = await supabase
+        .from('journal_entries')
+        .insert([{
+          entry_date: voucherForm.voucher_date,
+          description: `سند ${voucherForm.voucher_type === 'receipt' ? 'قبض' : 'صرف'} رقم ${voucherForm.voucher_number}: ${voucherForm.party_name}`,
+          reference_type: 'voucher',
+          reference_id: voucher.id,
+          user_id: user?.id
+        }])
+        .select().single();
+
+      if (eError) throw eError;
+
+      // 3. تجهيز أطراف القيد (فصل الحسابات)
+      const cashAccount = accounts.find(a => a.account_code === '1101' || a.account_name.includes('خزينة') || a.account_name.includes('صندوق'));
+      const cashAccountId = cashAccount?.id; 
+      const isReceipt = voucherForm.voucher_type === 'receipt';
+
+      const { error: lError } = await supabase.from('journal_lines').insert([
+        {
+          entry_id: entry.id,
+          account_id: voucherForm.account_id, // الطرف الأول (المصروف/الإيراد)
+          debit: isReceipt ? 0 : amount,
+          credit: isReceipt ? amount : 0
+        },
+        {
+          entry_id: entry.id,
+          account_id: cashAccountId,          // الطرف الثاني (الخزينة)
+          debit: isReceipt ? amount : 0,
+          credit: isReceipt ? 0 : amount
+        }
+      ]);
+
+      if (lError) throw lError;
+
+      // 4. التحديث النهائي وإغلاق النموذج
+      setShowVoucherForm(false);
+      await loadAll(); // تحديث كافة الجداول والقيود في الواجهة
+      alert('تم الحفظ والترحيل بنجاح ✅');
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'خطأ غير معروف';
+      console.error('Error:', errorMessage);
+      alert('حدث خطأ: ' + errorMessage);
+    } finally {
+      setSaving(false);
+    }
+  }
+// أضف هذا السطر مع باقي الـ States في بداية المكون (Component)
+const [journalEntries, setJournalEntries] = useState<any[]>([]);
+
+// داخل وظيفة loadAll أو كـ وظيفة مستقلة تحتها
+const fetchJournal = async () => {
+  const { data } = await supabase
+    .from('journal_entries')
+    .select(`
+      *,
+      journal_lines (
+        id, account_id, debit, credit,
+        accounts (account_name)
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (data) setJournalEntries(data);
+};
   // FIX 2: تعديل سند
   async function handleEditVoucher() {
     if (!editVoucher) return
@@ -385,14 +451,14 @@ export default function AccountingPage() {
   })
   const stmtTotal = stmtVouchers.reduce((s,v)=>s+(v.voucher_type==='receipt'?v.amount||0:-(v.amount||0)),0)
 
-  const TABS = [
+const TABS = [
     {key:'dashboard', label:'📊 لوحة المالية'},
     {key:'accounts',  label:'📁 دليل الحسابات'},
     {key:'vouchers',  label:'📋 السندات'},
-    {key:'reports',   label:'📈 التقارير'},
+    {key:'journal',   label:'📒 دفتر اليومية'}, // التبويب الجديد
     {key:'statement', label:'📊 كشف الحساب'},
+    {key:'reports',   label:'📈 التقارير'},
   ]
-
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',color:S.white,fontFamily:'Tajawal, sans-serif',direction:'rtl',background:S.navy}}>
 
@@ -693,6 +759,51 @@ export default function AccountingPage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+{(tab as string) === 'journal' && (
+          <div style={{ animation: 'fadeIn 0.3s ease-out', paddingBottom: 40 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, background: S.navy2, padding: '15px 20px', borderRadius: 12, border: `1px solid ${S.border}` }}>
+              <div>
+                <h3 style={{ color: S.gold, margin: 0, fontSize: 18 }}>📒 دفتر اليومية العام</h3>
+                <p style={{ color: S.muted, fontSize: 12, margin: '4px 0 0' }}>سجل كافة القيود المحاسبية والعمليات المالية</p>
+              </div>
+              <button onClick={fetchJournal} style={{ background: S.gold3, color: S.gold, border: `1px solid ${S.gold}`, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}>تحديث البيانات 🔄</button>
+            </div>
+            <div style={{ background: S.navy2, borderRadius: 12, border: `1px solid ${S.border}`, overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${S.border}` }}>
+                    <th style={{ padding: 15, color: S.gold }}>التاريخ والبيان</th>
+                    <th style={{ padding: 15, color: S.gold }}>الحساب</th>
+                    <th style={{ padding: 15, color: S.gold, textAlign: 'center' }}>مدين (+)</th>
+                    <th style={{ padding: 15, color: S.gold, textAlign: 'center' }}>دائن (-)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {journalEntries.length === 0 ? (
+                    <tr><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: S.muted }}>لا توجد قيود مسجلة حالياً</td></tr>
+                  ) : journalEntries.map((entry) => (
+                    <Fragment key={entry.id}>
+                      <tr style={{ background: 'rgba(201,168,76,0.05)' }}>
+                        <td colSpan={4} style={{ padding: '12px 15px', borderBottom: `1px solid ${S.borderG}`, fontWeight: 'bold', color: S.white }}>
+                          {entry.entry_date} — {entry.description}
+                        </td>
+                      </tr>
+                      {entry.journal_lines?.map((line: any) => (
+                        <tr key={line.id} style={{ borderBottom: `1px solid ${S.border}` }}>
+                          <td style={{ padding: 10 }}></td>
+                          <td style={{ padding: 10, color: S.white }}>{line.accounts?.account_name}</td>
+                          <td style={{ padding: 10, textAlign: 'center', color: S.green }}>{line.debit > 0 ? line.debit.toLocaleString() : '-'}</td>
+                          <td style={{ padding: 10, textAlign: 'center', color: S.red }}>{line.credit > 0 ? line.credit.toLocaleString() : '-'}</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
