@@ -76,10 +76,17 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
 }) {
   const [showDetail,setShowDetail]=useState(false)
   const [showTpl,   setShowTpl]   =useState(false)
+  const [showEdit,  setShowEdit]  =useState(false)
   const [selTpl,    setSelTpl]    =useState<any>(templates[0]||null)
   const [copied,    setCopied]    =useState(false)
   const [newNote,   setNewNote]   =useState('')
   const [savingN,   setSavingN]   =useState(false)
+  const [savingE,   setSavingE]   =useState(false)
+  const [editData,  setEditData]  =useState({
+    name:lead.name||'', company:lead.company||'', phone:lead.phone||'',
+    email:lead.email||'', website:lead.website||'', source:lead.source||'',
+    channel:lead.channel||'whatsapp', next_followup_at:lead.next_followup_at||'',
+  })
 
   const ch        = CHANNELS[lead.channel]||CHANNELS.whatsapp
   const uc        = urgColor(lead.last_action_at)
@@ -101,6 +108,21 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
     setSavingN(true)
     await onAddNote(lead.id, newNote.trim())
     setNewNote(''); setSavingN(false)
+  }
+
+  async function saveEdit() {
+    if (!editData.name.trim()) return
+    setSavingE(true)
+    await supabase.from('marketing_leads').update({
+      name:editData.name, company:editData.company||null,
+      phone:editData.phone||null, email:editData.email||null,
+      website:editData.website||null, source:editData.source||null,
+      channel:editData.channel,
+      next_followup_at:editData.next_followup_at||null,
+    }).eq('id',lead.id)
+    // تحديث محلي
+    Object.assign(lead, editData)
+    setShowEdit(false); setSavingE(false)
   }
 
   return (
@@ -288,64 +310,62 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
                   </button>
                 </div>
               )}
-
-              <div style={{display:'flex',gap:7}}>
+              {/* أزرار الأسفل */}
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                 <button onClick={()=>{ onDelete(lead.id); setShowDetail(false) }}
-                  style={{background:S.redB,border:`1px solid ${S.red}30`,color:S.red,padding:'8px 14px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>حذف</button>
+                  style={{background:S.redB,border:`1px solid ${S.red}30`,color:S.red,padding:'8px 12px',borderRadius:8,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🗑️ حذف</button>
+                <button onClick={()=>setShowEdit(!showEdit)}
+                  style={{background:showEdit?S.amberB:S.card2,border:`1px solid ${showEdit?S.amber+'40':S.border}`,color:showEdit?S.amber:S.muted,padding:'8px 12px',borderRadius:8,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>✏️ تعديل</button>
+                {lead.phone&&(
+                  <a href={`https://wa.me/${lead.phone.replace(/[^0-9]/g,'')}`} target="_blank" rel="noopener noreferrer"
+                    style={{background:S.greenB,border:`1px solid ${S.green}30`,color:S.green,padding:'8px 12px',borderRadius:8,fontSize:11,fontWeight:700,fontFamily:'Tajawal, sans-serif',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
+                    📱 واتساب
+                  </a>
+                )}
                 <button onClick={()=>{ setShowDetail(false); setShowTpl(true) }}
-                  style={{flex:1,background:S.gold,color:S.navy,border:'none',padding:'8px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+                  style={{flex:1,background:S.gold,color:S.navy,border:'none',padding:'8px',borderRadius:8,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif',minWidth:100}}>
                   🎯 أدوات الإقناع
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ── Modal أدوات الإقناع ── */}
-      {showTpl&&(
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1001,backdropFilter:'blur(8px)',padding:16}}
-          onClick={()=>setShowTpl(false)}>
-          <div style={{background:S.navy2,width:'100%',maxWidth:500,borderRadius:18,border:`1px solid ${S.borderG}`,direction:'rtl',maxHeight:'86vh',overflowY:'auto'}}
-            onClick={e=>e.stopPropagation()}>
-            <div style={{padding:'14px 18px',borderBottom:`1px solid ${S.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',background:S.gold3}}>
-              <button onClick={()=>setShowTpl(false)} style={{background:'none',border:'none',color:S.muted,fontSize:18,cursor:'pointer'}}>✕</button>
-              <div style={{fontSize:14,fontWeight:800,color:S.gold2}}>🎯 أدوات الإقناع — {lead.name}</div>
-            </div>
-            <div style={{padding:18}}>
-              {templates.length===0?(
-                <div style={{textAlign:'center',color:S.muted,padding:'40px 0'}}>
-                  <div style={{fontSize:36,marginBottom:12}}>📝</div>
-                  <div>اذهب لتبويب "قوالب الإقناع" لإضافة قوالبك</div>
-                </div>
-              ):(
-                <>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8,marginBottom:14}}>
-                    {templates.map((t:any)=>(
-                      <button key={t.id} onClick={()=>setSelTpl(t)}
-                        style={{padding:'10px',borderRadius:9,border:`1px solid ${selTpl?.id===t.id?S.gold:S.border}`,background:selTpl?.id===t.id?S.gold3:'transparent',color:selTpl?.id===t.id?S.gold2:S.muted,fontSize:12,fontWeight:selTpl?.id===t.id?700:400,cursor:'pointer',fontFamily:'Tajawal, sans-serif',textAlign:'right',transition:'all .15s'}}>
-                        {t.label}
-                      </button>
+              {/* فورم التعديل */}
+              {showEdit&&(
+                <div style={{background:S.navy3,border:`1px solid ${S.borderG}`,borderRadius:10,padding:14,marginTop:12}}>
+                  <div style={{fontSize:10,fontWeight:700,color:S.gold,marginBottom:10,textAlign:'right'}}>✏️ تعديل بيانات العميل</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                    {[
+                      {l:'الاسم *',  k:'name',    t:'text'},
+                      {l:'الشركة',   k:'company', t:'text'},
+                      {l:'الهاتف',   k:'phone',   t:'text'},
+                      {l:'الإيميل',  k:'email',   t:'email'},
+                      {l:'الموقع',   k:'website', t:'text'},
+                      {l:'المصدر',   k:'source',  t:'text'},
+                    ].map(f=>(
+                      <div key={f.k}>
+                        <label style={{display:'block',fontSize:8,color:S.muted,marginBottom:3,textAlign:'right'}}>{f.l}</label>
+                        <input type={f.t} value={(editData as any)[f.k]} onChange={e=>setEditData(p=>({...p,[f.k]:e.target.value}))} style={{...inp,fontSize:11,padding:'7px 10px'}}/>
+                      </div>
                     ))}
                   </div>
-                  {selTpl&&(
-                    <div style={{background:S.navy3,border:`1px solid ${S.border}`,borderRadius:10,padding:14,marginBottom:14,fontSize:12,color:S.white,lineHeight:'2',whiteSpace:'pre-wrap',fontFamily:'Tajawal, sans-serif',direction:'rtl',textAlign:'right'}}>
-                      {selTpl.text}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                    <div>
+                      <label style={{display:'block',fontSize:8,color:S.muted,marginBottom:3,textAlign:'right'}}>القناة</label>
+                      <select value={editData.channel} onChange={e=>setEditData(p=>({...p,channel:e.target.value}))} style={{...inp,fontSize:11,padding:'7px 10px',cursor:'pointer'}}>
+                        {Object.entries(CHANNELS).map(([k,v])=><option key={k} value={k} style={{background:S.navy2}}>{v.icon} {v.label}</option>)}
+                      </select>
                     </div>
-                  )}
+                    <div>
+                      <label style={{display:'block',fontSize:8,color:S.muted,marginBottom:3,textAlign:'right'}}>موعد المتابعة</label>
+                      <input type="date" value={editData.next_followup_at} onChange={e=>setEditData(p=>({...p,next_followup_at:e.target.value}))} style={{...inp,fontSize:11,padding:'7px 10px',colorScheme:'dark' as any}}/>
+                    </div>
+                  </div>
                   <div style={{display:'flex',gap:8}}>
-                    {lead.phone&&(
-                      <a href={`https://wa.me/${lead.phone.replace(/[^0-9]/g,'')}`} target="_blank" rel="noopener noreferrer"
-                        style={{flex:1,background:S.greenB,border:`1px solid ${S.green}30`,color:S.green,padding:'10px',borderRadius:9,fontSize:12,fontWeight:700,fontFamily:'Tajawal, sans-serif',textDecoration:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}>
-                        📱 واتساب
-                      </a>
-                    )}
-                    <button onClick={copyTpl}
-                      style={{flex:1,background:copied?S.greenB:S.gold,color:copied?S.green:S.navy,border:copied?`1px solid ${S.green}30`:'none',padding:'10px',borderRadius:9,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif',transition:'all .2s'}}>
-                      {copied?'✅ تم النسخ':'📋 نسخ القالب'}
+                    <button onClick={()=>setShowEdit(false)} style={{flex:1,background:'transparent',border:`1px solid ${S.border}`,color:S.muted,padding:'8px',borderRadius:8,fontSize:11,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
+                    <button onClick={saveEdit} disabled={savingE} style={{flex:2,background:savingE?S.muted:S.gold,color:S.navy,border:'none',padding:'8px',borderRadius:8,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+                      {savingE?'⏳...':'💾 حفظ التعديلات'}
                     </button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
