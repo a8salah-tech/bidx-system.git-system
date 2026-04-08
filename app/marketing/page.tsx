@@ -209,7 +209,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
           <button onClick={()=>setShowTpl(true)}
             style={{background:S.gold3,border:`1px solid ${S.borderG}`,color:S.gold2,padding:'4px 8px',borderRadius:6,fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
              إقناع
-          </button>
+          </button>      
           <select defaultValue="" onChange={e=>{if(e.target.value){onMove(lead.id,e.target.value);e.target.value=''}}}
             style={{background:S.card,border:`1px solid ${S.border}`,color:S.muted,borderRadius:6,fontSize:10,padding:'4px 5px',cursor:'pointer',fontFamily:'Tajawal, sans-serif',direction:'rtl'}}>
             <option value="">نقل←</option>
@@ -322,10 +322,10 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
                     📱 واتساب
                   </a>
                 )}
-                <button onClick={()=>{ setShowDetail(false); setShowTpl(true) }}
-                  style={{flex:1,background:S.gold,color:S.navy,border:'none',padding:'8px',borderRadius:8,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif',minWidth:100}}>
-                  🎯 أدوات الإقناع
-                </button>
+<button onClick={() => { setShowDetail(false); setShowTpl(true); }}
+  style={{flex:1,background:S.gold,color:S.navy,border:'none',padding:'8px',borderRadius:8,fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif',minWidth:100}}>
+  🎯 أدوات الإقناع
+</button>
               </div>
 
               {/* فورم التعديل */}
