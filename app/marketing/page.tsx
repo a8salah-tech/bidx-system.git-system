@@ -127,17 +127,37 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
           </span>
         </div>
 
-        {/* الاسم + FIX 3: دائرة واحدة فقط */}
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:7,marginTop:14}}>
-          <div style={{display:'flex',alignItems:'center',gap:5}}>
-            <div style={{width:8,height:8,borderRadius:'50%',background:uc,flexShrink:0}}/>
-            <span style={{fontSize:9,color:uc,fontWeight:700}}>{urgLabel(lead.last_action_at)}</span>
-          </div>
-          <div style={{textAlign:'right'}}>
-            <div style={{fontSize:13,fontWeight:700,color:isDecision?S.gold2:S.white}}>{lead.name}</div>
-            {lead.company&&<div style={{fontSize:10,color:S.muted}}>{lead.company}</div>}
-          </div>
-        </div>
+{/* مؤشر التواصل + النبض + الاسم — صف واحد مرتب */}
+<div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7, marginTop:0, paddingTop:4, minHeight: 40}}>
+<div style={{textAlign:'right', flex:1, marginRight:8, display:'flex', flexDirection:'column'}}>
+  
+  {/* اسم العميل في الأعلى */}
+<div style={{fontSize:13, fontWeight:700, color:isDecision?S.gold2:S.white, lineHeight:1.4}}>
+    {lead.name}
+  </div>
+
+  {/* مسافة صغيرة ثم اسم الشركة في سطر منفصل */}
+  {lead.company && (
+    <div style={{fontSize:10, color:S.muted, lineHeight:1, marginTop:10}}>
+      {lead.company}
+    </div>
+  )}
+
+</div>
+
+  {/* يسار: النبض - تم دفعها للأسفل يدوياً لتنفصل عن محاذاة الشركة العلوية */}
+  <div style={{
+    display:'flex', 
+    alignItems:'center', 
+    gap:4, 
+    flexShrink:0, 
+    marginTop: 18, // هذا الرقم يضمن نزولها لمستوى اسم العميل أو أسفل قليلاً
+    alignSelf: 'flex-start' 
+  }}>
+    <div style={{width:8, height:8, borderRadius:'50%', background:uc, flexShrink:0}}/>
+    <span style={{fontSize:9, color:uc, fontWeight:700}}>{urgLabel(lead.last_action_at)}</span>
+  </div>
+</div>
 
         {/* القناة + المصدر */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:7}}>
@@ -161,12 +181,12 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
           {lead.phone&&(
             <a href={`https://wa.me/${lead.phone.replace(/[^0-9]/g,'')}`} target="_blank" rel="noopener noreferrer"
               style={{background:S.greenB,border:`1px solid ${S.green}30`,color:S.green,padding:'4px 8px',borderRadius:6,fontSize:10,fontWeight:700,textDecoration:'none',display:'flex',alignItems:'center',gap:3}}>
-              📱 واتساب
+               واتساب
             </a>
           )}
           <button onClick={()=>setShowTpl(true)}
             style={{background:S.gold3,border:`1px solid ${S.borderG}`,color:S.gold2,padding:'4px 8px',borderRadius:6,fontSize:10,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-            🎯 إقناع
+             إقناع
           </button>
           <select defaultValue="" onChange={e=>{if(e.target.value){onMove(lead.id,e.target.value);e.target.value=''}}}
             style={{background:S.card,border:`1px solid ${S.border}`,color:S.muted,borderRadius:6,fontSize:10,padding:'4px 5px',cursor:'pointer',fontFamily:'Tajawal, sans-serif',direction:'rtl'}}>
@@ -691,21 +711,17 @@ export default function MarketingPage() {
 
       {/* الهيدر */}
       <div style={{background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'12px 24px',flexShrink:0}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:12,flexDirection:'row-reverse'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:12}}>
           {[
-            {icon:'👥',label:'إجمالي العملاء', val:totalLeads,  color:S.blue},
-            {icon:'🚀',label:'جاهزون للإغلاق',val:hotLeads,    color:S.green},
-            {icon:'🔴',label:'تواصل عاجل',     val:urgentLeads, color:S.red},
-            {icon:'✨',label:'مضافون اليوم',   val:todayLeads,  color:S.gold},
+            {label:'إجمالي العملاء', val:totalLeads,  color:S.blue},
+            {label:'جاهزون للإغلاق',val:hotLeads,    color:S.green},
+            {label:'تواصل عاجل',     val:urgentLeads, color:S.red},
+            {label:'مضافون اليوم',   val:todayLeads,  color:S.gold},
           ].map((s,i)=>(
-            <div key={i} style={{background:S.card,border:`1px solid ${S.border}`,borderRadius:9,padding:'9px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-              <div style={{textAlign:'right'}}>
-                <div style={{fontSize:18,fontWeight:900,color:s.color,fontFamily:'monospace'}}>{s.val}</div>
-                <div style={{fontSize:9,color:S.muted}}>{s.label}</div>
+             <div key={i} style={{background:S.card,border:`1px solid ${S.border}`,borderRadius:9,padding:'9px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>    
+                  <div style={{fontSize:11,color:S.muted,fontWeight:900}}>{s.label}</div>
+                <div style={{fontSize:18,color:s.color,fontFamily:'monospace'}}>{s.val}</div>
               </div>
-                            <span style={{fontSize:18}}>{s.icon}</span>
-
-            </div>
           ))}
         </div>
         <div style={{display:'flex',gap:10}}>
