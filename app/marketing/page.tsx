@@ -850,11 +850,11 @@ export default function MarketingPage() {
 
             {/* FIX 6: فورم المهمة */}
             {showTaskForm&&(
-              <div style={{background:S.navy2,border:`1px solid ${S.borderG}`,borderRadius:14,padding:18,marginBottom:16}}>
+              <div style={{background:S.navy2,border:`1px solid ${S.borderG}`,borderRadius:14,padding:18,marginBottom:16,direction: 'rtl'}}>
                 <div style={{fontSize:13,fontWeight:700,color:S.gold2,marginBottom:12,textAlign:'right'}}>مهمة جديدة</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10, direction: 'rtl'}}>
                   <div>
-                    <label style={{display:'block',fontSize:10,color:S.muted,fontWeight:700,marginBottom:5,textAlign:'right'}}>الأيقونة</label>
+                    <label style={{display:'block',fontSize:10,color:S.muted,fontWeight:700,marginBottom:5}}>الأيقونة</label>
                     <input type="text" value={taskForm.icon} onChange={e=>setTaskForm(p=>({...p,icon:e.target.value}))} style={{...inp,fontSize:14}} placeholder="📌"/>
                   </div>
                   <div>
@@ -895,35 +895,95 @@ export default function MarketingPage() {
                 <div style={{fontSize:13}}>أضف المهام اليومية التي تريد من موظفيك تنفيذها</div>
               </div>
             ):(
-              <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                {tasks.map((task:any)=>{
-                  const done=tasksDone.includes(task.id)
-                  const pc=task.priority==='high'?S.red:task.priority==='medium'?S.amber:S.muted
-                  return (
-                    <div key={task.id}
-                      style={{background:done?S.greenB:S.navy2,border:`1px solid ${done?S.green+'40':S.border}`,borderRadius:12,padding:'14px 18px',display:'flex',alignItems:'center',justifyContent:'space-between',transition:'all .2s'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:10}}>
-                        <button onClick={()=>deleteTask(task.id)} style={{background:'none',border:'none',color:S.muted,cursor:'pointer',fontSize:12,flexShrink:0}}>✕</button>
-                        <div onClick={()=>setTasksDone(prev=>done?prev.filter(id=>id!==task.id):[...prev,task.id])}
-                          style={{width:24,height:24,borderRadius:'50%',border:`2px solid ${done?S.green:S.border}`,background:done?S.green:'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,cursor:'pointer',transition:'all .2s'}}>
-                          {done&&<span style={{color:S.navy,fontSize:12,fontWeight:900}}>✓</span>}
-                        </div>
-                        <span style={{fontSize:10,padding:'2px 8px',borderRadius:20,background:`${pc}18`,color:pc,fontWeight:700}}>
-                          {task.priority==='high'?'عالي':task.priority==='medium'?'متوسط':'عادي'}
-                        </span>
-                      </div>
-                      <div style={{textAlign:'right',cursor:'pointer'}} onClick={()=>setTasksDone(prev=>done?prev.filter(id=>id!==task.id):[...prev,task.id])}>
-                        <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end',marginBottom:4}}>
-                          <div style={{fontSize:13,fontWeight:700,color:done?S.green:S.white,textDecoration:done?'line-through':'none'}}>{task.label}</div>
-                          <span style={{fontSize:18}}>{task.icon}</span>
-                        </div>
-                        {/* FIX 6: عرض description */}
-                        {task.description&&<div style={{fontSize:11,color:S.muted,lineHeight:'1.6'}}>{task.description}</div>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+<div style={{display:'flex',flexDirection:'row',gap:10}}>
+  {tasks.map((task:any)=>{
+    const pc=task.priority==='high'?S.red:task.priority==='medium'?S.amber:S.muted
+    const done=tasksDone.includes(task.id)
+
+    return (
+      <div key={task.id}
+        style={{
+          background:done?S.greenB:S.navy2,
+          border:`1px solid ${done?S.green+'40':S.border}`,
+          borderRadius:12,
+          padding:'14px 18px',
+          display:'flex',
+          alignItems:'center',
+          justifyContent:'space-between',
+          transition:'all .2s'
+        }}>
+
+        {/* اسم المهمة أولا */}
+        <div style={{textAlign:'right',cursor:'pointer'}}
+          onClick={()=>setTasksDone(prev=>done?prev.filter(id=>id!==task.id):[...prev,task.id])}>
+
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+            <span style={{fontSize:18}}>{task.icon}</span>
+
+            <div style={{
+              fontSize:13,
+              fontWeight:700,
+              color:done?S.green:S.white,
+              textDecoration:done?'line-through':'none'
+            }}>
+              {task.label}
+            </div>
+
+<span style={{marginLeft:8,fontSize:10,padding:'2px 8px',borderRadius:20,background:`${pc}18`,color:pc,fontWeight:700
+            }}>
+              {task.priority==='high'?'عالي':task.priority==='medium'?'متوسط':'عادي'}
+            </span>
+          </div>
+
+          {task.description &&
+            <div style={{fontSize:11,color:S.muted,lineHeight:'1.6'}}>
+              {task.description}
+            </div>
+          }
+        </div>
+
+        {/* الحالة + زر الحذف */}
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+
+          <div
+            onClick={()=>setTasksDone(prev=>done?prev.filter(id=>id!==task.id):[...prev,task.id])}
+            style={{
+              width:24,
+              height:24,
+              borderRadius:'50%',
+              border:`2px solid ${done?S.green:S.border}`,
+              background:done?S.green:'transparent',
+              display:'flex',
+              alignItems:'center',
+              justifyContent:'center',
+              cursor:'pointer',
+              transition:'all .2s'
+            }}>
+            {done && <span style={{color:S.navy,fontSize:12,fontWeight:900}}>✓</span>}
+          </div>
+
+          <button
+            onClick={()=>{
+              if(window.confirm('هل ترغب في حذف هذه المهمة؟')){
+                deleteTask(task.id)
+              }
+            }}
+            style={{
+              background:'none',
+              border:'none',
+              color:S.muted,
+              cursor:'pointer',
+              fontSize:12
+            }}>
+            ✕
+          </button>
+
+        </div>
+
+      </div>
+    )
+  })}
+</div>
             )}
           </div>
         )}
