@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COUNTRIES } from '../components/options';
 
 const S = {
   navy:'#0A1628',navy2:'#0F2040',navy3:'#0C1A32',
@@ -392,19 +393,25 @@ function KanbanColumn({stage,leads,stages,templates,onMove,onDelete,onAddNote,on
   const [editMode,  setEditMode]  = useState(false)
   const [eLabel,    setELabel]    = useState(stage.label)
   const [eDesc,     setEDesc]     = useState(stage.desc||'')
-  const [form, setForm] = useState({
-    name:'',company:'',phone:'',email:'',website:'',
-    channel:'whatsapp',source:'',next_followup_at:todayISO(),notes:'',
+const [form, setForm] = useState({
+    name:'', company:'', phone:'', country:'', email:'', website:'',
+    channel:'whatsapp', source:'', next_followup_at:todayISO(), notes:'',
   })
 
-  const urgentCnt = leads.filter(l=>(Date.now()-new Date(l.last_action_at||0).getTime())/3600000>48).length
+ const urgentCnt = leads.filter(l=>(Date.now()-new Date(l.last_action_at||0).getTime())/3600000>48).length
   const isDefault = DEFAULT_STAGES.some(d=>d.id===stage.id)
 
-  async function addLead() {
+async function addLead() {
     if (!form.name) { alert('أدخل اسم العميل'); return }
     setSaving(true)
     await onAddLead(stage.id,{...form})
-    setForm({name:'',company:'',phone:'',email:'',website:'',channel:'whatsapp',source:'',next_followup_at:todayISO(),notes:''})
+    
+    // 2. تصفير الحقول مع إضافة country لضمان نظافة النموذج
+    setForm({
+      name:'', company:'', phone:'', country:'', email:'', website:'',
+      channel:'whatsapp', source:'', next_followup_at:todayISO(), notes:''
+    })
+    
     setShowForm(false); setSaving(false)
   }
 
@@ -499,11 +506,39 @@ function KanbanColumn({stage,leads,stages,templates,onMove,onDelete,onAddNote,on
         + إضافة عميل في {stage.label}
       </div>
 
-      <div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
-        <input type="text" placeholder="اسم العميل *" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} style={{...inp, fontSize: 13, padding: '10px'}}/>
-        <input type="text" placeholder="اسم الشركة" value={form.company} onChange={e=>setForm(p=>({...p,company:e.target.value}))} style={{...inp, fontSize: 13, padding: '10px'}}/>
-        <input type="text" placeholder="رقم الهاتف / واتساب" value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} style={{...inp, fontSize: 13, padding: '10px'}}/>
-        
+<div style={{display: 'flex', flexDirection: 'column', gap: 10}}>
+  <input type="text" placeholder="اسم العميل *" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} style={{...inp, fontSize: 13, padding: '10px'}}/>
+  <input type="text" placeholder="اسم الشركة" value={form.company} onChange={e=>setForm(p=>({...p,company:e.target.value}))} style={{...inp, fontSize: 13, padding: '10px'}}/>
+  <input type="text" placeholder="رقم الهاتف / واتساب" value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))} style={{...inp, fontSize: 13, padding: '10px'}}/>
+  
+<select 
+  value={form.country} 
+  onChange={e => setForm(p => ({ ...p, country: e.target.value }))} 
+  style={{ 
+    ...inp, 
+    fontSize: 13, 
+    padding: '10px 10px 10px 35px', // زيادة الحشو من اليسار للسهم
+    backgroundColor: 'transparent', 
+    color: 'inherit',
+    appearance: 'none',
+    textAlign: 'right', // ضمان بداية النص من اليمين
+    direction: 'rtl',   // ضبط الاتجاه من اليمين لليسار
+    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'left 10px center', // السهم في أقصى اليسار
+    backgroundSize: '16px',
+    border: inp.border || '1px solid #444',
+    cursor: 'pointer',
+    width: '100%'
+  }}
+>
+  <option value="" style={{backgroundColor: '#1a1a1a', color: '#fff'}}>اختر الدولة</option>
+  {COUNTRIES.map(c => (
+    <option key={c.id} value={c.value} style={{backgroundColor: '#1a1a1a', color: '#fff'}}>
+      {c.label}
+    </option>
+  ))}
+</select>
         <div style={{display: 'flex', gap: 8}}>
           <input type="email" placeholder="الإيميل" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} style={{...inp, fontSize: 13, flex: 1, padding: '10px'}}/>
           <input type="text" placeholder="الموقع" value={form.website} onChange={e=>setForm(p=>({...p,website:e.target.value}))} style={{...inp, fontSize: 13, flex: 1, padding: '10px'}}/>
