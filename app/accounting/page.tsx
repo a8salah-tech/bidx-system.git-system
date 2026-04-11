@@ -893,12 +893,12 @@ export default function AccountingPage(){
                 <div style={{fontSize:11,fontWeight:700,color:S.amber,textAlign:'right',marginBottom:2}}>الخصوم وحقوق الملكية</div>
                 {accounts.filter(a=>['liability','equity'].includes(a.account_type)).map(a=>(
                   <div key={a.id} style={{display:'flex',justifyContent:'space-between',padding:'5px 12px',background:S.card,borderRadius:6}}>
-                    <span style={{fontSize:13,color:S.amber,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                     <span style={{fontSize:11,color:S.muted}}>{a.account_code} — {a.account_name}</span>
+                    <span style={{fontSize:13,color:S.amber,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                   </div>
                 ))}
                 <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(245,158,11,0.08)',borderRadius:8}}>
-                  <span style={{fontSize:12,fontWeight:700,color:S.white}}>إجمالي الخصوم + حقوق الملكية</span>=
+                                    <span style={{fontSize:12,fontWeight:700,color:S.white}}>إجمالي الخصوم + حقوق الملكية</span>=
                   <span style={{fontSize:14,fontWeight:800,color:S.amber,fontFamily:'monospace'}}>{fmt(totalLiabilities+Math.max(0,totalAssets-totalLiabilities),sym)}</span>
                 </div>
               </div>
