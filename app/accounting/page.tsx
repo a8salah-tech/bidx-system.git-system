@@ -201,7 +201,7 @@ export default function AccountingPage(){
     const [aR,vR,cR,sR,stR,jR] = await Promise.all([
       supabase.from('accounts').select('*').order('account_code'),
       supabase.from('vouchers').select('*').order('created_at',{ascending:false}),
-      supabase.from('customers').select('id,full_name,company_name').eq('created_by',uid).order('full_name'),
+      supabase.from('customers').select('id,full_name,company_name').order('full_name'),
       supabase.from('suppliers').select('id,company_name').order('company_name'),
       supabase.from('company_settings').select('default_currency').limit(1).single(),
       supabase.from('journal_entries').select(`*,journal_lines(id,account_id,debit,credit,accounts(account_code,account_name))`).order('entry_date',{ascending:false}),
@@ -241,58 +241,82 @@ export default function AccountingPage(){
   }
 
   // ── حفظ سند — مرتبط بدفتر اليومية ──
-  async function handleSaveVoucher(){
-    if(!vchForm.amount||!vchForm.account_id){alert('أدخل المبلغ وحدد الحساب');return}
-    setSaving(true)
-    try{
-      const {data:{session}}=await supabase.auth.getSession()
-      const uid=session?.user?.id
-      const amount=parseFloat(vchForm.amount)
+  async function handleSaveVoucher() {
+  if (!vchForm.amount || !vchForm.account_id) { alert('أدخل المبلغ وحدد الحساب'); return }
+  setSaving(true)
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const uid = session?.user?.id
+    const amount = parseFloat(vchForm.amount)
 
-      // 1. حفظ السند
-      const {data:vch,error:ve}=await supabase.from('vouchers').insert([{
-        voucher_type:vchForm.voucher_type,voucher_number:vchForm.voucher_number,
-        voucher_date:vchForm.voucher_date,account_id:vchForm.account_id,
-        party_type:vchForm.party_type,party_id:vchForm.party_id||null,
-        party_name:vchForm.party_name,amount,currency:vchForm.currency,
-        description:vchForm.description,payment_method:vchForm.payment_method,user_id:uid,
-      }]).select().single()
-      if(ve) throw ve
+    // 1. حفظ السند
+    const { data: vch, error: ve } = await supabase.from('vouchers').insert([{
+      voucher_type: vchForm.voucher_type,
+      voucher_number: vchForm.voucher_number,
+      voucher_date: vchForm.voucher_date,
+      account_id: vchForm.account_id,
+      party_type: vchForm.party_type,
+      party_id: vchForm.party_id || null,
+      party_name: vchForm.party_name,
+      amount,
+      currency: vchForm.currency,
+      description: vchForm.description,
+      payment_method: vchForm.payment_method,
+      user_id: uid,
+    }]).select().single()
+    if (ve) throw ve
 
-      // 2. تحديث رصيد الحساب
-      const acc=accounts.find(a=>a.id===vchForm.account_id)
-      if(acc){
-        const newBal=vchForm.voucher_type==='receipt'?acc.balance+amount:acc.balance-amount
-        await supabase.from('accounts').update({balance:newBal}).eq('id',acc.id)
-      }
+    // 2. إيجاد الحسابات المتأثرة
+    const isReceipt = vchForm.voucher_type === 'receipt'
+    const selectedAcc = accounts.find(a => a.id === vchForm.account_id)
+    const cashAcc = accounts.find(a => a.account_code === '1001' || a.account_name.includes('صندوق') || a.account_name.includes('خزينة'))
 
-      // 3. قيد يومية تلقائي
-      const {data:entry,error:ee}=await supabase.from('journal_entries').insert([{
-        entry_date:vchForm.voucher_date,
-        description:`${VOUCHER_TYPES[vchForm.voucher_type].label} ${vchForm.voucher_number} — ${vchForm.party_name||vchForm.description||''}`,
-        reference_type:'voucher',reference_id:vch.id,user_id:uid,
-      }]).select().single()
-      if(ee) throw ee
+    // 3. تحديث الأرصدة في جدول الحسابات (الطرفين)
+    // تحديث الحساب المختار (مصروف/إيراد/عميل)
+    if (selectedAcc) {
+      // القاعدة: المدين يزيد الرصيد (+) والدائن ينقصه (-) للحسابات المدينة، والعكس للدائنة
+      // برمجياً للتبسيط: الرصيد الجديد = القديم + (المدين - الدائن)
+      const debit = isReceipt ? 0 : amount
+      const credit = isReceipt ? amount : 0
+      const newBal = (selectedAcc.balance || 0) + (debit - credit)
+      await supabase.from('accounts').update({ balance: newBal }).eq('id', selectedAcc.id)
+    }
 
-      // 4. سطور القيد — الخزينة مقابل الحساب المختار
-      const isReceipt=vchForm.voucher_type==='receipt'
-      const cashAcc=accounts.find(a=>a.account_code==='1001'||a.account_name.includes('صندوق')||a.account_name.includes('خزينة'))
-      const lines:any[]=[
-        {entry_id:entry.id,account_id:vchForm.account_id,debit:isReceipt?0:amount,credit:isReceipt?amount:0},
-      ]
-      if(cashAcc){
-        lines.push({entry_id:entry.id,account_id:cashAcc.id,debit:isReceipt?amount:0,credit:isReceipt?0:amount})
-      }
-      await supabase.from('journal_lines').insert(lines)
+    // تحديث حساب الخزينة
+    if (cashAcc) {
+      const debit = isReceipt ? amount : 0
+      const credit = isReceipt ? 0 : amount
+      const newBal = (cashAcc.balance || 0) + (debit - credit)
+      await supabase.from('accounts').update({ balance: newBal }).eq('id', cashAcc.id)
+    }
 
-      setShowVchForm(false)
-      const nextN=getNext(vchForm.voucher_type,[...vouchers,{voucher_type:vchForm.voucher_type,voucher_number:vchForm.voucher_number}])
-      setVchForm(p=>({...p,amount:'',description:'',party_id:'',party_name:'',voucher_number:nextN}))
-      await loadAll()
-    }catch(err:any){alert('خطأ: '+err.message)}
-    finally{setSaving(false)}
-  }
+    // 4. قيد يومية تلقائي
+    const { data: entry, error: ee } = await supabase.from('journal_entries').insert([{
+      entry_date: vchForm.voucher_date,
+      description: `${VOUCHER_TYPES[vchForm.voucher_type].label} ${vchForm.voucher_number} — ${vchForm.party_name || vchForm.description || ''}`,
+      reference_type: 'voucher',
+      reference_id: vch.id,
+      user_id: uid,
+    }]).select().single()
+    if (ee) throw ee
 
+    // 5. سطور القيد في اليومية
+    const lines: any[] = [
+      { entry_id: entry.id, account_id: vchForm.account_id, debit: isReceipt ? 0 : amount, credit: isReceipt ? amount : 0 },
+    ]
+    if (cashAcc) {
+      lines.push({ entry_id: entry.id, account_id: cashAcc.id, debit: isReceipt ? amount : 0, credit: isReceipt ? 0 : amount })
+    }
+    await supabase.from('journal_lines').insert(lines)
+
+    setShowVchForm(false)
+    const nextN = getNext(vchForm.voucher_type, [...vouchers, { voucher_type: vchForm.voucher_type, voucher_number: vchForm.voucher_number }])
+    setVchForm(p => ({ ...p, amount: '', description: '', party_id: '', party_name: '', voucher_number: nextN }))
+    await loadAll()
+    
+  } catch (err: any) { alert('خطأ: ' + err.message) }
+  finally { setSaving(false) }
+}
   // ── تعديل سند ──
   async function handleEditVoucher(){
     if(!editVch)return
@@ -1030,17 +1054,69 @@ export default function AccountingPage(){
                 </select>
               </div>
               <div>
-                {vchForm.party_type==='customer'?(
-                  <><label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اختر العميل</label>
-                  <select value={vchForm.party_id} onChange={e=>{const c=customers.find(x=>x.id===e.target.value);setVchForm({...vchForm,party_id:e.target.value,party_name:c?.full_name||c?.company_name||''})}} style={{...inp,cursor:'pointer'}}>
-                    <option value="">اختر...</option>{customers.map(c=><option key={c.id} value={c.id} style={{background:S.navy2}}>{c.full_name}{c.company_name?` — ${c.company_name}`:''}</option>)}
-                  </select></>
-                ):vchForm.party_type==='supplier'?(
-                  <><label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اختر المورد</label>
-                  <select value={vchForm.party_id} onChange={e=>{const s=suppliers.find(x=>x.id===e.target.value);setVchForm({...vchForm,party_id:e.target.value,party_name:s?.company_name||''})}} style={{...inp,cursor:'pointer'}}>
-                    <option value="">اختر...</option>{suppliers.map(s=><option key={s.id} value={s.id} style={{background:S.navy2}}>{s.company_name}</option>)}
-                  </select></>
-                ):(
+{vchForm.party_type==='customer'?(
+<>
+<label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>
+اختر العميل
+</label>
+
+<select
+value={vchForm.party_id || ""}
+onChange={e=>{
+const id = e.target.value
+const c = customers.find(x => String(x.id) === id)
+
+setVchForm({
+...vchForm,
+party_id:id,
+party_name:c?.full_name || c?.company_name || ''
+})
+}}
+style={{...inp,cursor:'pointer'}}
+>
+
+<option value="">اختر...</option>
+
+{customers.map(c=>(
+<option key={c.id} value={c.id} style={{background:S.navy2}}>
+{c.full_name}{c.company_name?` — ${c.company_name}`:''}
+</option>
+))}
+
+</select>
+</>
+):vchForm.party_type==='supplier'?(
+<>
+<label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>
+اختر المورد
+</label>
+
+<select
+value={vchForm.party_id || ""}
+onChange={e=>{
+const id = e.target.value
+const s = suppliers.find(x => String(x.id) === id)
+
+setVchForm({
+...vchForm,
+party_id:id,
+party_name:s?.company_name || ''
+})
+}}
+style={{...inp,cursor:'pointer'}}
+>
+
+<option value="">اختر...</option>
+
+{suppliers.map(s=>(
+<option key={s.id} value={s.id} style={{background:S.navy2}}>
+{s.company_name}
+</option>
+))}
+
+</select>
+</>
+):(
                   <><label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اسم الطرف</label>
                   <input type="text" placeholder="اسم الجهة أو الشخص" value={vchForm.party_name} onChange={e=>setVchForm({...vchForm,party_name:e.target.value})} style={inp}/></>
                 )}
