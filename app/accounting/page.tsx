@@ -331,8 +331,9 @@ export default function AccountingPage(){
 
   // ── الإحصائيات ──
   const totalAssets      = accounts.filter(a=>a.account_type==='asset').reduce((s,a)=>s+(a.balance||0),0)
-  const totalLiabilities = accounts.filter(a=>a.account_type==='liability').reduce((s,a)=>s+(a.balance||0),0)
-  const totalIncome      = accounts.filter(a=>a.account_type==='income').reduce((s,a)=>s+(a.balance||0),0)
+const totalLiabilities = accounts
+  .filter(a => a.account_type === 'liability')
+  .reduce((s, a) => s + Math.abs(a.balance || 0), 0);  const totalIncome      = accounts.filter(a=>a.account_type==='income').reduce((s,a)=>s+(a.balance||0),0)
   const totalExpenses    = accounts.filter(a=>a.account_type==='expense').reduce((s,a)=>s+(a.balance||0),0)
   const netProfit        = totalIncome - totalExpenses
   const receipts         = vouchers.filter(v=>v.voucher_type==='receipt').reduce((s,v)=>s+(v.amount||0),0)
@@ -485,11 +486,11 @@ export default function AccountingPage(){
               <div style={{background:S.navy2,border:`1px solid ${S.borderG}`,borderRadius:14,padding:20}}>
                 <div style={{fontSize:12,fontWeight:700,color:S.muted,marginBottom:12,textAlign:'right'}}>⚖️ المعادلة المحاسبية</div>
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  <div style={{textAlign:'right',padding:'8px 0'}}><div style={{fontSize:11,color:S.muted,marginBottom:4}}>الأصول</div><div style={{fontSize:18,fontWeight:800,color:S.green,fontFamily:'monospace'}}>{fmt(totalAssets,sym)}</div></div>
+                  <div style={{textAlign:'center',padding:'8px 0'}}><div style={{fontSize:11,color:S.muted,marginBottom:4}}>الأصول</div><div style={{fontSize:18,fontWeight:800,color:S.green,fontFamily:'monospace'}}>{fmt(totalAssets,sym)}</div></div>
                   <div style={{textAlign:'center',color:S.gold,fontWeight:700,fontSize:16}}>=</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                     <div style={{textAlign:'center',background:S.card,borderRadius:8,padding:8}}><div style={{fontSize:10,color:S.muted}}>الخصوم</div><div style={{fontSize:13,fontWeight:700,color:S.red,fontFamily:'monospace'}}>{fmt(totalLiabilities,sym)}</div></div>
-                    <div style={{textAlign:'center',background:S.card,borderRadius:8,padding:8}}><div style={{fontSize:10,color:S.muted}}>حقوق الملكية</div><div style={{fontSize:13,fontWeight:700,color:S.amber,fontFamily:'monospace'}}>{fmt(Math.max(0,totalAssets-totalLiabilities),sym)}</div></div>
+                    <div style={{textAlign:'center',background:S.card,borderRadius:8,padding:8}}><div style={{fontSize:10,color:S.muted}}>حقوق الملكية</div><div style={{fontSize:13,fontWeight:700,color:S.amber,fontFamily:'monospace'}}>{fmt(totalAssets - totalLiabilities, sym)}</div></div>
                   </div>
                 </div>
               </div>
@@ -921,10 +922,12 @@ export default function AccountingPage(){
                     <span style={{fontSize:13,color:S.amber,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                   </div>
                 ))}
-                <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(245,158,11,0.08)',borderRadius:8}}>
-                                    <span style={{fontSize:12,fontWeight:700,color:S.white}}>إجمالي الخصوم + حقوق الملكية</span>=
-                  <span style={{fontSize:14,fontWeight:800,color:S.amber,fontFamily:'monospace'}}>{fmt(totalLiabilities+Math.max(0,totalAssets-totalLiabilities),sym)}</span>
-                </div>
+<div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(245,158,11,0.08)',borderRadius:8}}>
+  <span style={{fontSize:12,fontWeight:700,color:S.white}}>إجمالي الخصوم + حقوق الملكية</span>=
+  <span style={{fontSize:14,fontWeight:800,color:S.amber,fontFamily:'monospace'}}>
+    {fmt(totalLiabilities + (totalAssets - totalLiabilities), sym)}
+  </span>
+</div>
               </div>
             </div>
           </div>
