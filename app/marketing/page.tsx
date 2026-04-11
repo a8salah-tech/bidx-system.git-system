@@ -61,7 +61,7 @@ function urgColor(d:string) {
 function urgLabel(d:string) {
   if (!d) return '—'
   const h=(Date.now()-new Date(d).getTime())/3600000
-  return h>48?'🔴 عاجل':h>24?'🟡 متأخر':'🟢 نشط'
+  return h>48?' عاجل':h>24?' متأخر':' نشط'
 }
 
 // ======================================================
