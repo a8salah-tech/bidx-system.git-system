@@ -547,7 +547,7 @@ export default function AccountingPage(){
                         <td style={{...td_s,color:S.muted,maxWidth:160}}><div style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.description||'—'}</div></td>
                         <td style={td_s}>
                           <button onClick={()=>{setLedgerAccountId(a.id);setTab('ledger')}}
-                            style={{background:S.blueB||S.card2,border:`1px solid ${S.blue}30`,color:S.blue,padding:'3px 10px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+                            style={{background:S.blue||S.card2,border:`1px solid ${S.blue}30`,color:S.blue,padding:'3px 10px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
                             📗 الأستاذ
                           </button>
                         </td>
@@ -848,30 +848,30 @@ export default function AccountingPage(){
               <div style={{fontSize:14,fontWeight:800,color:S.white,marginBottom:16,textAlign:'right'}}>📊 قائمة الدخل</div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(59,130,246,0.08)',borderRadius:8}}>
+                      <span style={{fontSize:12,color:S.white,fontWeight:600}}>إجمالي الإيرادات</span>
                   <span style={{fontSize:16,fontWeight:800,color:S.blue,fontFamily:'monospace'}}>{fmt(totalIncome,sym)}</span>
-                  <span style={{fontSize:12,color:S.white,fontWeight:600}}>إجمالي الإيرادات</span>
                 </div>
                 {accounts.filter(a=>a.account_type==='income').map(a=>(
                   <div key={a.id} style={{display:'flex',justifyContent:'space-between',padding:'5px 12px'}}>
-                    <span style={{fontSize:13,color:S.green,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                     <span style={{fontSize:11,color:S.muted}}>{a.account_name}</span>
+                    <span style={{fontSize:13,color:S.green,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                   </div>
                 ))}
                 <div style={{height:1,background:S.border,margin:'4px 0'}}/>
                 <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(239,68,68,0.08)',borderRadius:8}}>
-                  <span style={{fontSize:16,fontWeight:800,color:S.red,fontFamily:'monospace'}}>{fmt(totalExpenses,sym)}</span>
                   <span style={{fontSize:12,color:S.white,fontWeight:600}}>إجمالي المصروفات</span>
+                  <span style={{fontSize:16,fontWeight:800,color:S.red,fontFamily:'monospace'}}>{fmt(totalExpenses,sym)}</span>
                 </div>
                 {accounts.filter(a=>a.account_type==='expense').map(a=>(
                   <div key={a.id} style={{display:'flex',justifyContent:'space-between',padding:'5px 12px'}}>
-                    <span style={{fontSize:13,color:S.red,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                     <span style={{fontSize:11,color:S.muted}}>{a.account_name}</span>
+                    <span style={{fontSize:13,color:S.red,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                   </div>
                 ))}
                 <div style={{height:2,background:S.border,margin:'4px 0'}}/>
                 <div style={{display:'flex',justifyContent:'space-between',padding:'14px 16px',background:`${profitColor}18`,borderRadius:10,border:`1px solid ${profitColor}40`}}>
-                  <span style={{fontSize:20,fontWeight:900,color:profitColor,fontFamily:'monospace'}}>{netProfit>=0?'+':''}{fmt(netProfit,sym)}</span>
                   <span style={{fontSize:13,fontWeight:700,color:profitColor}}>{netProfit>0?'📈 صافي ربح':netProfit<0?'📉 صافي خسارة':'⚖️ تعادل'}</span>
+                  <span style={{fontSize:20,fontWeight:900,color:profitColor,fontFamily:'monospace'}}>{netProfit>=0?'+':''}{fmt(netProfit,sym)}</span>
                 </div>
               </div>
             </div>
@@ -881,13 +881,13 @@ export default function AccountingPage(){
                 <div style={{fontSize:11,fontWeight:700,color:S.green,textAlign:'right',marginBottom:2}}>الأصول</div>
                 {accounts.filter(a=>a.account_type==='asset').map(a=>(
                   <div key={a.id} style={{display:'flex',justifyContent:'space-between',padding:'5px 12px',background:S.card,borderRadius:6}}>
-                    <span style={{fontSize:13,color:S.green,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                     <span style={{fontSize:11,color:S.muted}}>{a.account_code} — {a.account_name}</span>
+                    <span style={{fontSize:13,color:S.green,fontFamily:'monospace'}}>{fmt(a.balance||0,sym)}</span>
                   </div>
                 ))}
                 <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(34,197,94,0.08)',borderRadius:8}}>
-                  <span style={{fontSize:14,fontWeight:800,color:S.green,fontFamily:'monospace'}}>{fmt(totalAssets,sym)}</span>
                   <span style={{fontSize:12,fontWeight:700,color:S.white}}>إجمالي الأصول</span>
+                  <span style={{fontSize:14,fontWeight:800,color:S.green,fontFamily:'monospace'}}>{fmt(totalAssets,sym)}</span>
                 </div>
                 <div style={{height:1,background:S.border,margin:'4px 0'}}/>
                 <div style={{fontSize:11,fontWeight:700,color:S.amber,textAlign:'right',marginBottom:2}}>الخصوم وحقوق الملكية</div>
@@ -898,8 +898,8 @@ export default function AccountingPage(){
                   </div>
                 ))}
                 <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(245,158,11,0.08)',borderRadius:8}}>
+                  <span style={{fontSize:12,fontWeight:700,color:S.white}}>إجمالي الخصوم + حقوق الملكية</span>=
                   <span style={{fontSize:14,fontWeight:800,color:S.amber,fontFamily:'monospace'}}>{fmt(totalLiabilities+Math.max(0,totalAssets-totalLiabilities),sym)}</span>
-                  <span style={{fontSize:12,fontWeight:700,color:S.white}}>إجمالي الخصوم + حقوق الملكية</span>
                 </div>
               </div>
             </div>
