@@ -504,9 +504,7 @@ async function addLead() {
               {/* FIX 5: زر + في الهيدر */}
               <button onClick={()=>setShowForm(true)} title="إضافة عميل"
                 style={{background:`${stage.color}22`,border:`1px solid ${stage.color}40`,color:stage.color,width:21,height:21,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,cursor:'pointer',lineHeight:1,flexShrink:0}}>+</button>
-              {urgentCnt>0&&(
-                <span style={{background:S.red,color:S.white,borderRadius:'50%',width:17,height:17,display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700}}>{urgentCnt}</span>
-              )}
+
               <span style={{background:`${stage.color}18`,color:stage.color,fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:20}}>{leads.length}</span>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:5,textAlign:'right',direction:'rtl'}}>
