@@ -53,15 +53,65 @@ function timeAgo(d:string) {
   if (m<1440) return `منذ ${Math.floor(m/60)} ساعة`
   return `منذ ${Math.floor(m/1440)} يوم`
 }
-function urgColor(d:string) {
-  if (!d) return S.muted
-  const h=(Date.now()-new Date(d).getTime())/3600000
-  return h>48?S.red:h>24?S.amber:S.green
+function urgColor(lead:any) {
+
+  if (lead.stage_id === 'lost')
+    return S.muted
+
+  if (lead.stage_id === 'won')
+    return S.green
+
+  if (lead.next_followup_at) {
+    const diff = new Date(lead.next_followup_at).getTime() - Date.now()
+
+    if (diff < 0)
+      return S.red
+
+    if (diff < 86400000)
+      return S.amber
+  }
+
+  if (!urgColor(lead))
+    return S.muted
+
+  const h = (Date.now() - new Date(urgColor(lead)).getTime()) / 3600000
+
+  if (h > 48) return S.red
+  if (h > 24) return S.amber
+
+  return S.green
 }
-function urgLabel(d:string) {
-  if (!d) return '—'
-  const h=(Date.now()-new Date(d).getTime())/3600000
-  return h>48?' عاجل':h>24?' متأخر':' نشط'
+function urgLabel(lead:any) {
+
+  if (lead.stage_id === 'lost')
+    return 'غير مهتم'
+
+  if (lead.stage_id === 'won')
+    return 'تم البيع'
+
+  if (!lead.contacted_at)
+    return 'جديد'
+
+  if (lead.next_followup_at) {
+
+    const diff = new Date(lead.next_followup_at).getTime() - Date.now()
+
+    if (diff < 0)
+      return 'متابعة متأخرة'
+
+    if (diff < 86400000)
+      return 'متابعة اليوم'
+  }
+
+  if (!urgColor(lead))
+    return '—'
+
+  const h = (Date.now() - new Date(urgColor(lead)).getTime()) / 3600000
+
+  if (h > 48) return 'عاجل'
+  if (h > 24) return 'متأخر'
+
+  return 'نشط'
 }
 
 // ======================================================
@@ -90,7 +140,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
   })
 
   const ch        = CHANNELS[lead.channel]||CHANNELS.whatsapp
-  const uc        = urgColor(lead.last_action_at)
+  const uc        = urgLabel(lead)
   const isDecision= stage?.id==='decision'
   const isAction  = stage?.id==='action'
   const contacted = !!lead.contacted_at
@@ -133,7 +183,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
         background:S.card2,
         border:`1px solid ${isDecision?S.gold+'60':S.border}`,
         borderRight:isDecision?`3px solid ${S.gold}`:`1px solid ${S.border}`,
-        borderRadius:10,padding:'11px 13px',marginBottom:8,cursor:'pointer',
+        borderRadius:10,padding: '11px 5px 11px 13px',marginBottom:8,cursor:'pointer',
         boxShadow:isDecision?`0 0 10px ${S.gold}15`:'none',
         position:'relative',transition:'all .15s',
       }}>
@@ -155,9 +205,22 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
 <div style={{textAlign:'right', flex:1, marginRight:8, display:'flex', flexDirection:'column'}}>
   
   {/* اسم العميل في الأعلى */}
-<div style={{fontSize:13, fontWeight:700, color:isDecision?S.gold2:S.white, lineHeight:1.4}}>
-    {lead.name}
-  </div>
+<div style={{
+  fontSize: 13, 
+  fontWeight: 700, 
+  color: isDecision ? S.gold2 : S.white, 
+  lineHeight: 1.4,
+  textAlign: 'right',
+  direction: 'rtl',        // التأكد من اتجاه النص العربي
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '160px',       // تقليل العرض قليلاً لضمان عدم اللمس
+  display: 'block',        // ضروري لعمل خاصية الـ ellipsis بشكل صحيح
+  paddingLeft: '05px'      // مسافة أمان تمنع الالتصاق بالزر
+}}>
+  {lead.name}
+</div>
 
   {/* مسافة صغيرة ثم اسم الشركة في سطر منفصل */}
   {lead.company && (
@@ -178,7 +241,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
     alignSelf: 'flex-start' 
   }}>
     <div style={{width:8, height:8, borderRadius:'50%', background:uc, flexShrink:0}}/>
-    <span style={{fontSize:9, color:uc, fontWeight:700}}>{urgLabel(lead.last_action_at)}</span>
+    <span style={{fontSize:9, color:uc, fontWeight:700}}>{urgLabel(urgColor(lead))}</span>
   </div>
 </div>
 
@@ -196,7 +259,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
           <div style={{fontSize:9,color:S.muted}}>
             {lead.next_followup_at&&<span style={{color:S.amber}}>📅 {new Date(lead.next_followup_at).toLocaleDateString('ar-EG',{month:'short',day:'numeric'})}</span>}
           </div>
-          <div style={{fontSize:9,color:S.muted}}>آخر إجراء: {timeAgo(lead.last_action_at)}</div>
+          <div style={{fontSize:9,color:S.muted}}>آخر إجراء: {timeAgo(urgColor(lead))}</div>
         </div>
 
         {/* FIX 2: الأزرار — واتساب + أدوات الإقناع + نقل */}
@@ -245,7 +308,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
                   {l:'الإيميل', v:lead.email||'—'},
                   {l:'الموقع',  v:lead.website||'—'},
                   {l:'المصدر',  v:lead.source||'—'},
-                  {l:'آخر إجراء',v:timeAgo(lead.last_action_at)},
+                  {l:'آخر إجراء',v:timeAgo(urgColor(lead))},
                   {l:'المتابعة',v:lead.next_followup_at?new Date(lead.next_followup_at).toLocaleDateString('ar-EG'):'—'},
                 ].map((f,i)=>(
                   <div key={i} style={{background:S.card,borderRadius:7,padding:'8px 10px',textAlign:'right'}}>
@@ -393,7 +456,7 @@ function KanbanColumn({stage,leads,stages,templates,onMove,onDelete,onAddNote,on
   const [editMode,  setEditMode]  = useState(false)
   const [eLabel,    setELabel]    = useState(stage.label)
   const [eDesc,     setEDesc]     = useState(stage.desc||'')
-const [form, setForm] = useState({
+  const [form, setForm] = useState({
     name:'', company:'', phone:'', country:'', email:'', website:'',
     channel:'whatsapp', source:'', next_followup_at:todayISO(), notes:'',
   })
@@ -751,7 +814,8 @@ export default function MarketingPage() {
 
   const totalLeads  = leads.length
   const hotLeads    = leads.filter(l=>l.stage_id==='action').length
-  const urgentLeads = leads.filter(l=>(Date.now()-new Date(l.last_action_at||0).getTime())/3600000>48).length
+  const today = new Date().toISOString().split('T')[0] 
+  const contactedToday = leads.filter(l => l.contacted_at && l.contacted_at.startsWith(today) ).length
   const todayLeads  = leads.filter(l=>{ const d=new Date(l.created_at),t=new Date(); return d.getDate()===t.getDate()&&d.getMonth()===t.getMonth() }).length
 
   const TABS=[
@@ -770,7 +834,7 @@ export default function MarketingPage() {
           {[
             {label:'إجمالي العملاء', val:totalLeads,  color:S.blue},
             {label:'جاهزون للإغلاق',val:hotLeads,    color:S.green},
-            {label:'تواصل عاجل',     val:urgentLeads, color:S.red},
+            {label:'تم التواصل اليوم', val:contactedToday, color:S.red},
             {label:'مضافون اليوم',   val:todayLeads,  color:S.gold},
           ].map((s,i)=>(
              <div key={i} style={{background:S.card,border:`1px solid ${S.border}`,borderRadius:9,padding:'9px 14px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>    
