@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
 import { CURRENCIES } from '../components/options'
 
+// ── الألوان ──
 const S = {
   navy:'#0A1628',navy2:'#0F2040',navy3:'#0C1A32',
   gold:'#C9A84C',gold2:'#E8C97A',gold3:'rgba(201,168,76,0.10)',
@@ -23,11 +24,11 @@ const CURRENCY_SYMBOLS: Record<string,string> = {
 }
 
 const ACCOUNT_TYPES: Record<string,{label:string;color:string;bg:string;icon:string}> = {
-  asset:     {label:'أصول',      color:S.green, bg:'rgba(34,197,94,0.12)',  icon:'🏦'},
-  liability: {label:'خصوم',      color:S.red,   bg:'rgba(239,68,68,0.12)', icon:'📋'},
-  equity:    {label:'حقوق ملكية',color:S.amber, bg:'rgba(245,158,11,0.12)',icon:'💼'},
-  income:    {label:'إيرادات',   color:S.blue,  bg:'rgba(59,130,246,0.12)',icon:'📈'},
-  expense:   {label:'مصروفات',  color:S.red,   bg:'rgba(239,68,68,0.12)', icon:'📉'},
+  asset:    {label:'أصول',      color:S.green,bg:'rgba(34,197,94,0.12)', icon:'🏦'},
+  liability:{label:'خصوم',      color:S.red,  bg:'rgba(239,68,68,0.12)',icon:'📋'},
+  equity:   {label:'حقوق ملكية',color:S.amber,bg:'rgba(245,158,11,0.12)',icon:'💼'},
+  income:   {label:'إيرادات',   color:S.blue, bg:'rgba(59,130,246,0.12)',icon:'📈'},
+  expense:  {label:'مصروفات',  color:S.red,  bg:'rgba(239,68,68,0.12)', icon:'📉'},
 }
 
 const VOUCHER_TYPES: Record<string,{label:string;color:string;icon:string}> = {
@@ -36,69 +37,51 @@ const VOUCHER_TYPES: Record<string,{label:string;color:string;icon:string}> = {
   journal:{label:'قيد يومية',color:S.blue, icon:'📒'},
 }
 
-const PAYMENT_METHODS = ['نقداً','تحويل بنكي','شيك','بطاقة ائتمان','خطاب اعتماد','آجل']
+const PAYMENT_METHODS=['نقداً','تحويل بنكي','شيك','بطاقة ائتمان','خطاب اعتماد','آجل']
 
+// ── style ──
 const inp: React.CSSProperties = {
   width:'100%',background:S.navy3,border:`1px solid ${S.border}`,
   borderRadius:'9px',padding:'10px 14px',fontSize:'13px',color:S.white,
   outline:'none',fontFamily:'Tajawal, sans-serif',
   boxSizing:'border-box',direction:'rtl',textAlign:'right',
 }
+const th: React.CSSProperties = {
+  padding:'11px 14px',textAlign:'right',fontSize:'10px',
+  color:S.muted,fontWeight:700,background:'rgba(255,255,255,0.04)',
+}
+const td_s: React.CSSProperties = {padding:'11px 14px',textAlign:'right',fontSize:12}
 
-function fmt(n:number,sym='$') {
+function fmt(n:number,sym='$'){
   return `${sym}${Math.abs(n).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}`
 }
 
-// FIX 1: رقم مستقل لكل نوع سند
-function nextReceiptNumber(existing:any[]):string {
-  const nums = existing
-    .filter(v=>v.voucher_type==='receipt')
-    .map(v=>v.voucher_number)
-    .filter((n:string)=>/^Q-\d+$/.test(n))
-    .map((n:string)=>parseInt(n.replace('Q-','')))
-  const max = nums.length ? Math.max(...nums) : 0
-  return `Q-${String(max+1).padStart(4,'0')}`
+// ── ترقيم السندات المنفصل ──
+function nextNum(vouchers:any[],type:string,prefix:string):string{
+  const nums=vouchers.filter(v=>v.voucher_type===type).map(v=>v.voucher_number)
+    .filter((n:string)=>n?.startsWith(prefix+'-')).map((n:string)=>parseInt(n.replace(prefix+'-','')))
+  return `${prefix}-${String((nums.length?Math.max(...nums):0)+1).padStart(4,'0')}`
 }
-function nextPaymentNumber(existing:any[]):string {
-  const nums = existing
-    .filter(v=>v.voucher_type==='payment')
-    .map(v=>v.voucher_number)
-    .filter((n:string)=>/^S-\d+$/.test(n))
-    .map((n:string)=>parseInt(n.replace('S-','')))
-  const max = nums.length ? Math.max(...nums) : 0
-  return `S-${String(max+1).padStart(4,'0')}`
-}
-function nextJournalNumber(existing:any[]):string {
-  const nums = existing
-    .filter(v=>v.voucher_type==='journal')
-    .map(v=>v.voucher_number)
-    .filter((n:string)=>/^J-\d+$/.test(n))
-    .map((n:string)=>parseInt(n.replace('J-','')))
-  const max = nums.length ? Math.max(...nums) : 0
-  return `J-${String(max+1).padStart(4,'0')}`
-}
-function getNextVoucherNumber(type:string, existing:any[]):string {
-  if (type==='receipt') return nextReceiptNumber(existing)
-  if (type==='payment') return nextPaymentNumber(existing)
-  return nextJournalNumber(existing)
+function getNext(type:string,vouchers:any[]){
+  if(type==='receipt') return nextNum(vouchers,'receipt','Q')
+  if(type==='payment') return nextNum(vouchers,'payment','S')
+  return nextNum(vouchers,'journal','J')
 }
 
-// ======================================================
+// ════════════════════════════════════════════════════
 // CurrencyBar
-// ======================================================
-function CurrencyBar({currency,setCurrency}:{currency:string;setCurrency:(c:string)=>void}) {
-  const [open,setOpen] = useState(false)
-  const sym  = CURRENCY_SYMBOLS[currency]||currency
-  const curr = CURRENCIES.find(c=>c.value===currency)
-
+// ════════════════════════════════════════════════════
+function CurrencyBar({currency,setCurrency}:{currency:string;setCurrency:(c:string)=>void}){
+  const [open,setOpen]=useState(false)
+  const sym=CURRENCY_SYMBOLS[currency]||currency
+  const curr=CURRENCIES.find(c=>c.value===currency)
   useEffect(()=>{
-    if (!open) return
-    function h() { setOpen(false) }
+    if(!open)return
+    const h=()=>setOpen(false)
     document.addEventListener('click',h)
-    return ()=>document.removeEventListener('click',h)
+    return()=>document.removeEventListener('click',h)
   },[open])
-
-  return (
+  return(
     <div style={{position:'relative'}} onClick={e=>e.stopPropagation()}>
       <button onClick={()=>setOpen(o=>!o)}
         style={{display:'flex',alignItems:'center',gap:8,padding:'7px 14px',borderRadius:8,background:S.gold3,border:`1px solid ${S.borderG}`,color:S.gold2,cursor:'pointer',fontFamily:'Tajawal, sans-serif',fontSize:13,fontWeight:700}}>
@@ -112,7 +95,7 @@ function CurrencyBar({currency,setCurrency}:{currency:string;setCurrency:(c:stri
             <button key={c.id} onClick={()=>{setCurrency(c.value);setOpen(false)}}
               style={{width:'100%',padding:'10px 16px',background:currency===c.value?S.gold3:'transparent',border:'none',borderBottom:`1px solid ${S.border}`,color:currency===c.value?S.gold2:S.white,cursor:'pointer',fontFamily:'Tajawal, sans-serif',fontSize:12,display:'flex',justifyContent:'space-between',alignItems:'center',direction:'rtl'}}>
               <span>{c.label}</span>
-              <span style={{fontSize:12,fontWeight:800,color:S.gold,minWidth:40,textAlign:'right'}}>{CURRENCY_SYMBOLS[c.value]||c.value}</span>
+              <span style={{fontSize:12,fontWeight:800,color:S.gold}}>{CURRENCY_SYMBOLS[c.value]||c.value}</span>
             </button>
           ))}
         </div>
@@ -121,303 +104,208 @@ function CurrencyBar({currency,setCurrency}:{currency:string;setCurrency:(c:stri
   )
 }
 
-// ======================================================
-// Modal طباعة/معاينة السند
-// ======================================================
-function VoucherPrintModal({voucher,sym,onClose}:{voucher:any;sym:string;onClose:()=>void}) {
-  const vt = VOUCHER_TYPES[voucher.voucher_type]||VOUCHER_TYPES.journal
-  const vSym = CURRENCY_SYMBOLS[voucher.currency]||sym
-
-  function handlePrint() {
-    window.print()
-  }
-
-  return (
-    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,backdropFilter:'blur(8px)',padding:16}}
-      onClick={onClose}>
-      <div style={{background:S.white,width:'100%',maxWidth:600,borderRadius:16,overflow:'hidden',direction:'rtl'}}
-        onClick={e=>e.stopPropagation()}>
-
-        {/* شريط الطباعة */}
+// ════════════════════════════════════════════════════
+// Modal طباعة السند
+// ════════════════════════════════════════════════════
+function PrintModal({v,sym,onClose}:{v:any;sym:string;onClose:()=>void}){
+  const vt=VOUCHER_TYPES[v.voucher_type]||VOUCHER_TYPES.journal
+  const vSym=CURRENCY_SYMBOLS[v.currency]||sym
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,backdropFilter:'blur(8px)',padding:16}} onClick={onClose}>
+      <div style={{background:S.white,width:'100%',maxWidth:600,borderRadius:16,overflow:'hidden',direction:'rtl'}} onClick={e=>e.stopPropagation()}>
         <div style={{background:S.navy2,padding:'12px 20px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div style={{display:'flex',gap:8}}>
-            <button onClick={handlePrint}
-              style={{background:S.gold,color:S.navy,border:'none',padding:'8px 20px',borderRadius:7,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-              🖨️ طباعة
-            </button>
-            <button onClick={onClose}
-              style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:'8px 16px',borderRadius:7,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-              ✕ إغلاق
-            </button>
+            <button onClick={()=>window.print()} style={{background:S.gold,color:S.navy,border:'none',padding:'8px 20px',borderRadius:7,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️ طباعة</button>
+            <button onClick={onClose} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:'8px 16px',borderRadius:7,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>✕</button>
           </div>
           <span style={{fontSize:13,fontWeight:700,color:S.gold2}}>معاينة السند</span>
         </div>
-
-        {/* محتوى السند للطباعة */}
         <div id="print-area" style={{padding:32,background:S.white,color:'#111',fontFamily:'Tajawal, sans-serif',direction:'rtl'}}>
-          {/* رأس السند */}
           <div style={{textAlign:'center',marginBottom:24,borderBottom:'2px solid #ddd',paddingBottom:16}}>
             <div style={{fontSize:20,fontWeight:900,color:S.navy,marginBottom:4}}>bidlx.com</div>
             <div style={{fontSize:16,fontWeight:700,color:vt.color,marginBottom:4}}>{vt.icon} {vt.label}</div>
-            <div style={{fontSize:22,fontWeight:900,color:S.navy,fontFamily:'monospace'}}>{voucher.voucher_number}</div>
+            <div style={{fontSize:22,fontWeight:900,color:S.navy,fontFamily:'monospace'}}>{v.voucher_number}</div>
           </div>
-
-          {/* تفاصيل السند */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:20}}>
-            {[
-              {l:'رقم السند',   v:voucher.voucher_number},
-              {l:'التاريخ',     v:voucher.voucher_date?new Date(voucher.voucher_date).toLocaleDateString('ar-EG'):'—'},
-              {l:'الطرف الآخر', v:voucher.party_name||'—'},
-              {l:'طريقة الدفع', v:voucher.payment_method||'—'},
-              {l:'العملة',      v:voucher.currency||'—'},
-              {l:'نوع السند',   v:vt.label},
-            ].map((f,i)=>(
+            {[{l:'رقم السند',v:v.voucher_number},{l:'التاريخ',v:v.voucher_date?new Date(v.voucher_date).toLocaleDateString('ar-EG'):'—'},{l:'الطرف الآخر',v:v.party_name||'—'},{l:'طريقة الدفع',v:v.payment_method||'—'},{l:'العملة',v:v.currency||'—'},{l:'نوع السند',v:vt.label}]
+              .map((f,i)=>(
               <div key={i} style={{background:'#f8f8f8',borderRadius:8,padding:'10px 14px',textAlign:'right'}}>
                 <div style={{fontSize:10,color:'#666',marginBottom:3,fontWeight:700}}>{f.l}</div>
-                <div style={{fontSize:13,fontWeight:600,color:'#111'}}>{f.v}</div>
+                <div style={{fontSize:13,fontWeight:600}}>{f.v}</div>
               </div>
             ))}
           </div>
-
-          {/* المبلغ */}
-          <div style={{background:voucher.voucher_type==='receipt'?'#f0fff4':'#fff0f0',border:`2px solid ${vt.color}`,borderRadius:12,padding:'18px 24px',textAlign:'center',marginBottom:16}}>
+          <div style={{background:v.voucher_type==='receipt'?'#f0fff4':'#fff0f0',border:`2px solid ${vt.color}`,borderRadius:12,padding:'18px 24px',textAlign:'center',marginBottom:16}}>
             <div style={{fontSize:12,color:'#666',marginBottom:6}}>المبلغ</div>
-            <div style={{fontSize:32,fontWeight:900,color:vt.color,fontFamily:'monospace'}}>
-              {voucher.voucher_type==='receipt'?'+':'-'}{fmt(voucher.amount||0,vSym)}
-            </div>
+            <div style={{fontSize:32,fontWeight:900,color:vt.color,fontFamily:'monospace'}}>{v.voucher_type==='receipt'?'+':'-'}{fmt(v.amount||0,vSym)}</div>
           </div>
-
-          {/* البيان */}
-          {voucher.description&&(
-            <div style={{background:'#f8f8f8',borderRadius:8,padding:'12px 16px',marginBottom:16,textAlign:'right'}}>
-              <div style={{fontSize:10,color:'#666',marginBottom:4,fontWeight:700}}>البيان</div>
-              <div style={{fontSize:13,color:'#111'}}>{voucher.description}</div>
-            </div>
-          )}
-
-          {/* التوقيعات */}
+          {v.description&&<div style={{background:'#f8f8f8',borderRadius:8,padding:'12px 16px',marginBottom:16,textAlign:'right'}}><div style={{fontSize:10,color:'#666',marginBottom:4,fontWeight:700}}>البيان</div><div style={{fontSize:13}}>{v.description}</div></div>}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginTop:32,paddingTop:20,borderTop:'1px solid #ddd'}}>
-            {['المحاسب','المدير المالي','المستلم'].map(label=>(
-              <div key={label} style={{textAlign:'center'}}>
-                <div style={{height:40,borderBottom:'1px solid #999',marginBottom:6}}/>
-                <div style={{fontSize:11,color:'#666'}}>{label}</div>
-              </div>
+            {['المحاسب','المدير المالي','المستلم'].map(l=>(
+              <div key={l} style={{textAlign:'center'}}><div style={{height:40,borderBottom:'1px solid #999',marginBottom:6}}/><div style={{fontSize:11,color:'#666'}}>{l}</div></div>
             ))}
           </div>
-
-          {/* التذييل */}
-          <div style={{textAlign:'center',marginTop:20,fontSize:10,color:'#999'}}>
-            هذا السند صادر من نظام bidlx.com — {new Date().toLocaleDateString('ar-EG')}
-          </div>
+          <div style={{textAlign:'center',marginTop:20,fontSize:10,color:'#999'}}>صادر من نظام bidlx.com — {new Date().toLocaleDateString('ar-EG')}</div>
         </div>
       </div>
     </div>
   )
 }
 
-// ======================================================
+// ════════════════════════════════════════════════════
 // الصفحة الرئيسية
-// ======================================================
-export default function AccountingPage() {
-  const [tab,        setTab]        = useState<'dashboard'|'accounts'|'vouchers'|'reports'|'statement'>('dashboard')
-  const [accounts,   setAccounts]   = useState<any[]>([])
-  const [vouchers,   setVouchers]   = useState<any[]>([])
-  const [customers,  setCustomers]  = useState<any[]>([])
-  const [suppliers,  setSuppliers]  = useState<any[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [search,     setSearch]     = useState('')
-  const [typeFilter, setTypeFilter] = useState('all')
-  const [currency,   setCurrency]   = useState('USD')
-  const [vPage,      setVPage]      = useState(1) // FIX 2: pagination
+// ════════════════════════════════════════════════════
+export default function AccountingPage(){
+  const [tab,setTab]=useState<'dashboard'|'accounts'|'vouchers'|'journal'|'ledger'|'trial'|'statement'|'reports'>('dashboard')
+  const [accounts,setAccounts]   = useState<any[]>([])
+  const [vouchers,setVouchers]   = useState<any[]>([])
+  const [customers,setCustomers] = useState<any[]>([])
+  const [suppliers,setSuppliers] = useState<any[]>([])
+  const [journalEntries,setJournalEntries] = useState<any[]>([])
+  const [loading,setLoading]     = useState(true)
+  const [search,setSearch]       = useState('')
+  const [typeFilter,setTypeFilter] = useState('all')
+  const [currency,setCurrency]   = useState('USD')
+  const [vPage,setVPage]         = useState(1)
 
-  // Modal states
-  const [showAccountForm, setShowAccountForm] = useState(false)
-  const [showVoucherForm, setShowVoucherForm] = useState(false)
-  const [printVoucher,    setPrintVoucher]    = useState<any>(null) // FIX 2: طباعة
-  const [editVoucher,     setEditVoucher]     = useState<any>(null) // FIX 2: تعديل
-  const [saving,          setSaving]          = useState(false)
-
-  const [accountForm, setAccountForm] = useState({
-    account_code:'',account_name:'',account_type:'asset',description:'',opening_balance:'0',
-  })
-
-  const [voucherForm, setVoucherForm] = useState({
-    voucher_type:'receipt', voucher_number:'Q-0001',
-    voucher_date:new Date().toISOString().split('T')[0],
-    account_id:'', party_type:'customer', party_id:'', party_name:'',
-    amount:'', currency:'USD', description:'', payment_method:'نقداً',
-  })
+  // دفتر الأستاذ
+  const [ledgerAccountId,setLedgerAccountId] = useState('')
 
   // كشف الحساب
-  const [stmtPartyType,  setStmtPartyType]  = useState<'customer'|'supplier'|'account'>('customer')
-  const [stmtPartyId,    setStmtPartyId]    = useState('')
-  const [stmtAccountId,  setStmtAccountId]  = useState('')
-  const [stmtFrom,       setStmtFrom]       = useState('')
-  const [stmtTo,         setStmtTo]         = useState('')
+  const [stmtType,setStmtType]   = useState<'customer'|'supplier'|'account'>('customer')
+  const [stmtPartyId,setStmtPartyId] = useState('')
+  const [stmtAccountId,setStmtAccountId] = useState('')
+  const [stmtFrom,setStmtFrom]   = useState('')
+  const [stmtTo,setStmtTo]       = useState('')
 
+  // Modals
+  const [showAccForm,setShowAccForm]   = useState(false)
+  const [showVchForm,setShowVchForm]   = useState(false)
+  const [printVch,setPrintVch]         = useState<any>(null)
+  const [editVch,setEditVch]           = useState<any>(null)
+  const [saving,setSaving]             = useState(false)
+
+  const [accForm,setAccForm] = useState({account_code:'',account_name:'',account_type:'asset',description:'',opening_balance:'0'})
+  const [vchForm,setVchForm] = useState({
+    voucher_type:'receipt',voucher_number:'Q-0001',
+    voucher_date:new Date().toISOString().split('T')[0],
+    account_id:'',party_type:'customer',party_id:'',party_name:'',
+    amount:'',currency:'USD',description:'',payment_method:'نقداً',
+  })
+
+  // ── load ──
   const loadAll = useCallback(async()=>{
     setLoading(true)
-    const {data:{user}} = await supabase.auth.getUser()
-    const [accRes,vchRes,custRes,suppRes,settRes] = await Promise.all([
+    const {data:{session}} = await supabase.auth.getSession()
+    const uid = session?.user?.id
+    const [aR,vR,cR,sR,stR,jR] = await Promise.all([
       supabase.from('accounts').select('*').order('account_code'),
       supabase.from('vouchers').select('*').order('created_at',{ascending:false}),
-      supabase.from('customers').select('id,full_name,company_name').eq('user_id',user?.id).order('full_name'),
+      supabase.from('customers').select('id,full_name,company_name').eq('created_by',uid).order('full_name'),
       supabase.from('suppliers').select('id,company_name').order('company_name'),
       supabase.from('company_settings').select('default_currency').limit(1).single(),
+      supabase.from('journal_entries').select(`*,journal_lines(id,account_id,debit,credit,accounts(account_code,account_name))`).order('entry_date',{ascending:false}),
     ])
-    setAccounts(accRes.data||[])
-    setVouchers(vchRes.data||[])
-    setCustomers(custRes.data||[])
-    setSuppliers(suppRes.data||[])
-    if (settRes.data?.default_currency) setCurrency(settRes.data.default_currency)
-    // FIX 1: رقم السند التالي حسب النوع الافتراضي (receipt)
-    const nextNum = nextReceiptNumber(vchRes.data||[])
-    setVoucherForm(prev=>({...prev,voucher_number:nextNum,currency}))
+    setAccounts(aR.data||[])
+    setVouchers(vR.data||[])
+    setCustomers(cR.data||[])
+    setSuppliers(sR.data||[])
+    setJournalEntries(jR.data||[])
+    if(stR.data?.default_currency) setCurrency(stR.data.default_currency)
+    const nextN = getNext('receipt',vR.data||[])
+    setVchForm(prev=>({...prev,voucher_number:nextN,currency}))
     setLoading(false)
   },[])
 
-  useEffect(()=>{ loadAll() },[loadAll])
+  useEffect(()=>{loadAll()},[loadAll])
 
-  async function saveCurrency(cur:string) {
+  // ── حفظ العملة ──
+  async function saveCurrency(cur:string){
     setCurrency(cur)
-    setVoucherForm(prev=>({...prev,currency:cur}))
-    const {data:existing} = await supabase.from('company_settings').select('id').limit(1).single()
-    if (existing?.id) await supabase.from('company_settings').update({default_currency:cur}).eq('id',existing.id)
+    setVchForm(p=>({...p,currency:cur}))
+    const {data:ex}=await supabase.from('company_settings').select('id').limit(1).single()
+    if(ex?.id) await supabase.from('company_settings').update({default_currency:cur}).eq('id',ex.id)
     else await supabase.from('company_settings').insert([{default_currency:cur}])
   }
 
-  async function handleSaveAccount() {
-    if (!accountForm.account_code||!accountForm.account_name) { alert('أدخل الكود والاسم'); return }
+  // ── حفظ حساب ──
+  async function handleSaveAccount(){
+    if(!accForm.account_code||!accForm.account_name){alert('أدخل الكود والاسم');return}
     setSaving(true)
-    const {data:{user}} = await supabase.auth.getUser()
-    const bal = parseFloat(accountForm.opening_balance)||0
-    const {error} = await supabase.from('accounts').insert([{...accountForm,balance:bal,opening_balance:bal,currency,user_id:user?.id}])
-    if (error) alert('خطأ: '+error.message)
-    else {
-      setShowAccountForm(false)
-      setAccountForm({account_code:'',account_name:'',account_type:'asset',description:'',opening_balance:'0'})
-      await loadAll()
-    }
+    const {data:{session}}=await supabase.auth.getSession()
+    const bal=parseFloat(accForm.opening_balance)||0
+    const {error}=await supabase.from('accounts').insert([{...accForm,balance:bal,opening_balance:bal,currency,user_id:session?.user?.id}])
+    if(error) alert('خطأ: '+error.message)
+    else{setShowAccForm(false);setAccForm({account_code:'',account_name:'',account_type:'asset',description:'',opening_balance:'0'});await loadAll()}
     setSaving(false)
   }
 
-async function handleSaveVoucher() {
-    if (!voucherForm.amount || !voucherForm.account_id) { 
-      alert('يرجى إدخال المبلغ وتحديد الحساب أولاً'); 
-      return;
-    }
-    
-    setSaving(true);
-    try {
-      // استخدام getSession بدلاً من getUser لتجنب خطأ Lock steal
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-      const amount = parseFloat(voucherForm.amount);
+  // ── حفظ سند — مرتبط بدفتر اليومية ──
+  async function handleSaveVoucher(){
+    if(!vchForm.amount||!vchForm.account_id){alert('أدخل المبلغ وحدد الحساب');return}
+    setSaving(true)
+    try{
+      const {data:{session}}=await supabase.auth.getSession()
+      const uid=session?.user?.id
+      const amount=parseFloat(vchForm.amount)
 
-      // 1. حفظ السند في جدول السندات
-      const { data: voucher, error: vError } = await supabase
-        .from('vouchers')
-        .insert([{
-          voucher_type: voucherForm.voucher_type,
-          voucher_number: voucherForm.voucher_number,
-          voucher_date: voucherForm.voucher_date,
-          account_id: voucherForm.account_id,
-          party_type: voucherForm.party_type,
-          party_id: voucherForm.party_id || null,
-          party_name: voucherForm.party_name,
-          amount,
-          currency: voucherForm.currency,
-          description: voucherForm.description,
-          payment_method: voucherForm.payment_method,
-          user_id: user?.id,
-        }])
-        .select().single();
+      // 1. حفظ السند
+      const {data:vch,error:ve}=await supabase.from('vouchers').insert([{
+        voucher_type:vchForm.voucher_type,voucher_number:vchForm.voucher_number,
+        voucher_date:vchForm.voucher_date,account_id:vchForm.account_id,
+        party_type:vchForm.party_type,party_id:vchForm.party_id||null,
+        party_name:vchForm.party_name,amount,currency:vchForm.currency,
+        description:vchForm.description,payment_method:vchForm.payment_method,user_id:uid,
+      }]).select().single()
+      if(ve) throw ve
 
-      if (vError) throw vError;
+      // 2. تحديث رصيد الحساب
+      const acc=accounts.find(a=>a.id===vchForm.account_id)
+      if(acc){
+        const newBal=vchForm.voucher_type==='receipt'?acc.balance+amount:acc.balance-amount
+        await supabase.from('accounts').update({balance:newBal}).eq('id',acc.id)
+      }
 
-      // 2. ترحيل القيد لدفتر اليومية
-      const { data: entry, error: eError } = await supabase
-        .from('journal_entries')
-        .insert([{
-          entry_date: voucherForm.voucher_date,
-          description: `سند ${voucherForm.voucher_type === 'receipt' ? 'قبض' : 'صرف'} رقم ${voucherForm.voucher_number}: ${voucherForm.party_name}`,
-          reference_type: 'voucher',
-          reference_id: voucher.id,
-          user_id: user?.id
-        }])
-        .select().single();
+      // 3. قيد يومية تلقائي
+      const {data:entry,error:ee}=await supabase.from('journal_entries').insert([{
+        entry_date:vchForm.voucher_date,
+        description:`${VOUCHER_TYPES[vchForm.voucher_type].label} ${vchForm.voucher_number} — ${vchForm.party_name||vchForm.description||''}`,
+        reference_type:'voucher',reference_id:vch.id,user_id:uid,
+      }]).select().single()
+      if(ee) throw ee
 
-      if (eError) throw eError;
+      // 4. سطور القيد — الخزينة مقابل الحساب المختار
+      const isReceipt=vchForm.voucher_type==='receipt'
+      const cashAcc=accounts.find(a=>a.account_code==='1001'||a.account_name.includes('صندوق')||a.account_name.includes('خزينة'))
+      const lines:any[]=[
+        {entry_id:entry.id,account_id:vchForm.account_id,debit:isReceipt?0:amount,credit:isReceipt?amount:0},
+      ]
+      if(cashAcc){
+        lines.push({entry_id:entry.id,account_id:cashAcc.id,debit:isReceipt?amount:0,credit:isReceipt?0:amount})
+      }
+      await supabase.from('journal_lines').insert(lines)
 
-      // 3. تجهيز أطراف القيد (فصل الحسابات)
-      const cashAccount = accounts.find(a => a.account_code === '1101' || a.account_name.includes('خزينة') || a.account_name.includes('صندوق'));
-      const cashAccountId = cashAccount?.id; 
-      const isReceipt = voucherForm.voucher_type === 'receipt';
-
-      const { error: lError } = await supabase.from('journal_lines').insert([
-        {
-          entry_id: entry.id,
-          account_id: voucherForm.account_id, // الطرف الأول (المصروف/الإيراد)
-          debit: isReceipt ? 0 : amount,
-          credit: isReceipt ? amount : 0
-        },
-        {
-          entry_id: entry.id,
-          account_id: cashAccountId,          // الطرف الثاني (الخزينة)
-          debit: isReceipt ? amount : 0,
-          credit: isReceipt ? 0 : amount
-        }
-      ]);
-
-      if (lError) throw lError;
-
-      // 4. التحديث النهائي وإغلاق النموذج
-      setShowVoucherForm(false);
-      await loadAll(); // تحديث كافة الجداول والقيود في الواجهة
-      alert('تم الحفظ والترحيل بنجاح ✅');
-
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'خطأ غير معروف';
-      console.error('Error:', errorMessage);
-      alert('حدث خطأ: ' + errorMessage);
-    } finally {
-      setSaving(false);
-    }
+      setShowVchForm(false)
+      const nextN=getNext(vchForm.voucher_type,[...vouchers,{voucher_type:vchForm.voucher_type,voucher_number:vchForm.voucher_number}])
+      setVchForm(p=>({...p,amount:'',description:'',party_id:'',party_name:'',voucher_number:nextN}))
+      await loadAll()
+    }catch(err:any){alert('خطأ: '+err.message)}
+    finally{setSaving(false)}
   }
-// أضف هذا السطر مع باقي الـ States في بداية المكون (Component)
-const [journalEntries, setJournalEntries] = useState<any[]>([]);
 
-// داخل وظيفة loadAll أو كـ وظيفة مستقلة تحتها
-const fetchJournal = async () => {
-  const { data } = await supabase
-    .from('journal_entries')
-    .select(`
-      *,
-      journal_lines (
-        id, account_id, debit, credit,
-        accounts (account_name)
-      )
-    `)
-    .order('created_at', { ascending: false });
-
-  if (data) setJournalEntries(data);
-};
-  // FIX 2: تعديل سند
-  async function handleEditVoucher() {
-    if (!editVoucher) return
+  // ── تعديل سند ──
+  async function handleEditVoucher(){
+    if(!editVch)return
     setSaving(true)
     await supabase.from('vouchers').update({
-      voucher_date:editVoucher.voucher_date,
-      party_name:editVoucher.party_name,
-      amount:parseFloat(editVoucher.amount)||editVoucher.amount,
-      description:editVoucher.description,
-      payment_method:editVoucher.payment_method,
-    }).eq('id',editVoucher.id)
-    setEditVoucher(null)
-    await loadAll()
-    setSaving(false)
+      voucher_date:editVch.voucher_date,party_name:editVch.party_name,
+      amount:parseFloat(editVch.amount)||editVch.amount,
+      description:editVch.description,payment_method:editVch.payment_method,
+    }).eq('id',editVch.id)
+    setEditVch(null);await loadAll();setSaving(false)
   }
 
+  // ── الإحصائيات ──
   const totalAssets      = accounts.filter(a=>a.account_type==='asset').reduce((s,a)=>s+(a.balance||0),0)
   const totalLiabilities = accounts.filter(a=>a.account_type==='liability').reduce((s,a)=>s+(a.balance||0),0)
   const totalIncome      = accounts.filter(a=>a.account_type==='income').reduce((s,a)=>s+(a.balance||0),0)
@@ -426,54 +314,83 @@ const fetchJournal = async () => {
   const receipts         = vouchers.filter(v=>v.voucher_type==='receipt').reduce((s,v)=>s+(v.amount||0),0)
   const payments         = vouchers.filter(v=>v.voucher_type==='payment').reduce((s,v)=>s+(v.amount||0),0)
   const profitColor      = netProfit>0?S.green:netProfit<0?S.red:S.amber
+  const sym              = CURRENCY_SYMBOLS[currency]||currency
 
-  const filteredAccounts = accounts
-    .filter(a=>typeFilter==='all'||a.account_type===typeFilter)
-    .filter(a=>a.account_name?.includes(search)||a.account_code?.includes(search))
+  // ── دفتر الأستاذ ──
+  // نحسب مدين/دائن لكل حساب من journal_lines
+  function getLedgerLines(accountId:string){
+    const lines:any[]=[]
+    journalEntries.forEach(entry=>{
+      (entry.journal_lines||[]).forEach((line:any)=>{
+        if(line.account_id===accountId){
+          lines.push({date:entry.entry_date,desc:entry.description,debit:line.debit,credit:line.credit,voucherRef:entry.reference_id})
+        }
+      })
+    })
+    return lines.sort((a,b)=>a.date.localeCompare(b.date))
+  }
 
-  const sym = CURRENCY_SYMBOLS[currency]||currency
+  // ── ميزان المراجعة (من journal_lines) ──
+  const trialBalance = accounts.map(acc=>{
+    let totalDebit=0,totalCredit=0
+    journalEntries.forEach(entry=>{
+      (entry.journal_lines||[]).forEach((line:any)=>{
+        if(line.account_id===acc.id){totalDebit+=(line.debit||0);totalCredit+=(line.credit||0)}
+      })
+    })
+    const netDebit  = totalDebit > totalCredit ? totalDebit-totalCredit : 0
+    const netCredit = totalCredit > totalDebit ? totalCredit-totalDebit : 0
+    return {...acc,totalDebit,totalCredit,netDebit,netCredit}
+  }).filter(a=>a.totalDebit>0||a.totalCredit>0)
 
-  // FIX 2: pagination السندات
-  const PAGE_SIZE = 20
-  const totalPages = Math.ceil(vouchers.length/PAGE_SIZE)
-  const pagedVouchers = vouchers.slice((vPage-1)*PAGE_SIZE, vPage*PAGE_SIZE)
+  const trialTotalDebit  = trialBalance.reduce((s,a)=>s+a.netDebit,0)
+  const trialTotalCredit = trialBalance.reduce((s,a)=>s+a.netCredit,0)
 
-  // كشف الحساب
+  // ── كشف الحساب ──
   const stmtVouchers = vouchers.filter(v=>{
-    if (stmtPartyType==='account' && stmtAccountId) return v.account_id===stmtAccountId
-    if (stmtPartyType==='customer' && stmtPartyId) return v.party_id===stmtPartyId && v.party_type==='customer'
-    if (stmtPartyType==='supplier' && stmtPartyId) return v.party_id===stmtPartyId && v.party_type==='supplier'
+    if(stmtType==='account'&&stmtAccountId) return v.account_id===stmtAccountId
+    if(stmtType==='customer'&&stmtPartyId) return v.party_id===stmtPartyId&&v.party_type==='customer'
+    if(stmtType==='supplier'&&stmtPartyId) return v.party_id===stmtPartyId&&v.party_type==='supplier'
     return false
   }).filter(v=>{
-    if (stmtFrom && v.voucher_date < stmtFrom) return false
-    if (stmtTo   && v.voucher_date > stmtTo)   return false
+    if(stmtFrom&&v.voucher_date<stmtFrom)return false
+    if(stmtTo&&v.voucher_date>stmtTo)return false
     return true
   })
-  const stmtTotal = stmtVouchers.reduce((s,v)=>s+(v.voucher_type==='receipt'?v.amount||0:-(v.amount||0)),0)
+  const stmtTotal=stmtVouchers.reduce((s,v)=>s+(v.voucher_type==='receipt'?v.amount||0:-(v.amount||0)),0)
 
-const TABS = [
-    {key:'dashboard', label:'📊 لوحة المالية'},
-    {key:'accounts',  label:'📁 دليل الحسابات'},
-    {key:'vouchers',  label:'📋 السندات'},
-    {key:'journal',   label:'📒 دفتر اليومية'}, // التبويب الجديد
-    {key:'statement', label:'📊 كشف الحساب'},
-    {key:'reports',   label:'📈 التقارير'},
+  // pagination
+  const PAGE=20,totalPages=Math.ceil(vouchers.length/PAGE)
+  const pagedV=vouchers.slice((vPage-1)*PAGE,vPage*PAGE)
+  const filteredAcc=accounts.filter(a=>typeFilter==='all'||a.account_type===typeFilter).filter(a=>a.account_name?.includes(search)||a.account_code?.includes(search))
+
+  // ledger account details
+  const ledgerAccount = accounts.find(a=>a.id===ledgerAccountId)
+  const ledgerLines   = ledgerAccountId ? getLedgerLines(ledgerAccountId) : []
+  let ledgerRunning   = ledgerAccount?.opening_balance||0
+
+  const TABS=[
+    {key:'dashboard',label:'📊 لوحة المالية'},
+    {key:'accounts', label:'📁 دليل الحسابات'},
+    {key:'vouchers', label:'📋 السندات'},
+    {key:'journal',  label:'📒 دفتر اليومية'},
+    {key:'ledger',   label:'📗 دفتر الأستاذ'},
+    {key:'trial',    label:'⚖️ ميزان المراجعة'},
+    {key:'statement',label:'📊 كشف الحساب'},
+    {key:'reports',  label:'📈 التقارير'},
   ]
-  return (
+
+  return(
     <div style={{display:'flex',flexDirection:'column',height:'100%',color:S.white,fontFamily:'Tajawal, sans-serif',direction:'rtl',background:S.navy}}>
 
-      {/* شريط الأدوات */}
+      {/* ── شريط الأدوات ── */}
       <div style={{background:S.navy2,borderBottom:`1px solid ${S.borderG}`,padding:'12px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <div style={{display:'flex',gap:8}}>
-          <button onClick={()=>{
-            const nextNum = getNextVoucherNumber(voucherForm.voucher_type, vouchers)
-            setVoucherForm(prev=>({...prev,voucher_number:nextNum,currency}))
-            setShowVoucherForm(true)
-          }}
+          <button onClick={()=>{setVchForm(p=>({...p,voucher_number:getNext(p.voucher_type,vouchers),currency}));setShowVchForm(true)}}
             style={{background:S.gold,color:S.navy,border:'none',padding:'9px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
             + إضافة سند
           </button>
-          <button onClick={()=>setShowAccountForm(true)}
+          <button onClick={()=>setShowAccForm(true)}
             style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:'9px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
             + إضافة حساب
           </button>
@@ -481,30 +398,28 @@ const TABS = [
         <CurrencyBar currency={currency} setCurrency={saveCurrency}/>
       </div>
 
-      {/* التبويبات */}
-      <div style={{display:'flex',gap:2,background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'0 24px',flexShrink:0}}>
+      {/* ── التبويبات ── */}
+      <div style={{display:'flex',background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'0 24px',flexShrink:0,overflowX:'auto'}}>
         {TABS.map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key as any)}
-            style={{padding:'12px 20px',fontSize:'12px',fontWeight:600,cursor:'pointer',fontFamily:'Tajawal, sans-serif',border:'none',borderBottom:tab===t.key?`2px solid ${S.gold}`:'2px solid transparent',background:'transparent',color:tab===t.key?S.gold2:S.muted,transition:'all .15s',textAlign:'right'}}>
+            style={{padding:'11px 16px',fontSize:'11px',fontWeight:600,cursor:'pointer',fontFamily:'Tajawal, sans-serif',border:'none',borderBottom:tab===t.key?`2px solid ${S.gold}`:'2px solid transparent',background:'transparent',color:tab===t.key?S.gold2:S.muted,transition:'all .15s',whiteSpace:'nowrap'}}>
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* المحتوى */}
+      {/* ── المحتوى ── */}
       <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
 
         {/* ══ لوحة المالية ══ */}
         {tab==='dashboard'&&(
           <div style={{display:'flex',flexDirection:'column',gap:16}}>
-
-            {/* الإحصائيات */}
             <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
               {[
-                {label:'إجمالي الأصول',   val:fmt(totalAssets,sym),     color:S.green, sub:'إجمالي الموجودات'},
-                {label:'إجمالي الخصوم',   val:fmt(totalLiabilities,sym), color:S.red,   sub:'الالتزامات المستحقة'},
-                {label:'إجمالي الإيرادات',val:fmt(totalIncome,sym),      color:S.blue,  sub:'المبيعات والخدمات'},
-                {label:'إجمالي المصروفات',val:fmt(totalExpenses,sym),    color:S.amber, sub:'التكاليف والنفقات'},
+                {label:'إجمالي الأصول',   val:fmt(totalAssets,sym),     color:S.green,sub:'الموجودات'},
+                {label:'إجمالي الخصوم',   val:fmt(totalLiabilities,sym),color:S.red,  sub:'الالتزامات'},
+                {label:'إجمالي الإيرادات',val:fmt(totalIncome,sym),     color:S.blue, sub:'المبيعات'},
+                {label:'إجمالي المصروفات',val:fmt(totalExpenses,sym),   color:S.amber,sub:'التكاليف'},
               ].map((s,i)=>(
                 <div key={i} style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:18,textAlign:'right'}}>
                   <div style={{fontSize:9,color:S.muted,marginBottom:4,fontWeight:600}}>{s.sub}</div>
@@ -514,98 +429,68 @@ const TABS = [
               ))}
             </div>
 
-            {/* صافي الربح + التدفق + المعادلة */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+              {/* صافي الربح */}
               <div style={{background:S.navy2,border:`2px solid ${profitColor}`,borderRadius:14,padding:20,boxShadow:`0 0 24px ${profitColor}22`}}>
                 <div style={{fontSize:12,fontWeight:700,color:S.muted,marginBottom:12,textAlign:'right'}}>📊 صافي الربح / الخسارة</div>
-                <div style={{fontSize:28,fontWeight:900,color:profitColor,lineHeight:1,marginBottom:8,textAlign:'right'}}>
-                  {netProfit>=0?'+':''}{fmt(netProfit,sym)}
-                </div>
-                <div style={{fontSize:11,color:profitColor,fontWeight:700,marginBottom:12,textAlign:'right'}}>
-                  {netProfit>0?'📈 ربح':netProfit<0?'📉 خسارة':'⚖️ تعادل'}
-                </div>
+                <div style={{fontSize:28,fontWeight:900,color:profitColor,lineHeight:1,marginBottom:8,textAlign:'right',fontFamily:'monospace'}}>{netProfit>=0?'+':''}{fmt(netProfit,sym)}</div>
+                <div style={{fontSize:11,color:profitColor,fontWeight:700,marginBottom:12,textAlign:'right'}}>{netProfit>0?'📈 ربح':netProfit<0?'📉 خسارة':'⚖️ تعادل'}</div>
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                  <div style={{display:'flex',justifyContent:'space-between'}}>
-                    <span style={{fontSize:12,fontWeight:700,color:S.green}}>{fmt(totalIncome,sym)}</span>
-                    <span style={{fontSize:11,color:S.muted}}>الإيرادات</span>
-                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:12,fontWeight:700,color:S.green}}>{fmt(totalIncome,sym)}</span><span style={{fontSize:11,color:S.muted}}>الإيرادات</span></div>
                   <div style={{height:1,background:S.border}}/>
-                  <div style={{display:'flex',justifyContent:'space-between'}}>
-                    <span style={{fontSize:12,fontWeight:700,color:S.red}}>{fmt(totalExpenses,sym)}</span>
-                    <span style={{fontSize:11,color:S.muted}}>المصروفات</span>
-                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:12,fontWeight:700,color:S.red}}>{fmt(totalExpenses,sym)}</span><span style={{fontSize:11,color:S.muted}}>المصروفات</span></div>
                 </div>
               </div>
-
+              {/* التدفق النقدي */}
               <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:20}}>
                 <div style={{fontSize:12,fontWeight:700,color:S.muted,marginBottom:12,textAlign:'right'}}>💵 التدفق النقدي</div>
                 <div style={{display:'flex',flexDirection:'column',gap:10}}>
                   <div style={{background:'rgba(34,197,94,0.08)',borderRadius:10,padding:'12px 14px',textAlign:'right'}}>
                     <div style={{fontSize:10,color:S.muted,marginBottom:3}}>📥 سندات القبض</div>
-                    <div style={{fontSize:18,fontWeight:800,color:S.green}}>{fmt(receipts,sym)}</div>
+                    <div style={{fontSize:18,fontWeight:800,color:S.green,fontFamily:'monospace'}}>{fmt(receipts,sym)}</div>
                     <div style={{fontSize:10,color:S.muted}}>{vouchers.filter(v=>v.voucher_type==='receipt').length} سند</div>
                   </div>
                   <div style={{background:'rgba(239,68,68,0.08)',borderRadius:10,padding:'12px 14px',textAlign:'right'}}>
                     <div style={{fontSize:10,color:S.muted,marginBottom:3}}>📤 سندات الصرف</div>
-                    <div style={{fontSize:18,fontWeight:800,color:S.red}}>{fmt(payments,sym)}</div>
+                    <div style={{fontSize:18,fontWeight:800,color:S.red,fontFamily:'monospace'}}>{fmt(payments,sym)}</div>
                     <div style={{fontSize:10,color:S.muted}}>{vouchers.filter(v=>v.voucher_type==='payment').length} سند</div>
                   </div>
                 </div>
               </div>
-
+              {/* المعادلة المحاسبية */}
               <div style={{background:S.navy2,border:`1px solid ${S.borderG}`,borderRadius:14,padding:20}}>
                 <div style={{fontSize:12,fontWeight:700,color:S.muted,marginBottom:12,textAlign:'right'}}>⚖️ المعادلة المحاسبية</div>
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                  <div style={{textAlign:'right',padding:'8px 0'}}>
-                    <div style={{fontSize:11,color:S.muted,marginBottom:4}}>الأصول</div>
-                    <div style={{fontSize:18,fontWeight:800,color:S.green}}>{fmt(totalAssets,sym)}</div>
-                  </div>
+                  <div style={{textAlign:'right',padding:'8px 0'}}><div style={{fontSize:11,color:S.muted,marginBottom:4}}>الأصول</div><div style={{fontSize:18,fontWeight:800,color:S.green,fontFamily:'monospace'}}>{fmt(totalAssets,sym)}</div></div>
                   <div style={{textAlign:'center',color:S.gold,fontWeight:700,fontSize:16}}>=</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <div style={{textAlign:'center',background:S.card,borderRadius:8,padding:8}}>
-                      <div style={{fontSize:10,color:S.muted}}>الخصوم</div>
-                      <div style={{fontSize:13,fontWeight:700,color:S.red}}>{fmt(totalLiabilities,sym)}</div>
-                    </div>
-                    <div style={{textAlign:'center',background:S.card,borderRadius:8,padding:8}}>
-                      <div style={{fontSize:10,color:S.muted}}>حقوق الملكية</div>
-                      <div style={{fontSize:13,fontWeight:700,color:S.amber}}>{fmt(Math.max(0,totalAssets-totalLiabilities),sym)}</div>
-                    </div>
+                    <div style={{textAlign:'center',background:S.card,borderRadius:8,padding:8}}><div style={{fontSize:10,color:S.muted}}>الخصوم</div><div style={{fontSize:13,fontWeight:700,color:S.red,fontFamily:'monospace'}}>{fmt(totalLiabilities,sym)}</div></div>
+                    <div style={{textAlign:'center',background:S.card,borderRadius:8,padding:8}}><div style={{fontSize:10,color:S.muted}}>حقوق الملكية</div><div style={{fontSize:13,fontWeight:700,color:S.amber,fontFamily:'monospace'}}>{fmt(Math.max(0,totalAssets-totalLiabilities),sym)}</div></div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* FIX 2: آخر السندات مع معاينة وتعديل */}
+            {/* آخر السندات */}
             <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:20}}>
               <div style={{fontSize:13,fontWeight:800,color:S.white,marginBottom:14,textAlign:'right'}}>🕐 آخر السندات المسجلة</div>
-              {vouchers.length===0?(
-                <div style={{textAlign:'center',color:S.muted,padding:'30px 0',fontSize:13}}>لا توجد سندات بعد</div>
-              ):vouchers.slice(0,6).map((v,i)=>{
-                const vt = VOUCHER_TYPES[v.voucher_type]||VOUCHER_TYPES.journal
-                const vSym = CURRENCY_SYMBOLS[v.currency]||sym
-                return (
+              {vouchers.length===0?<div style={{textAlign:'center',color:S.muted,padding:'30px 0'}}>لا توجد سندات بعد</div>:vouchers.slice(0,6).map((v,i)=>{
+                const vt=VOUCHER_TYPES[v.voucher_type]||VOUCHER_TYPES.journal
+                const vSym=CURRENCY_SYMBOLS[v.currency]||sym
+                return(
                   <div key={v.id||i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',borderBottom:i<5?`1px solid ${S.border}`:'none'}}>
-                    {/* يمين: أزرار */}
                     <div style={{display:'flex',gap:6}}>
-                      <button onClick={()=>setPrintVoucher(v)}
-                        style={{background:S.card2,border:`1px solid ${S.border}`,color:S.muted,padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-                        🖨️ طباعة
-                      </button>
-                      <button onClick={()=>setEditVoucher({...v,amount:String(v.amount)})}
-                        style={{background:S.gold3,border:`1px solid ${S.borderG}`,color:S.gold2,padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-                        ✏️ تعديل
-                      </button>
+                      <button onClick={()=>setPrintVch(v)} style={{background:S.card2,border:`1px solid ${S.border}`,color:S.muted,padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️</button>
+                      <button onClick={()=>setEditVch({...v,amount:String(v.amount)})} style={{background:S.gold3,border:`1px solid ${S.borderG}`,color:S.gold2,padding:'4px 10px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>✏️</button>
                     </div>
-                    {/* وسط */}
                     <div style={{textAlign:'right',flex:1,margin:'0 12px'}}>
                       <div style={{fontSize:13,fontWeight:700}}>{v.description||v.party_name||'—'}</div>
                       <div style={{fontSize:9,color:S.muted,marginTop:2,display:'flex',gap:8,justifyContent:'flex-end',alignItems:'center'}}>
                         <span>{v.voucher_date?new Date(v.voucher_date).toLocaleDateString('ar-EG'):''}</span>
-                        <span style={{fontSize:9,padding:'1px 6px',borderRadius:20,background:`${vt.color}18`,color:vt.color,fontWeight:700}}>{vt.icon} {vt.label}</span>
+                        <span style={{padding:'1px 6px',borderRadius:20,background:`${vt.color}18`,color:vt.color,fontWeight:700}}>{vt.icon} {vt.label}</span>
                         <span style={{fontFamily:'monospace'}}>{v.voucher_number}</span>
                       </div>
                     </div>
-                    {/* يسار: المبلغ */}
                     <div style={{fontSize:15,fontWeight:800,color:v.voucher_type==='receipt'?S.green:S.red,fontFamily:'monospace',flexShrink:0}}>
                       {v.voucher_type==='receipt'?'+':'-'}{fmt(v.amount||0,vSym)}
                     </div>
@@ -620,12 +505,11 @@ const TABS = [
         {tab==='accounts'&&(
           <div style={{display:'flex',flexDirection:'column',gap:14}}>
             <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-              <input type="text" placeholder="🔍 ابحث بالاسم أو الكود..." value={search}
-                onChange={e=>setSearch(e.target.value)} style={{...inp,flex:1,minWidth:200,background:S.navy2}}/>
+              <input type="text" placeholder="🔍 ابحث..." value={search} onChange={e=>setSearch(e.target.value)} style={{...inp,flex:1,minWidth:200,background:S.navy2}}/>
               <div style={{display:'flex',background:S.navy2,border:`1px solid ${S.border}`,borderRadius:10,overflow:'hidden'}}>
                 {[{key:'all',label:'الكل'},...Object.entries(ACCOUNT_TYPES).map(([k,v])=>({key:k,label:v.icon+' '+v.label}))].map(t=>(
                   <button key={t.key} onClick={()=>setTypeFilter(t.key)}
-                    style={{padding:'8px 12px',fontSize:'11px',fontWeight:600,cursor:'pointer',fontFamily:'Tajawal, sans-serif',border:'none',background:typeFilter===t.key?S.gold:'transparent',color:typeFilter===t.key?S.navy:S.muted,transition:'all .15s',whiteSpace:'nowrap'}}>
+                    style={{padding:'8px 12px',fontSize:'11px',fontWeight:600,cursor:'pointer',fontFamily:'Tajawal, sans-serif',border:'none',background:typeFilter===t.key?S.gold:'transparent',color:typeFilter===t.key?S.navy:S.muted,whiteSpace:'nowrap'}}>
                     {t.label}
                   </button>
                 ))}
@@ -635,11 +519,11 @@ const TABS = [
               {Object.entries(ACCOUNT_TYPES).map(([key,t])=>{
                 const accs=accounts.filter(a=>a.account_type===key)
                 const total=accs.reduce((s,a)=>s+(a.balance||0),0)
-                return (
+                return(
                   <div key={key} onClick={()=>setTypeFilter(key)}
                     style={{background:typeFilter===key?`${t.color}15`:S.navy2,border:`1px solid ${typeFilter===key?t.color:S.border}`,borderRadius:12,padding:14,cursor:'pointer',textAlign:'right',transition:'all .2s'}}>
                     <div style={{fontSize:18,marginBottom:6}}>{t.icon}</div>
-                    <div style={{fontSize:14,fontWeight:800,color:t.color}}>{fmt(total,sym)}</div>
+                    <div style={{fontSize:14,fontWeight:800,color:t.color,fontFamily:'monospace'}}>{fmt(total,sym)}</div>
                     <div style={{fontSize:10,color:S.muted,marginTop:2}}>{t.label} ({accs.length})</div>
                   </div>
                 )
@@ -647,31 +531,25 @@ const TABS = [
             </div>
             <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead>
-                  <tr style={{background:'rgba(255,255,255,0.05)',borderBottom:`1px solid ${S.border}`}}>
-                    {['الكود','اسم الحساب','النوع','الرصيد الحالي','الوصف'].map(h=>(
-                      <th key={h} style={{padding:'12px 14px',textAlign:'right',fontSize:'10px',color:S.muted,fontWeight:700}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
+                <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>{['الكود','اسم الحساب','النوع','الرصيد الحالي','الوصف','الأستاذ'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {loading?(
-                    <tr><td colSpan={5} style={{padding:'40px',textAlign:'center',color:S.muted}}>جاري التحميل...</td></tr>
-                  ):filteredAccounts.length===0?(
-                    <tr><td colSpan={5} style={{padding:'40px',textAlign:'center',color:S.muted}}>لا توجد حسابات</td></tr>
-                  ):filteredAccounts.map((a,i)=>{
+                  {loading?<tr><td colSpan={6} style={{padding:'40px',textAlign:'center',color:S.muted}}>جاري التحميل...</td></tr>
+                  :filteredAcc.length===0?<tr><td colSpan={6} style={{padding:'40px',textAlign:'center',color:S.muted}}>لا توجد حسابات</td></tr>
+                  :filteredAcc.map((a,i)=>{
                     const t=ACCOUNT_TYPES[a.account_type]||ACCOUNT_TYPES.asset
                     const aSym=CURRENCY_SYMBOLS[a.currency]||sym
-                    return (
-                      <tr key={a.id} style={{borderTop:`1px solid rgba(255,255,255,0.05)`,background:i%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                        <td style={{padding:'12px 14px',color:S.gold,fontWeight:700,fontSize:13,fontFamily:'monospace',textAlign:'right'}}>{a.account_code}</td>
-                        <td style={{padding:'12px 14px',fontSize:13,fontWeight:600,textAlign:'right'}}>{t.icon} {a.account_name}</td>
-                        <td style={{padding:'12px 14px',textAlign:'right'}}>
-                          <span style={{fontSize:10,padding:'3px 10px',borderRadius:20,background:t.bg,color:t.color,fontWeight:700}}>{t.label}</span>
-                        </td>
-                        <td style={{padding:'12px 14px',fontSize:14,fontWeight:800,color:a.balance>=0?S.green:S.red,fontFamily:'monospace',textAlign:'right'}}>{fmt(a.balance||0,aSym)}</td>
-                        <td style={{padding:'12px 14px',fontSize:11,color:S.muted,maxWidth:180,textAlign:'right'}}>
-                          <div style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.description||'—'}</div>
+                    return(
+                      <tr key={a.id} style={{borderTop:`1px solid rgba(255,255,255,0.04)`,background:i%2===0?'transparent':S.card}}>
+                        <td style={{...td_s,color:S.gold,fontWeight:700,fontFamily:'monospace'}}>{a.account_code}</td>
+                        <td style={{...td_s,fontWeight:600}}>{t.icon} {a.account_name}</td>
+                        <td style={td_s}><span style={{fontSize:10,padding:'3px 10px',borderRadius:20,background:t.bg,color:t.color,fontWeight:700}}>{t.label}</span></td>
+                        <td style={{...td_s,fontSize:14,fontWeight:800,color:a.balance>=0?S.green:S.red,fontFamily:'monospace'}}>{fmt(a.balance||0,aSym)}</td>
+                        <td style={{...td_s,color:S.muted,maxWidth:160}}><div style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{a.description||'—'}</div></td>
+                        <td style={td_s}>
+                          <button onClick={()=>{setLedgerAccountId(a.id);setTab('ledger')}}
+                            style={{background:S.blueB||S.card2,border:`1px solid ${S.blue}30`,color:S.blue,padding:'3px 10px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+                            📗 الأستاذ
+                          </button>
                         </td>
                       </tr>
                     )
@@ -689,114 +567,85 @@ const TABS = [
               {Object.entries(VOUCHER_TYPES).map(([key,t])=>{
                 const vList=vouchers.filter(v=>v.voucher_type===key)
                 const total=vList.reduce((s,v)=>s+(v.amount||0),0)
-                return (
+                return(
                   <div key={key} style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:18,textAlign:'right'}}>
                     <div style={{fontSize:22,marginBottom:8}}>{t.icon}</div>
-                    <div style={{fontSize:20,fontWeight:900,color:t.color,marginBottom:4}}>{fmt(total,sym)}</div>
+                    <div style={{fontSize:20,fontWeight:900,color:t.color,marginBottom:4,fontFamily:'monospace'}}>{fmt(total,sym)}</div>
                     <div style={{fontSize:11,color:S.muted}}>{t.label} — {vList.length} سند</div>
                   </div>
                 )
               })}
             </div>
-
             <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
-                <thead>
-                  <tr style={{background:'rgba(255,255,255,0.05)',borderBottom:`1px solid ${S.border}`}}>
-                    {['رقم السند','النوع','التاريخ','الطرف الآخر','المبلغ','العملة','طريقة الدفع','إجراءات'].map(h=>(
-                      <th key={h} style={{padding:'12px 14px',textAlign:'right',fontSize:'10px',color:S.muted,fontWeight:700}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
+                <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>{['رقم السند','النوع','التاريخ','الطرف الآخر','المبلغ','العملة','طريقة الدفع','إجراءات'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {pagedVouchers.length===0?(
-                    <tr><td colSpan={8} style={{padding:'40px',textAlign:'center',color:S.muted}}>لا توجد سندات بعد</td></tr>
-                  ):pagedVouchers.map((v,i)=>{
+                  {pagedV.length===0?<tr><td colSpan={8} style={{padding:'40px',textAlign:'center',color:S.muted}}>لا توجد سندات بعد</td></tr>
+                  :pagedV.map((v,i)=>{
                     const vt=VOUCHER_TYPES[v.voucher_type]||VOUCHER_TYPES.journal
                     const vSym=CURRENCY_SYMBOLS[v.currency]||sym
-                    return (
-                      <tr key={v.id} style={{borderTop:`1px solid rgba(255,255,255,0.05)`,background:i%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                        <td style={{padding:'12px 14px',color:S.gold,fontWeight:700,fontSize:12,fontFamily:'monospace',textAlign:'right'}}>{v.voucher_number}</td>
-                        <td style={{padding:'12px 14px',textAlign:'right'}}>
-                          <span style={{fontSize:10,padding:'3px 10px',borderRadius:20,background:`${vt.color}18`,color:vt.color,fontWeight:700}}>{vt.icon} {vt.label}</span>
-                        </td>
-                        <td style={{padding:'12px 14px',fontSize:12,color:S.muted,textAlign:'right'}}>{v.voucher_date?new Date(v.voucher_date).toLocaleDateString('ar-EG'):'—'}</td>
-                        <td style={{padding:'12px 14px',fontSize:13,textAlign:'right'}}>{v.party_name||'—'}</td>
-                        <td style={{padding:'12px 14px',fontSize:14,fontWeight:800,color:v.voucher_type==='receipt'?S.green:S.red,fontFamily:'monospace',textAlign:'right'}}>
-                          {v.voucher_type==='receipt'?'+':'-'}{fmt(v.amount||0,vSym)}
-                        </td>
-                        <td style={{padding:'12px 14px',fontSize:11,textAlign:'right'}}>
-                          <span style={{padding:'2px 8px',borderRadius:6,background:S.card2,color:S.gold,fontSize:10,fontWeight:700}}>{v.currency||currency}</span>
-                        </td>
-                        <td style={{padding:'12px 14px',fontSize:11,color:S.muted,textAlign:'right'}}>{v.payment_method||'—'}</td>
-                        {/* FIX 2: أزرار طباعة وتعديل */}
-                        <td style={{padding:'12px 14px',textAlign:'right'}}>
-                          <div style={{display:'flex',gap:5,justifyContent:'flex-end'}}>
-                            <button onClick={()=>setPrintVoucher(v)}
-                              style={{background:S.card2,border:`1px solid ${S.border}`,color:S.muted,padding:'4px 8px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️</button>
-                            <button onClick={()=>setEditVoucher({...v,amount:String(v.amount)})}
-                              style={{background:S.gold3,border:`1px solid ${S.borderG}`,color:S.gold2,padding:'4px 8px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>✏️</button>
-                          </div>
-                        </td>
+                    return(
+                      <tr key={v.id} style={{borderTop:`1px solid rgba(255,255,255,0.04)`,background:i%2===0?'transparent':S.card}}>
+                        <td style={{...td_s,color:S.gold,fontWeight:700,fontFamily:'monospace'}}>{v.voucher_number}</td>
+                        <td style={td_s}><span style={{fontSize:10,padding:'3px 10px',borderRadius:20,background:`${vt.color}18`,color:vt.color,fontWeight:700}}>{vt.icon} {vt.label}</span></td>
+                        <td style={{...td_s,color:S.muted}}>{v.voucher_date?new Date(v.voucher_date).toLocaleDateString('ar-EG'):'—'}</td>
+                        <td style={td_s}>{v.party_name||'—'}</td>
+                        <td style={{...td_s,fontSize:14,fontWeight:800,color:v.voucher_type==='receipt'?S.green:S.red,fontFamily:'monospace'}}>{v.voucher_type==='receipt'?'+':'-'}{fmt(v.amount||0,vSym)}</td>
+                        <td style={td_s}><span style={{padding:'2px 8px',borderRadius:6,background:S.card2,color:S.gold,fontSize:10,fontWeight:700}}>{v.currency||currency}</span></td>
+                        <td style={{...td_s,color:S.muted}}>{v.payment_method||'—'}</td>
+                        <td style={td_s}><div style={{display:'flex',gap:5,justifyContent:'flex-end'}}>
+                          <button onClick={()=>setPrintVch(v)} style={{background:S.card2,border:`1px solid ${S.border}`,color:S.muted,padding:'4px 8px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️</button>
+                          <button onClick={()=>setEditVch({...v,amount:String(v.amount)})} style={{background:S.gold3,border:`1px solid ${S.borderG}`,color:S.gold2,padding:'4px 8px',borderRadius:6,fontSize:10,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>✏️</button>
+                        </div></td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-
-            {/* FIX 2: Pagination */}
             {totalPages>1&&(
               <div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8}}>
-                <button onClick={()=>setVPage(p=>Math.max(1,p-1))} disabled={vPage===1}
-                  style={{background:S.card2,border:`1px solid ${S.border}`,color:vPage===1?S.muted:S.white,padding:'6px 14px',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-                  ← السابقة
-                </button>
+                <button onClick={()=>setVPage(p=>Math.max(1,p-1))} disabled={vPage===1} style={{background:S.card2,border:`1px solid ${S.border}`,color:vPage===1?S.muted:S.white,padding:'6px 14px',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>← السابقة</button>
                 <span style={{fontSize:12,color:S.muted}}>صفحة {vPage} من {totalPages}</span>
-                <button onClick={()=>setVPage(p=>Math.min(totalPages,p+1))} disabled={vPage===totalPages}
-                  style={{background:S.card2,border:`1px solid ${S.border}`,color:vPage===totalPages?S.muted:S.white,padding:'6px 14px',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-                  التالية →
-                </button>
+                <button onClick={()=>setVPage(p=>Math.min(totalPages,p+1))} disabled={vPage===totalPages} style={{background:S.card2,border:`1px solid ${S.border}`,color:vPage===totalPages?S.muted:S.white,padding:'6px 14px',borderRadius:7,fontSize:12,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>التالية →</button>
               </div>
             )}
           </div>
         )}
 
-{(tab as string) === 'journal' && (
-          <div style={{ animation: 'fadeIn 0.3s ease-out', paddingBottom: 40 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, background: S.navy2, padding: '15px 20px', borderRadius: 12, border: `1px solid ${S.border}` }}>
-              <div>
-                <h3 style={{ color: S.gold, margin: 0, fontSize: 18 }}>📒 دفتر اليومية العام</h3>
-                <p style={{ color: S.muted, fontSize: 12, margin: '4px 0 0' }}>سجل كافة القيود المحاسبية والعمليات المالية</p>
+        {/* ══ دفتر اليومية ══ */}
+        {tab==='journal'&&(
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:18,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <button onClick={loadAll} style={{background:S.gold3,color:S.gold2,border:`1px solid ${S.borderG}`,padding:'8px 16px',borderRadius:8,cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'Tajawal, sans-serif'}}>🔄 تحديث</button>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:14,fontWeight:800,color:S.white}}>📒 دفتر اليومية العام</div>
+                <div style={{fontSize:11,color:S.muted,marginTop:2}}>سجل كافة القيود المحاسبية — {journalEntries.length} قيد</div>
               </div>
-              <button onClick={fetchJournal} style={{ background: S.gold3, color: S.gold, border: `1px solid ${S.gold}`, padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 'bold' }}>تحديث البيانات 🔄</button>
             </div>
-            <div style={{ background: S.navy2, borderRadius: 12, border: `1px solid ${S.border}`, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'right' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: `1px solid ${S.border}` }}>
-                    <th style={{ padding: 15, color: S.gold }}>التاريخ والبيان</th>
-                    <th style={{ padding: 15, color: S.gold }}>الحساب</th>
-                    <th style={{ padding: 15, color: S.gold, textAlign: 'center' }}>مدين (+)</th>
-                    <th style={{ padding: 15, color: S.gold, textAlign: 'center' }}>دائن (-)</th>
-                  </tr>
-                </thead>
+            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>
+                  {['التاريخ والبيان','الحساب','مدين','دائن'].map(h=><th key={h} style={th}>{h}</th>)}
+                </tr></thead>
                 <tbody>
-                  {journalEntries.length === 0 ? (
-                    <tr><td colSpan={4} style={{ padding: 40, textAlign: 'center', color: S.muted }}>لا توجد قيود مسجلة حالياً</td></tr>
-                  ) : journalEntries.map((entry) => (
+                  {journalEntries.length===0?<tr><td colSpan={4} style={{padding:'40px',textAlign:'center',color:S.muted}}>لا توجد قيود مسجلة</td></tr>
+                  :journalEntries.map(entry=>(
                     <Fragment key={entry.id}>
-                      <tr style={{ background: 'rgba(201,168,76,0.05)' }}>
-                        <td colSpan={4} style={{ padding: '12px 15px', borderBottom: `1px solid ${S.borderG}`, fontWeight: 'bold', color: S.white }}>
-                          {entry.entry_date} — {entry.description}
+                      <tr style={{background:'rgba(201,168,76,0.05)',borderBottom:`1px solid ${S.borderG}`}}>
+                        <td colSpan={4} style={{padding:'11px 14px',textAlign:'right',fontWeight:700,color:S.gold2,fontSize:12}}>
+                          {entry.entry_date&&new Date(entry.entry_date).toLocaleDateString('ar-EG')} — {entry.description}
                         </td>
                       </tr>
-                      {entry.journal_lines?.map((line: any) => (
-                        <tr key={line.id} style={{ borderBottom: `1px solid ${S.border}` }}>
-                          <td style={{ padding: 10 }}></td>
-                          <td style={{ padding: 10, color: S.white }}>{line.accounts?.account_name}</td>
-                          <td style={{ padding: 10, textAlign: 'center', color: S.green }}>{line.debit > 0 ? line.debit.toLocaleString() : '-'}</td>
-                          <td style={{ padding: 10, textAlign: 'center', color: S.red }}>{line.credit > 0 ? line.credit.toLocaleString() : '-'}</td>
+                      {(entry.journal_lines||[]).map((line:any,li:number)=>(
+                        <tr key={line.id} style={{borderBottom:`1px solid ${S.border}`,background:li%2===0?'transparent':S.card}}>
+                          <td style={td_s}></td>
+                          <td style={{...td_s,fontWeight:600}}>
+                            <span style={{fontSize:10,color:S.gold,fontFamily:'monospace',marginLeft:8}}>{line.accounts?.account_code}</span>
+                            {line.accounts?.account_name}
+                          </td>
+                          <td style={{...td_s,color:S.green,fontFamily:'monospace',fontWeight:700}}>{line.debit>0?fmt(line.debit,sym):'—'}</td>
+                          <td style={{...td_s,color:S.red,fontFamily:'monospace',fontWeight:700}}>{line.credit>0?fmt(line.credit,sym):'—'}</td>
                         </tr>
                       ))}
                     </Fragment>
@@ -807,6 +656,191 @@ const TABS = [
           </div>
         )}
 
+        {/* ══ دفتر الأستاذ ══ */}
+        {tab==='ledger'&&(
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:18}}>
+              <div style={{fontSize:14,fontWeight:800,color:S.white,marginBottom:14,textAlign:'right'}}>📗 دفتر الأستاذ</div>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اختر الحساب</label>
+                <select value={ledgerAccountId} onChange={e=>setLedgerAccountId(e.target.value)} style={{...inp,cursor:'pointer',maxWidth:400}}>
+                  <option value="">اختر حساباً...</option>
+                  {accounts.map(a=><option key={a.id} value={a.id} style={{background:S.navy2}}>{a.account_code} — {a.account_name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {ledgerAccount&&(
+              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+                <div style={{padding:'14px 20px',background:'rgba(255,255,255,0.03)',borderBottom:`1px solid ${S.border}`,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:11,color:S.muted}}>رصيد افتتاحي: {fmt(ledgerAccount.opening_balance||0,sym)}</span>
+                  <div style={{textAlign:'right'}}>
+                    <span style={{fontSize:13,fontWeight:800,color:S.gold2}}>{ledgerAccount.account_code} — {ledgerAccount.account_name}</span>
+                  </div>
+                </div>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>
+                    {['التاريخ','البيان','مدين','دائن','الرصيد'].map(h=><th key={h} style={th}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    <tr style={{background:S.card,borderBottom:`1px solid ${S.border}`}}>
+                      <td style={td_s}>—</td>
+                      <td style={{...td_s,color:S.muted,fontStyle:'italic'}}>الرصيد الافتتاحي</td>
+                      <td style={td_s}>—</td><td style={td_s}>—</td>
+                      <td style={{...td_s,fontFamily:'monospace',fontWeight:700,color:S.gold}}>{fmt(ledgerAccount.opening_balance||0,sym)}</td>
+                    </tr>
+                    {ledgerLines.length===0?<tr><td colSpan={5} style={{padding:'30px',textAlign:'center',color:S.muted}}>لا توجد حركات مسجلة في دفتر اليومية</td></tr>
+                    :ledgerLines.map((line,i)=>{
+                      ledgerRunning+=((line.debit||0)-(line.credit||0))
+                      return(
+                        <tr key={i} style={{borderTop:`1px solid rgba(255,255,255,0.04)`,background:i%2===0?'transparent':S.card}}>
+                          <td style={{...td_s,color:S.muted}}>{line.date?new Date(line.date).toLocaleDateString('ar-EG'):'—'}</td>
+                          <td style={td_s}>{line.desc||'—'}</td>
+                          <td style={{...td_s,color:S.green,fontFamily:'monospace',fontWeight:700}}>{line.debit>0?fmt(line.debit,sym):'—'}</td>
+                          <td style={{...td_s,color:S.red,fontFamily:'monospace',fontWeight:700}}>{line.credit>0?fmt(line.credit,sym):'—'}</td>
+                          <td style={{...td_s,fontFamily:'monospace',fontWeight:800,color:ledgerRunning>=0?S.green:S.red}}>{fmt(ledgerRunning,sym)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{borderTop:`2px solid ${S.borderG}`,background:S.card2}}>
+                      <td colSpan={4} style={{padding:'12px 14px',textAlign:'right',fontSize:12,fontWeight:700,color:S.gold2}}>الرصيد الختامي</td>
+                      <td style={{padding:'12px 14px',textAlign:'right',fontSize:16,fontWeight:900,fontFamily:'monospace',color:ledgerRunning>=0?S.green:S.red}}>{fmt(ledgerRunning,sym)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ ميزان المراجعة ══ */}
+        {tab==='trial'&&(
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:18,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <button onClick={()=>window.print()} style={{background:S.gold,color:S.navy,border:'none',padding:'8px 20px',borderRadius:8,fontSize:12,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️ طباعة</button>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:14,fontWeight:800,color:S.white}}>⚖️ ميزان المراجعة</div>
+                <div style={{fontSize:11,color:S.muted,marginTop:2}}>مشتق من قيود دفتر اليومية — {trialBalance.length} حساب</div>
+              </div>
+            </div>
+
+            {trialBalance.length===0?(
+              <div style={{textAlign:'center',color:S.muted,padding:'60px 0'}}>
+                <div style={{fontSize:40,marginBottom:12}}>⚖️</div>
+                <div>أضف قيوداً في دفتر اليومية لظهور ميزان المراجعة</div>
+              </div>
+            ):(
+              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>
+                    {['الكود','اسم الحساب','إجمالي المدين','إجمالي الدائن','صافي مدين','صافي دائن'].map(h=><th key={h} style={th}>{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {trialBalance.map((a,i)=>(
+                      <tr key={a.id} style={{borderTop:`1px solid rgba(255,255,255,0.04)`,background:i%2===0?'transparent':S.card}}>
+                        <td style={{...td_s,color:S.gold,fontWeight:700,fontFamily:'monospace'}}>{a.account_code}</td>
+                        <td style={{...td_s,fontWeight:600}}>{a.account_name}</td>
+                        <td style={{...td_s,color:S.green,fontFamily:'monospace'}}>{fmt(a.totalDebit,sym)}</td>
+                        <td style={{...td_s,color:S.red,fontFamily:'monospace'}}>{fmt(a.totalCredit,sym)}</td>
+                        <td style={{...td_s,color:a.netDebit>0?S.green:S.muted,fontFamily:'monospace',fontWeight:700}}>{a.netDebit>0?fmt(a.netDebit,sym):'—'}</td>
+                        <td style={{...td_s,color:a.netCredit>0?S.red:S.muted,fontFamily:'monospace',fontWeight:700}}>{a.netCredit>0?fmt(a.netCredit,sym):'—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{borderTop:`2px solid ${S.borderG}`,background:S.card2}}>
+                      <td colSpan={4} style={{padding:'12px 14px',textAlign:'right',fontSize:12,fontWeight:700,color:S.gold2}}>الإجماليات</td>
+                      <td style={{padding:'12px 14px',textAlign:'right',fontSize:14,fontWeight:900,fontFamily:'monospace',color:S.green}}>{fmt(trialTotalDebit,sym)}</td>
+                      <td style={{padding:'12px 14px',textAlign:'right',fontSize:14,fontWeight:900,fontFamily:'monospace',color:S.red}}>{fmt(trialTotalCredit,sym)}</td>
+                    </tr>
+                    <tr style={{background:S.card2}}>
+                      <td colSpan={6} style={{padding:'10px 14px',textAlign:'center',fontSize:11,color:Math.abs(trialTotalDebit-trialTotalCredit)<0.01?S.green:S.red,fontWeight:700}}>
+                        {Math.abs(trialTotalDebit-trialTotalCredit)<0.01?'✅ الميزان متوازن — المدين = الدائن':'⚠️ الميزان غير متوازن — تحقق من القيود'}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ كشف الحساب ══ */}
+        {tab==='statement'&&(
+          <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:20}}>
+              <div style={{fontSize:13,fontWeight:800,color:S.white,marginBottom:14,textAlign:'right'}}>📊 كشف الحساب</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:14}}>
+                <div>
+                  <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>نوع الحساب</label>
+                  <select value={stmtType} onChange={e=>{setStmtType(e.target.value as any);setStmtPartyId('');setStmtAccountId('')}} style={{...inp,cursor:'pointer'}}>
+                    <option value="customer" style={{background:S.navy2}}>عميل</option>
+                    <option value="supplier" style={{background:S.navy2}}>مورد</option>
+                    <option value="account"  style={{background:S.navy2}}>حساب من دليل الحسابات</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>{stmtType==='customer'?'العميل':stmtType==='supplier'?'المورد':'الحساب'}</label>
+                  {stmtType==='account'?(
+                    <select value={stmtAccountId} onChange={e=>setStmtAccountId(e.target.value)} style={{...inp,cursor:'pointer'}}>
+                      <option value="">اختر...</option>
+                      {accounts.map(a=><option key={a.id} value={a.id} style={{background:S.navy2}}>{a.account_code} — {a.account_name}</option>)}
+                    </select>
+                  ):stmtType==='customer'?(
+                    <select value={stmtPartyId} onChange={e=>setStmtPartyId(e.target.value)} style={{...inp,cursor:'pointer'}}>
+                      <option value="">اختر...</option>
+                      {customers.map(c=><option key={c.id} value={c.id} style={{background:S.navy2}}>{c.full_name}{c.company_name?` — ${c.company_name}`:''}</option>)}
+                    </select>
+                  ):(
+                    <select value={stmtPartyId} onChange={e=>setStmtPartyId(e.target.value)} style={{...inp,cursor:'pointer'}}>
+                      <option value="">اختر...</option>
+                      {suppliers.map(s=><option key={s.id} value={s.id} style={{background:S.navy2}}>{s.company_name}</option>)}
+                    </select>
+                  )}
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>الفترة</label>
+                  <div style={{display:'flex',gap:6}}>
+                    <input type="date" value={stmtFrom} onChange={e=>setStmtFrom(e.target.value)} style={{...inp,flex:1,colorScheme:'dark' as any}}/>
+                    <input type="date" value={stmtTo}   onChange={e=>setStmtTo(e.target.value)}   style={{...inp,flex:1,colorScheme:'dark' as any}}/>
+                  </div>
+                </div>
+              </div>
+              <button onClick={()=>window.print()} style={{background:S.gold,color:S.navy,border:'none',padding:'9px 24px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️ طباعة</button>
+            </div>
+            {stmtVouchers.length>0&&(
+              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>{['التاريخ','رقم السند','البيان','مدين','دائن','الرصيد'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {(()=>{let r=0;return stmtVouchers.map((v,i)=>{const isR=v.voucher_type==='receipt';const a=v.amount||0;r+=isR?a:-a;return(
+                      <tr key={v.id} style={{borderTop:`1px solid rgba(255,255,255,0.04)`,background:i%2===0?'transparent':S.card}}>
+                        <td style={{...td_s,color:S.muted}}>{v.voucher_date?new Date(v.voucher_date).toLocaleDateString('ar-EG'):'—'}</td>
+                        <td style={{...td_s,color:S.gold,fontFamily:'monospace'}}>{v.voucher_number}</td>
+                        <td style={td_s}>{v.description||v.party_name||'—'}</td>
+                        <td style={{...td_s,color:S.green,fontFamily:'monospace',fontWeight:700}}>{isR?fmt(a,sym):'—'}</td>
+                        <td style={{...td_s,color:S.red,fontFamily:'monospace',fontWeight:700}}>{!isR?fmt(a,sym):'—'}</td>
+                        <td style={{...td_s,fontFamily:'monospace',fontWeight:800,color:r>=0?S.green:S.red}}>{fmt(r,sym)}</td>
+                      </tr>
+                    )})})()}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{borderTop:`2px solid ${S.borderG}`,background:S.card2}}>
+                      <td colSpan={5} style={{padding:'12px 14px',textAlign:'right',fontSize:12,fontWeight:700,color:S.gold2}}>الرصيد النهائي</td>
+                      <td style={{padding:'12px 14px',textAlign:'right',fontSize:16,fontWeight:900,fontFamily:'monospace',color:stmtTotal>=0?S.green:S.red}}>{fmt(stmtTotal,sym)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+            {(stmtPartyId||stmtAccountId)&&stmtVouchers.length===0&&(
+              <div style={{textAlign:'center',color:S.muted,padding:'60px 0'}}><div style={{fontSize:40,marginBottom:12}}>📊</div><div>لا توجد حركات</div></div>
+            )}
+          </div>
+        )}
+
         {/* ══ التقارير ══ */}
         {tab==='reports'&&(
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
@@ -814,7 +848,7 @@ const TABS = [
               <div style={{fontSize:14,fontWeight:800,color:S.white,marginBottom:16,textAlign:'right'}}>📊 قائمة الدخل</div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
                 <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(59,130,246,0.08)',borderRadius:8}}>
-                  <span style={{fontSize:16,fontWeight:800,color:S.blue}}>{fmt(totalIncome,sym)}</span>
+                  <span style={{fontSize:16,fontWeight:800,color:S.blue,fontFamily:'monospace'}}>{fmt(totalIncome,sym)}</span>
                   <span style={{fontSize:12,color:S.white,fontWeight:600}}>إجمالي الإيرادات</span>
                 </div>
                 {accounts.filter(a=>a.account_type==='income').map(a=>(
@@ -825,7 +859,7 @@ const TABS = [
                 ))}
                 <div style={{height:1,background:S.border,margin:'4px 0'}}/>
                 <div style={{display:'flex',justifyContent:'space-between',padding:'8px 12px',background:'rgba(239,68,68,0.08)',borderRadius:8}}>
-                  <span style={{fontSize:16,fontWeight:800,color:S.red}}>{fmt(totalExpenses,sym)}</span>
+                  <span style={{fontSize:16,fontWeight:800,color:S.red,fontFamily:'monospace'}}>{fmt(totalExpenses,sym)}</span>
                   <span style={{fontSize:12,color:S.white,fontWeight:600}}>إجمالي المصروفات</span>
                 </div>
                 {accounts.filter(a=>a.account_type==='expense').map(a=>(
@@ -836,16 +870,11 @@ const TABS = [
                 ))}
                 <div style={{height:2,background:S.border,margin:'4px 0'}}/>
                 <div style={{display:'flex',justifyContent:'space-between',padding:'14px 16px',background:`${profitColor}18`,borderRadius:10,border:`1px solid ${profitColor}40`}}>
-                  <span style={{fontSize:20,fontWeight:900,color:profitColor,fontFamily:'monospace'}}>
-                    {netProfit>=0?'+':''}{fmt(netProfit,sym)}
-                  </span>
-                  <span style={{fontSize:13,fontWeight:700,color:profitColor}}>
-                    {netProfit>0?'📈 صافي ربح':netProfit<0?'📉 صافي خسارة':'⚖️ تعادل'}
-                  </span>
+                  <span style={{fontSize:20,fontWeight:900,color:profitColor,fontFamily:'monospace'}}>{netProfit>=0?'+':''}{fmt(netProfit,sym)}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:profitColor}}>{netProfit>0?'📈 صافي ربح':netProfit<0?'📉 صافي خسارة':'⚖️ تعادل'}</span>
                 </div>
               </div>
             </div>
-
             <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:20}}>
               <div style={{fontSize:14,fontWeight:800,color:S.white,marginBottom:16,textAlign:'right'}}>⚖️ الميزانية العمومية</div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -876,158 +905,36 @@ const TABS = [
             </div>
           </div>
         )}
-
-        {/* ══ كشف الحساب ══ */}
-        {tab==='statement'&&(
-          <div style={{display:'flex',flexDirection:'column',gap:14}}>
-
-            {/* فلاتر */}
-            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:20}}>
-              <div style={{fontSize:13,fontWeight:800,color:S.white,marginBottom:16,textAlign:'right'}}>📊 كشف الحساب</div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:14}}>
-                <div>
-                  <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>نوع الحساب</label>
-                  <select value={stmtPartyType} onChange={e=>{ setStmtPartyType(e.target.value as any); setStmtPartyId(''); setStmtAccountId('') }}
-                    style={{...inp,cursor:'pointer'}}>
-                    <option value="customer" style={{background:S.navy2}}>عميل</option>
-                    <option value="supplier" style={{background:S.navy2}}>مورد</option>
-                    <option value="account"  style={{background:S.navy2}}>حساب من دليل الحسابات</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>
-                    {stmtPartyType==='customer'?'العميل':stmtPartyType==='supplier'?'المورد':'الحساب'}
-                  </label>
-                  {stmtPartyType==='account'?(
-                    <select value={stmtAccountId} onChange={e=>setStmtAccountId(e.target.value)} style={{...inp,cursor:'pointer'}}>
-                      <option value="">اختر الحساب...</option>
-                      {accounts.map(a=><option key={a.id} value={a.id} style={{background:S.navy2}}>{a.account_code} — {a.account_name}</option>)}
-                    </select>
-                  ):stmtPartyType==='customer'?(
-                    <select value={stmtPartyId} onChange={e=>setStmtPartyId(e.target.value)} style={{...inp,cursor:'pointer'}}>
-                      <option value="">اختر العميل...</option>
-                      {customers.map(c=><option key={c.id} value={c.id} style={{background:S.navy2}}>{c.full_name}{c.company_name?` — ${c.company_name}`:''}</option>)}
-                    </select>
-                  ):(
-                    <select value={stmtPartyId} onChange={e=>setStmtPartyId(e.target.value)} style={{...inp,cursor:'pointer'}}>
-                      <option value="">اختر المورد...</option>
-                      {suppliers.map(s=><option key={s.id} value={s.id} style={{background:S.navy2}}>{s.company_name}</option>)}
-                    </select>
-                  )}
-                </div>
-                <div>
-                  <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>الفترة</label>
-                  <div style={{display:'flex',gap:6}}>
-                    <input type="date" value={stmtFrom} onChange={e=>setStmtFrom(e.target.value)} style={{...inp,flex:1,colorScheme:'dark' as any}} placeholder="من"/>
-                    <input type="date" value={stmtTo}   onChange={e=>setStmtTo(e.target.value)}   style={{...inp,flex:1,colorScheme:'dark' as any}} placeholder="إلى"/>
-                  </div>
-                </div>
-              </div>
-
-              <button onClick={()=>window.print()}
-                style={{background:S.gold,color:S.navy,border:'none',padding:'9px 24px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
-                🖨️ طباعة الكشف
-              </button>
-            </div>
-
-            {/* جدول الكشف */}
-            {stmtVouchers.length>0&&(
-              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead>
-                    <tr style={{background:'rgba(255,255,255,0.05)',borderBottom:`1px solid ${S.border}`}}>
-                      {['التاريخ','رقم السند','البيان','مدين','دائن','الرصيد'].map(h=>(
-                        <th key={h} style={{padding:'12px 14px',textAlign:'right',fontSize:10,color:S.muted,fontWeight:700}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(()=>{
-                      let running = 0
-                      return stmtVouchers.map((v,i)=>{
-                        const isReceipt = v.voucher_type==='receipt'
-                        const amt = v.amount||0
-                        running += isReceipt ? amt : -amt
-                        return (
-                          <tr key={v.id} style={{borderTop:`1px solid rgba(255,255,255,0.05)`,background:i%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                            <td style={{padding:'10px 14px',fontSize:12,color:S.muted,textAlign:'right'}}>{v.voucher_date?new Date(v.voucher_date).toLocaleDateString('ar-EG'):'—'}</td>
-                            <td style={{padding:'10px 14px',fontSize:11,color:S.gold,fontFamily:'monospace',textAlign:'right'}}>{v.voucher_number}</td>
-                            <td style={{padding:'10px 14px',fontSize:12,textAlign:'right'}}>{v.description||v.party_name||'—'}</td>
-                            <td style={{padding:'10px 14px',fontSize:13,color:S.green,fontFamily:'monospace',fontWeight:700,textAlign:'right'}}>
-                              {isReceipt?fmt(amt,sym):'—'}
-                            </td>
-                            <td style={{padding:'10px 14px',fontSize:13,color:S.red,fontFamily:'monospace',fontWeight:700,textAlign:'right'}}>
-                              {!isReceipt?fmt(amt,sym):'—'}
-                            </td>
-                            <td style={{padding:'10px 14px',fontSize:13,fontWeight:800,fontFamily:'monospace',textAlign:'right',color:running>=0?S.green:S.red}}>
-                              {fmt(running,sym)}
-                            </td>
-                          </tr>
-                        )
-                      })
-                    })()}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{borderTop:`2px solid ${S.borderG}`,background:S.card2}}>
-                      <td colSpan={5} style={{padding:'12px 14px',textAlign:'right',fontSize:12,fontWeight:700,color:S.gold2}}>الرصيد النهائي</td>
-                      <td style={{padding:'12px 14px',fontSize:16,fontWeight:900,fontFamily:'monospace',textAlign:'right',color:stmtTotal>=0?S.green:S.red}}>
-                        {fmt(stmtTotal,sym)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-
-            {(stmtPartyId||stmtAccountId)&&stmtVouchers.length===0&&(
-              <div style={{textAlign:'center',color:S.muted,padding:'60px 0'}}>
-                <div style={{fontSize:40,marginBottom:12}}>📊</div>
-                <div>لا توجد حركات لهذا الحساب</div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* ══ Modal طباعة السند ══ */}
-      {printVoucher&&(
-        <VoucherPrintModal voucher={printVoucher} sym={sym} onClose={()=>setPrintVoucher(null)}/>
-      )}
+      {/* ── Modals ── */}
+      {printVch&&<PrintModal v={printVch} sym={sym} onClose={()=>setPrintVch(null)}/>}
 
-      {/* ══ Modal تعديل السند ══ */}
-      {editVoucher&&(
+      {/* تعديل سند */}
+      {editVch&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(8px)',padding:16}}>
           <div style={{background:S.navy2,width:'100%',maxWidth:500,borderRadius:18,padding:26,border:`1px solid ${S.borderG}`,direction:'rtl'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-              <button onClick={()=>setEditVoucher(null)} style={{background:'none',border:'none',color:S.muted,fontSize:18,cursor:'pointer'}}>✕</button>
-              <div style={{fontSize:15,fontWeight:800,color:S.gold2}}>✏️ تعديل السند — {editVoucher.voucher_number}</div>
+              <button onClick={()=>setEditVch(null)} style={{background:'none',border:'none',color:S.muted,fontSize:18,cursor:'pointer'}}>✕</button>
+              <div style={{fontSize:15,fontWeight:800,color:S.gold2}}>✏️ تعديل السند — {editVch.voucher_number}</div>
             </div>
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              <div>
-                <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>التاريخ</label>
-                <input type="date" value={editVoucher.voucher_date} onChange={e=>setEditVoucher({...editVoucher,voucher_date:e.target.value})} style={{...inp,colorScheme:'dark' as any}}/>
-              </div>
-              <div>
-                <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>الطرف الآخر</label>
-                <input type="text" value={editVoucher.party_name} onChange={e=>setEditVoucher({...editVoucher,party_name:e.target.value})} style={inp}/>
-              </div>
-              <div>
-                <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>المبلغ</label>
-                <input type="number" value={editVoucher.amount} onChange={e=>setEditVoucher({...editVoucher,amount:e.target.value})} style={inp}/>
-              </div>
+              {[{l:'التاريخ',k:'voucher_date',t:'date'},{l:'الطرف الآخر',k:'party_name',t:'text'},{l:'المبلغ',k:'amount',t:'number'},{l:'البيان',k:'description',t:'text'}]
+                .map(f=>(
+                <div key={f.k}>
+                  <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>{f.l}</label>
+                  <input type={f.t} value={(editVch as any)[f.k]||''} onChange={e=>setEditVch({...editVch,[f.k]:e.target.value})} style={{...inp,colorScheme:f.t==='date'?'dark' as any:undefined}}/>
+                </div>
+              ))}
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>طريقة الدفع</label>
-                <select value={editVoucher.payment_method} onChange={e=>setEditVoucher({...editVoucher,payment_method:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                <select value={editVch.payment_method} onChange={e=>setEditVch({...editVch,payment_method:e.target.value})} style={{...inp,cursor:'pointer'}}>
                   {PAYMENT_METHODS.map(m=><option key={m} value={m} style={{background:S.navy2}}>{m}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>البيان</label>
-                <input type="text" value={editVoucher.description} onChange={e=>setEditVoucher({...editVoucher,description:e.target.value})} style={inp}/>
-              </div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10,marginTop:18}}>
-              <button onClick={()=>setEditVoucher(null)} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
+              <button onClick={()=>setEditVch(null)} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
               <button onClick={handleEditVoucher} disabled={saving} style={{background:saving?S.muted:S.gold,color:S.navy,border:'none',padding:11,borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
                 {saving?'⏳ جاري الحفظ...':'💾 حفظ التعديلات'}
               </button>
@@ -1036,47 +943,39 @@ const TABS = [
         </div>
       )}
 
-      {/* ══ Modal إضافة حساب ══ */}
-      {showAccountForm&&(
+      {/* إضافة حساب */}
+      {showAccForm&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(8px)',padding:16}}>
           <div style={{background:S.navy2,width:'100%',maxWidth:520,borderRadius:20,padding:28,border:`1px solid ${S.borderG}`,maxHeight:'90vh',overflowY:'auto',direction:'rtl'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:22}}>
-              <button onClick={()=>setShowAccountForm(false)} style={{background:'none',border:'none',color:S.muted,fontSize:20,cursor:'pointer'}}>✕</button>
+              <button onClick={()=>setShowAccForm(false)} style={{background:'none',border:'none',color:S.muted,fontSize:20,cursor:'pointer'}}>✕</button>
               <div style={{fontSize:16,fontWeight:800,color:S.gold2}}>📁 إضافة حساب جديد</div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-              {[
-                {l:'كود الحساب *',k:'account_code',t:'text',p:'مثال: 1101'},
-                {l:'اسم الحساب *', k:'account_name',t:'text',p:'اسم الحساب'},
-              ].map(f=>(
+              {[{l:'كود الحساب *',k:'account_code',p:'مثال: 1101'},{l:'اسم الحساب *',k:'account_name',p:'اسم الحساب'}].map(f=>(
                 <div key={f.k}>
                   <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>{f.l}</label>
-                  <input type={f.t} placeholder={f.p} value={(accountForm as any)[f.k]}
-                    onChange={e=>setAccountForm({...accountForm,[f.k]:e.target.value})} style={inp}/>
+                  <input type="text" placeholder={f.p} value={(accForm as any)[f.k]} onChange={e=>setAccForm({...accForm,[f.k]:e.target.value})} style={inp}/>
                 </div>
               ))}
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>نوع الحساب</label>
-                <select value={accountForm.account_type} onChange={e=>setAccountForm({...accountForm,account_type:e.target.value})} style={{...inp,cursor:'pointer'}}>
-                  {Object.entries(ACCOUNT_TYPES).map(([k,v])=>(
-                    <option key={k} value={k} style={{background:S.navy2}}>{v.icon} {v.label}</option>
-                  ))}
+                <select value={accForm.account_type} onChange={e=>setAccForm({...accForm,account_type:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                  {Object.entries(ACCOUNT_TYPES).map(([k,v])=><option key={k} value={k} style={{background:S.navy2}}>{v.icon} {v.label}</option>)}
                 </select>
               </div>
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>الرصيد الافتتاحي ({sym})</label>
-                <input type="number" placeholder="0.00" value={accountForm.opening_balance}
-                  onChange={e=>setAccountForm({...accountForm,opening_balance:e.target.value})} style={inp}/>
+                <input type="number" placeholder="0.00" value={accForm.opening_balance} onChange={e=>setAccForm({...accForm,opening_balance:e.target.value})} style={inp}/>
               </div>
               <div style={{gridColumn:'span 2'}}>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>الوصف</label>
-                <input type="text" placeholder="وصف مختصر..." value={accountForm.description}
-                  onChange={e=>setAccountForm({...accountForm,description:e.target.value})} style={inp}/>
+                <input type="text" placeholder="وصف مختصر..." value={accForm.description} onChange={e=>setAccForm({...accForm,description:e.target.value})} style={inp}/>
               </div>
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10,marginTop:20}}>
-              <button onClick={()=>setShowAccountForm(false)} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
-              <button onClick={handleSaveAccount} disabled={saving} style={{background:saving?S.muted:S.gold,color:S.navy,border:'none',padding:11,borderRadius:8,fontSize:13,fontWeight:700,cursor:saving?'not-allowed':'pointer',fontFamily:'Tajawal, sans-serif'}}>
+              <button onClick={()=>setShowAccForm(false)} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
+              <button onClick={handleSaveAccount} disabled={saving} style={{background:saving?S.muted:S.gold,color:S.navy,border:'none',padding:11,borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
                 {saving?'⏳ جاري الحفظ...':'💾 حفظ الحساب'}
               </button>
             </div>
@@ -1084,127 +983,98 @@ const TABS = [
         </div>
       )}
 
-      {/* ══ Modal إضافة سند ══ */}
-      {showVoucherForm&&(
+      {/* إضافة سند */}
+      {showVchForm&&(
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(8px)',padding:16}}>
           <div style={{background:S.navy2,width:'100%',maxWidth:580,borderRadius:20,padding:28,border:`1px solid ${S.borderG}`,maxHeight:'90vh',overflowY:'auto',direction:'rtl'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-              <button onClick={()=>setShowVoucherForm(false)} style={{background:'none',border:'none',color:S.muted,fontSize:20,cursor:'pointer'}}>✕</button>
+              <button onClick={()=>setShowVchForm(false)} style={{background:'none',border:'none',color:S.muted,fontSize:20,cursor:'pointer'}}>✕</button>
               <div style={{fontSize:16,fontWeight:800,color:S.gold2}}>📋 إضافة سند مالي</div>
             </div>
-
-            {/* رقم السند */}
             <div style={{background:S.gold3,border:`1px solid ${S.borderG}`,borderRadius:10,padding:'10px 16px',marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
               <span style={{fontSize:10,color:S.muted}}>رقم السند (تلقائي)</span>
-              <span style={{fontSize:18,fontWeight:900,color:S.gold2,fontFamily:'monospace'}}>{voucherForm.voucher_number}</span>
+              <span style={{fontSize:18,fontWeight:900,color:S.gold2,fontFamily:'monospace'}}>{vchForm.voucher_number}</span>
             </div>
-
-            {/* FIX 1: نوع السند يغير الرقم تلقائياً */}
             <div style={{display:'flex',gap:8,marginBottom:18,justifyContent:'flex-end'}}>
               {Object.entries(VOUCHER_TYPES).map(([key,t])=>(
-                <button key={key} onClick={()=>{
-                  const nextNum = getNextVoucherNumber(key, vouchers)
-                  setVoucherForm({...voucherForm,voucher_type:key,voucher_number:nextNum})
-                }}
-                  style={{padding:'8px 16px',borderRadius:8,border:`1px solid ${voucherForm.voucher_type===key?t.color:S.border}`,background:voucherForm.voucher_type===key?`${t.color}18`:'transparent',color:voucherForm.voucher_type===key?t.color:S.muted,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+                <button key={key} onClick={()=>setVchForm({...vchForm,voucher_type:key,voucher_number:getNext(key,vouchers)})}
+                  style={{padding:'8px 16px',borderRadius:8,border:`1px solid ${vchForm.voucher_type===key?t.color:S.border}`,background:vchForm.voucher_type===key?`${t.color}18`:'transparent',color:vchForm.voucher_type===key?t.color:S.muted,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
                   {t.icon} {t.label}
                 </button>
               ))}
             </div>
-
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>التاريخ</label>
-                <input type="date" value={voucherForm.voucher_date}
-                  onChange={e=>setVoucherForm({...voucherForm,voucher_date:e.target.value})}
-                  style={{...inp,colorScheme:'dark' as any}}/>
+                <input type="date" value={vchForm.voucher_date} onChange={e=>setVchForm({...vchForm,voucher_date:e.target.value})} style={{...inp,colorScheme:'dark' as any}}/>
               </div>
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>العملة</label>
-                <select value={voucherForm.currency} onChange={e=>setVoucherForm({...voucherForm,currency:e.target.value})} style={{...inp,cursor:'pointer'}}>
-                  {CURRENCIES.map(c=>(
-                    <option key={c.id} value={c.value} style={{background:S.navy2}}>{CURRENCY_SYMBOLS[c.value]||c.value} {c.label}</option>
-                  ))}
+                <select value={vchForm.currency} onChange={e=>setVchForm({...vchForm,currency:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                  {CURRENCIES.map(c=><option key={c.id} value={c.value} style={{background:S.navy2}}>{CURRENCY_SYMBOLS[c.value]||c.value} {c.label}</option>)}
                 </select>
               </div>
-
               <div style={{gridColumn:'span 2'}}>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>الحساب المتأثر *</label>
-                <select value={voucherForm.account_id} onChange={e=>setVoucherForm({...voucherForm,account_id:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                <select value={vchForm.account_id} onChange={e=>setVchForm({...vchForm,account_id:e.target.value})} style={{...inp,cursor:'pointer'}}>
                   <option value="">اختر الحساب...</option>
-                  {accounts.map(a=>{
-                    const aSym=CURRENCY_SYMBOLS[a.currency]||sym
-                    return <option key={a.id} value={a.id} style={{background:S.navy2}}>{a.account_code} — {a.account_name} ({fmt(a.balance||0,aSym)})</option>
-                  })}
+                  {accounts.map(a=>{const aSym=CURRENCY_SYMBOLS[a.currency]||sym;return<option key={a.id} value={a.id} style={{background:S.navy2}}>{a.account_code} — {a.account_name} ({fmt(a.balance||0,aSym)})</option>})}
                 </select>
               </div>
-
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>الطرف الآخر</label>
-                <select value={voucherForm.party_type} onChange={e=>setVoucherForm({...voucherForm,party_type:e.target.value,party_id:'',party_name:''})} style={{...inp,cursor:'pointer'}}>
+                <select value={vchForm.party_type} onChange={e=>setVchForm({...vchForm,party_type:e.target.value,party_id:'',party_name:''})} style={{...inp,cursor:'pointer'}}>
                   <option value="customer" style={{background:S.navy2}}>عميل</option>
                   <option value="supplier" style={{background:S.navy2}}>مورد</option>
                   <option value="other"    style={{background:S.navy2}}>طرف آخر</option>
                 </select>
               </div>
               <div>
-                {voucherForm.party_type==='customer'?(
-                  <>
-                    <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اختر العميل</label>
-                    <select value={voucherForm.party_id} onChange={e=>{const c=customers.find(x=>x.id===e.target.value);setVoucherForm({...voucherForm,party_id:e.target.value,party_name:c?.full_name||c?.company_name||''})}} style={{...inp,cursor:'pointer'}}>
-                      <option value="">اختر...</option>
-                      {customers.map(c=><option key={c.id} value={c.id} style={{background:S.navy2}}>{c.full_name}{c.company_name?` — ${c.company_name}`:''}</option>)}
-                    </select>
-                  </>
-                ):voucherForm.party_type==='supplier'?(
-                  <>
-                    <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اختر المورد</label>
-                    <select value={voucherForm.party_id} onChange={e=>{const s=suppliers.find(x=>x.id===e.target.value);setVoucherForm({...voucherForm,party_id:e.target.value,party_name:s?.company_name||''})}} style={{...inp,cursor:'pointer'}}>
-                      <option value="">اختر...</option>
-                      {suppliers.map(s=><option key={s.id} value={s.id} style={{background:S.navy2}}>{s.company_name}</option>)}
-                    </select>
-                  </>
+                {vchForm.party_type==='customer'?(
+                  <><label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اختر العميل</label>
+                  <select value={vchForm.party_id} onChange={e=>{const c=customers.find(x=>x.id===e.target.value);setVchForm({...vchForm,party_id:e.target.value,party_name:c?.full_name||c?.company_name||''})}} style={{...inp,cursor:'pointer'}}>
+                    <option value="">اختر...</option>{customers.map(c=><option key={c.id} value={c.id} style={{background:S.navy2}}>{c.full_name}{c.company_name?` — ${c.company_name}`:''}</option>)}
+                  </select></>
+                ):vchForm.party_type==='supplier'?(
+                  <><label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اختر المورد</label>
+                  <select value={vchForm.party_id} onChange={e=>{const s=suppliers.find(x=>x.id===e.target.value);setVchForm({...vchForm,party_id:e.target.value,party_name:s?.company_name||''})}} style={{...inp,cursor:'pointer'}}>
+                    <option value="">اختر...</option>{suppliers.map(s=><option key={s.id} value={s.id} style={{background:S.navy2}}>{s.company_name}</option>)}
+                  </select></>
                 ):(
-                  <>
-                    <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اسم الطرف</label>
-                    <input type="text" placeholder="اسم الجهة أو الشخص" value={voucherForm.party_name} onChange={e=>setVoucherForm({...voucherForm,party_name:e.target.value})} style={inp}/>
-                  </>
+                  <><label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اسم الطرف</label>
+                  <input type="text" placeholder="اسم الجهة أو الشخص" value={vchForm.party_name} onChange={e=>setVchForm({...vchForm,party_name:e.target.value})} style={inp}/></>
                 )}
               </div>
-
               <div>
-                <label style={{display:'block',fontSize:11,color:voucherForm.voucher_type==='receipt'?S.green:S.red,fontWeight:700,marginBottom:6,textAlign:'right'}}>
-                  المبلغ ({CURRENCY_SYMBOLS[voucherForm.currency]||voucherForm.currency}) *
-                </label>
-                <input type="number" placeholder="0.00" value={voucherForm.amount}
-                  onChange={e=>setVoucherForm({...voucherForm,amount:e.target.value})}
-                  style={{...inp,fontSize:16,fontWeight:700,color:voucherForm.voucher_type==='receipt'?S.green:S.red,border:`1px solid ${voucherForm.voucher_type==='receipt'?S.green:S.red}44`}}/>
+                <label style={{display:'block',fontSize:11,color:vchForm.voucher_type==='receipt'?S.green:S.red,fontWeight:700,marginBottom:6,textAlign:'right'}}>المبلغ ({CURRENCY_SYMBOLS[vchForm.currency]||vchForm.currency}) *</label>
+                <input type="number" placeholder="0.00" value={vchForm.amount} onChange={e=>setVchForm({...vchForm,amount:e.target.value})}
+                  style={{...inp,fontSize:16,fontWeight:700,color:vchForm.voucher_type==='receipt'?S.green:S.red,border:`1px solid ${vchForm.voucher_type==='receipt'?S.green:S.red}44`}}/>
               </div>
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>طريقة الدفع</label>
-                <select value={voucherForm.payment_method} onChange={e=>setVoucherForm({...voucherForm,payment_method:e.target.value})} style={{...inp,cursor:'pointer'}}>
+                <select value={vchForm.payment_method} onChange={e=>setVchForm({...vchForm,payment_method:e.target.value})} style={{...inp,cursor:'pointer'}}>
                   {PAYMENT_METHODS.map(m=><option key={m} value={m} style={{background:S.navy2}}>{m}</option>)}
                 </select>
               </div>
-
               <div style={{gridColumn:'span 2'}}>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>البيان / الوصف</label>
-                <input type="text" placeholder="وصف العملية المالية..." value={voucherForm.description}
-                  onChange={e=>setVoucherForm({...voucherForm,description:e.target.value})} style={inp}/>
+                <input type="text" placeholder="وصف العملية المالية..." value={vchForm.description} onChange={e=>setVchForm({...vchForm,description:e.target.value})} style={inp}/>
               </div>
             </div>
-
             <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10,marginTop:20}}>
-              <button onClick={()=>setShowVoucherForm(false)} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
-              <button onClick={handleSaveVoucher} disabled={saving} style={{background:saving?S.muted:S.gold,color:S.navy,border:'none',padding:11,borderRadius:8,fontSize:13,fontWeight:700,cursor:saving?'not-allowed':'pointer',fontFamily:'Tajawal, sans-serif'}}>
-                {saving?'⏳ جاري الحفظ...':`💾 حفظ ${VOUCHER_TYPES[voucherForm.voucher_type]?.label||'السند'}`}
+              <button onClick={()=>setShowVchForm(false)} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
+              <button onClick={handleSaveVoucher} disabled={saving} style={{background:saving?S.muted:S.gold,color:S.navy,border:'none',padding:11,borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+                {saving?'⏳ جاري الحفظ...':`💾 حفظ ${VOUCHER_TYPES[vchForm.voucher_type]?.label||'السند'}`}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <style>{`@media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:absolute;left:0;top:0;width:100%}}`}</style>
+      <style>{`
+        @media print{body *{visibility:hidden}#print-area,#print-area *{visibility:visible}#print-area{position:absolute;left:0;top:0;width:100%}}
+        .blueB{background:rgba(59,130,246,0.10)}
+      `}</style>
     </div>
   )
 }

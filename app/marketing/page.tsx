@@ -151,38 +151,35 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
         </div>
 
 {/* مؤشر التواصل + النبض + الاسم — صف واحد مرتب */}
-<div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7, marginTop:0, paddingTop:4, minHeight:40}}>
+<div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:7, marginTop:0, paddingTop:4, minHeight: 40}}>
+<div style={{textAlign:'right', flex:1, marginRight:8, display:'flex', flexDirection:'column'}}>
+  
+  {/* اسم العميل في الأعلى */}
+<div style={{fontSize:13, fontWeight:700, color:isDecision?S.gold2:S.white, lineHeight:1.4}}>
+    {lead.name}
+  </div>
 
-  <div style={{textAlign:'right', flex:1, marginRight:8, display:'flex', flexDirection:'column'}}>
-
-    {/* اسم العميل */}
-    <div style={{fontSize:13, fontWeight:700, color:isDecision?S.gold2:S.white, lineHeight:1.4}}>
-      {lead.name}
+  {/* مسافة صغيرة ثم اسم الشركة في سطر منفصل */}
+  {lead.company && (
+    <div style={{fontSize:10, color:S.muted, lineHeight:1, marginTop:10}}>
+      {lead.company}
     </div>
+  )}
 
-    {/* اسم الشركة */}
-    {lead.company && (
-      <div style={{fontSize:10, color:S.muted, lineHeight:1, marginTop:10}}>
-        {lead.company}
-      </div>
-    )}
+</div>
 
-  </div>
-
-  {/* حالة المتابعة */}
+  {/* يسار: النبض - تم دفعها للأسفل يدوياً لتنفصل عن محاذاة الشركة العلوية */}
   <div style={{
-    display:'flex',
-    alignItems:'center',
-    gap:4,
-    flexShrink:0,
-    marginTop:18,
-    alignSelf:'flex-start'
+    display:'flex', 
+    alignItems:'center', 
+    gap:4, 
+    flexShrink:0, 
+    marginTop: 18, // هذا الرقم يضمن نزولها لمستوى اسم العميل أو أسفل قليلاً
+    alignSelf: 'flex-start' 
   }}>
-    <span style={{fontSize:9, color:uc, fontWeight:700}}>
-      {urgLabel(lead.last_action_at)}
-    </span>
+    <div style={{width:8, height:8, borderRadius:'50%', background:uc, flexShrink:0}}/>
+    <span style={{fontSize:9, color:uc, fontWeight:700}}>{urgLabel(lead.last_action_at)}</span>
   </div>
-
 </div>
 
         {/* القناة + المصدر */}
