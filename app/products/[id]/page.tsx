@@ -397,68 +397,119 @@ export default function ProductDetailPage({params}:{params:Promise<{id:string}>}
   const [loading,      setLoading]      = useState(true)
   const [editMode,     setEditMode]     = useState(false)
   const [saving,       setSaving]       = useState(false)
-  const [activeTab,    setActiveTab]    = useState<'details'|'offer'>('details')
+  
+  // 🟢 تحديث: إضافة التبويب الثالث 'received'
+  const [activeTab,    setActiveTab]    = useState<'details'|'offer'|'received'>('details')
+  
   const [showSendOffer,setShowSendOffer]= useState(false)
   const [editData,     setEditData]     = useState<any>({})
   const [offersSent,   setOffersSent]   = useState(0)
-  const isOwner = currentUser && product && currentUser.id === product.user_id
+  const [receivedCount, setReceivedCount] = useState(0) // 🟢 إضافة عداد العروض
 
+  // 1. حساب الملكية (تأكد أن العمود هو supplier_id أو user_id حسب جدولك الموحد)
+// 🟢 حساب الملكية بشكل آمن ويقبل القيم من الجدول الموحد
+const isOwner = !!(currentUser?.id && product && (
+  String(currentUser.id) === String(product.user_id) || 
+  String(currentUser.id) === String(product.supplier_id)
+));
   // ── التحميل ──
-  useEffect(()=>{
-    async function load(){
+useEffect(() => {
+    async function load() {
       setLoading(true)
-      const {data:{user}}=await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
       setCurrentUser(user)
 
-      // نحاول نجيب بالـ id أولاً، وإلا بالاسم
-      let pd:any=null
-      const {data:byId}=await supabase.from('supplier_products').select('*').eq('id',productId).single()
-      if(byId){ pd=byId }
-      else {
-        const {data:byName}=await supabase.from('supplier_products').select('*').eq('name',productId).limit(1).single()
-        pd=byName
-      }
-      if(pd){
+// داخل useEffect في دالة load
+let pd: any = null;
+
+// محاولة جلب بالـ ID أولاً
+const { data: byId } = await supabase.from('products').select('*').eq('id', productId).single();
+
+if (byId) {
+  pd = byId;
+} else {
+  // محاولة البحث بالاسم مع فك تشفير الرموز (مثل %2F التي تعني /)
+  const decodedName = decodeURIComponent(productId);
+  const { data: byName } = await supabase
+    .from('products')
+    .select('*')
+    .ilike('name', decodedName) // استخدام ilike لتجنب مشاكل الحروف الكبيرة والصغيرة
+    .limit(1)
+    .single();
+  pd = byName;
+}
+
+      if (pd) {
         setProduct(pd)
-        setEditData({...pd})
-        if(pd.supplier_id){
-          const {data:sup}=await supabase.from('suppliers').select('*').eq('id',pd.supplier_id).single()
+        setEditData({ ...pd })
+
+        // 🟢 التعديل الجوهري: الموردين موجودون في profiles وليس suppliers
+        if (pd.supplier_id) {
+          const { data: sup } = await supabase
+            .from('profiles') // تغيير اسم الجدول من suppliers إلى profiles
+            .select('*')
+            .eq('id', pd.supplier_id)
+            .single()
           setSupplier(sup)
         }
-        // عدد العروض المُرسلة لهذا المنتج
-        const {count}=await supabase.from('product_offers').select('*',{count:'exact',head:true}).eq('product_id',pd.id)
-        setOffersSent(count||0)
+
+        // جلب عدد العروض المُرسلة
+        const { count } = await supabase
+          .from('product_offers')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', pd.id)
+        
+        setOffersSent(count || 0)
       }
+      
       setLoading(false)
     }
     load()
-  },[productId])
-
+  }, [productId])
   function handleFieldChange(k:string,v:string){ setEditData((p:any)=>({...p,[k]:v})) }
 
-  async function handleSave(){
+async function handleSave(){
     if(!product) return
     setSaving(true)
-    const {error}=await supabase.from('supplier_products').update({
-      name:editData.name, category:editData.category, price_range:editData.price_range,
-      currency:editData.currency, min_order:editData.min_order, incoterms:editData.incoterms,
-      loading_port:editData.loading_port, shipping_time:editData.shipping_time,
-      shelf_life:editData.shelf_life, stock_quantity:editData.stock_quantity,
-      origin_country:editData.origin_country, market_country:editData.market_country,
-      certifications:editData.certifications, notes:editData.notes,
+    
+    // 🟢 التعديل الجوهري: التوجيه لجدول products الموحد
+    const {error}=await supabase.from('products').update({
+      name:editData.name, 
+      category:editData.category, 
+      price_range:editData.price_range,
+      currency:editData.currency, 
+      min_order:editData.min_order, 
+      incoterms:editData.incoterms,
+      loading_port:editData.loading_port, 
+      shipping_time:editData.shipping_time,
+      shelf_life:editData.shelf_life, 
+      stock_quantity:editData.stock_quantity,
+      origin_country:editData.origin_country, 
+      market_country:editData.market_country,
+      certifications:editData.certifications, 
+      notes:editData.notes,
       packaging_options:editData.packaging_options,
-      ffa:editData.ffa, moisture:editData.moisture, peroxide:editData.peroxide,
-      iodine:editData.iodine, color_lovibond:editData.color_lovibond, appearance:editData.appearance,
-      payment_terms:editData.payment_terms, quality_grade:editData.quality_grade,
+      ffa:editData.ffa, 
+      moisture:editData.moisture, 
+      peroxide:editData.peroxide,
+      iodine:editData.iodine, 
+      color_lovibond:editData.color_lovibond, 
+      appearance:editData.appearance,
+      payment_terms:editData.payment_terms, 
+      quality_grade:editData.quality_grade,
       private_label:editData.private_label,
       tech_specs:editData.tech_specs||null,
       logistics_visible:editData.logistics_visible||null,
+      // نضمن بقاء نوع المصدر كمورد
+      source_type: 'supplier' 
     }).eq('id',product.id)
+    
     setSaving(false)
-    if(error){alert('خطأ: '+error.message);return}
+    if(error){alert('خطأ في التحديث: '+error.message);return}
+    
     setProduct({...product,...editData})
     setEditMode(false)
-    alert('✅ تم حفظ التعديلات')
+    alert('✅ تم حفظ التعديلات في المخزن الموحد')
   }
 
   if(loading) return(
