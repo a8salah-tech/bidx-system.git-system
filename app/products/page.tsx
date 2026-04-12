@@ -486,12 +486,28 @@ const fetchProducts = async () => {
 
                           <td style={{ padding: `12px 14px`, fontSize: `11px`, color: S.muted, textAlign: `center`, width: `50px` }}>{i + 1}</td>
 
-                          <td style={{ padding: `12px 14px`, textAlign: `right` }}>
-                            <div style={{ display: `flex`, alignItems: `center`, gap: `8px` }}>
-                              <span style={{ fontSize: `13px`, fontWeight: 600 }}>📦 {name}</span>
-                              {i === 0 && <span style={{ fontSize: `9px`, padding: `2px 8px`, borderRadius: `8px`, background: `rgba(201,168,76,0.12)`, color: S.gold, fontWeight: 700 }}>الأكثر</span>}
-                            </div>
-                          </td>
+                         <td style={{ padding: `12px 14px`, textAlign: `right` }}>
+  <div style={{ display: `flex`, alignItems: `center`, gap: `8px` }}>
+    {/* الرابط الجديد الفخم */}
+    <span 
+      onClick={(e) => {
+        e.stopPropagation(); 
+        router.push(`/products/${encodeURIComponent(name)}`); 
+      }}
+      style={{ 
+        fontSize: `13px`, 
+        fontWeight: 600, 
+        color: S.gold, 
+        cursor: 'pointer', 
+        textDecoration: 'underline',
+        display: 'inline-block' 
+      }}
+    >
+      📦 {name}
+    </span>
+    {i === 0 && <span style={{ fontSize: `9px`, padding: `2px 8px`, borderRadius: `8px`, background: `rgba(201,168,76,0.12)`, color: S.gold, fontWeight: 700 }}>الأكثر</span>}
+  </div>
+</td>
 
                           <td style={{ padding: `12px 14px`, textAlign: `right` }}>
                             <span style={{ fontSize: `14px`, fontWeight: 700, color: S.gold }}>{safeSups.filter((s: any) => s.supplier_id).length}</span>
