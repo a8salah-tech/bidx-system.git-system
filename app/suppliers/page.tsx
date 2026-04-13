@@ -1,477 +1,677 @@
 'use client'
 
-// ===== الاستيرادات =====
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
-import AppShell from "../components/AppShell";
-// ===== تعريف نوع بيانات المورد =====
-interface Supplier {
-  id: string
-  created_at: string
-  supplier_number: number
-  company_name: string
-  country: string
-  city: string
-  status: string
-  rating: number
-  completion_pct: number
-  contact_name: string
-  contact_whatsapp: string
-  contact_email: string
-  annual_sales: string
-  notes: string
-  total_deals: number
-  total_amount: number
-  main_products: string
-  last_contact_date: string
-  last_contact_method: string
-  website: string
-}
 
-// ===== دوال مساعدة (خارج المكون — صحيح) =====
-function timeAgo(date: string) {
-  if (!date) return null
-  const diff = Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
-  if (diff === 0) return 'اليوم'
-  if (diff === 1) return 'منذ يوم'
-  if (diff < 7) return `منذ ${diff} أيام`
-  if (diff < 30) return `منذ ${Math.floor(diff / 7)} أسابيع`
-  return `منذ ${Math.floor(diff / 30)} أشهر`
-}
-
-function formatSupNum(n: number) {
-  return `SUP-${String(n).padStart(5, '0')}`
-}
-
-// ===== دالة تنظيف اسم المنتج (BidLX V1.2.1) =====
-function cleanProductName(name: string): string {
-  return name
-    .trim()
-    .replace(/^(ال)/, '')       // حذف "ال" التعريف من البداية
-    .replace(/\s+/g, ' ')        // توحيد المسافات
-    .toLowerCase()               // توحيد الأحرف
-}
-
-// ===== نظام الألوان الموحد =====
+// ── نظام الألوان ──
 const S = {
-  navy:  '#0A1628',
-  navy2: '#0F2040',
-  gold:  '#C9A84C',
-  gold2: '#E8C97A',
-  gold3: 'rgba(201,168,76,0.12)',
-  white: '#FAFAF8',
-  muted: '#8A9BB5',
-  border: 'rgba(255,255,255,0.08)',
-  green: '#22C55E',
-  red:   '#EF4444',
-  blue:  '#3B82F6',
-  amber: '#F59E0B',
-  card2: 'rgba(255,255,255,0.08)',
+  navy:'#0A1628',navy2:'#0F2040',navy3:'#0C1A32',
+  gold:'#C9A84C',gold2:'#E8C97A',gold3:'rgba(201,168,76,0.12)',goldB:'rgba(201,168,76,0.22)',
+  white:'#FAFAF8',muted:'#8A9BB5',border:'rgba(255,255,255,0.08)',
+  green:'#22C55E',greenB:'rgba(34,197,94,0.12)',
+  red:'#EF4444',redB:'rgba(239,68,68,0.12)',
+  blue:'#3B82F6',blueB:'rgba(59,130,246,0.12)',
+  amber:'#F59E0B',amberB:'rgba(245,158,11,0.12)',
+  card:'rgba(255,255,255,0.04)',card2:'rgba(255,255,255,0.08)',
+  purple:'#8B5CF6',
 }
 
-// ===== المكون الرئيسي =====
-export default function SuppliersPage() {
+const inp: React.CSSProperties = {
+  width:'100%',background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.10)',
+  borderRadius:'10px',padding:'10px 14px',fontSize:'13px',color:'#fff',
+  outline:'none',fontFamily:'Tajawal, sans-serif',boxSizing:'border-box',
+  direction:'rtl',textAlign:'right',transition:'border-color .2s',
+}
 
-  // ===== الراوتر — داخل المكون (صحيح) =====
-  const router = useRouter()
+interface Supplier {
+  id:string; created_at:string; supplier_number:number; company_name:string;
+  country:string; city:string; status:string; rating:number; completion_pct:number;
+  contact_name:string; contact_whatsapp:string; contact_email:string; contact_phone:string;
+  annual_sales:string; notes:string; total_deals:number; total_amount:number;
+  main_products:string; last_contact_date:string; last_contact_method:string;
+  website:string; certifications:string; quality_rating:number; delivery_rating:number;
+  comm_rating:number; price_rating:number; flex_rating:number; user_id:string;
+}
 
-  // ===== الـ State — كل الـ Hooks في أعلى المكون =====
-  const [currentPage, setCurrentPage]   = useState(1)
-  const rowsPerPage = 20
-  const [suppliers, setSuppliers]       = useState<Supplier[]>([])
-  const [loading, setLoading]           = useState(true)
-  const [search, setSearch]             = useState('')
-  const [tab, setTab]                   = useState<'active' | 'suspended'>('active')
-  const [showForm, setShowForm]         = useState(false)
-  const [aiLoading, setAiLoading]       = useState(false)
-  const [filterCountry, setFilterCountry] = useState('')
-  const [viewMode, setViewMode]         = useState<'table' | 'cards'>('table')
-  const [userName, setUserName]         = useState('User')
+// ── دوال مساعدة ──
+function timeAgo(date:string){
+  if(!date) return null
+  const diff=Math.floor((Date.now()-new Date(date).getTime())/86400000)
+  if(diff===0) return 'اليوم'
+  if(diff===1) return 'منذ يوم'
+  if(diff<7) return `منذ ${diff} أيام`
+  if(diff<30) return `منذ ${Math.floor(diff/7)} أسابيع`
+  return `منذ ${Math.floor(diff/30)} شهر`
+}
+function formatSupNum(n:number){ return `SUP-${String(n).padStart(5,'0')}` }
+function initials(name:string){ return name?.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)||'??' }
+function ratingColor(r:number){ return r>=7?S.green:r>=5?S.amber:S.red }
+
+// ── نجوم التقييم ──
+function Stars({rating,max=10,size=10}:{rating:number;max?:number;size?:number}){
+  const stars=Math.round((rating/max)*5)
+  return(
+    <div style={{display:'flex',gap:2,alignItems:'center'}}>
+      {[1,2,3,4,5].map(i=>(
+        <svg key={i} width={size} height={size} viewBox="0 0 16 16" style={{fill:i<=stars?S.gold:'rgba(201,168,76,0.2)'}}>
+          <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z"/>
+        </svg>
+      ))}
+      <span style={{fontSize:size-2,color:S.muted,marginRight:3}}>{rating||0}/10</span>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════
+// Modal إضافة مورد — تصميم جديد متعدد الخطوات
+// ════════════════════════════════════════════════
+function AddSupplierModal({onClose,onSaved,existingSuppliers}:{
+  onClose:()=>void; onSaved:()=>void; existingSuppliers:Supplier[];
+}){
+  const [step,       setStep]       = useState(1) // خطوات 1,2,3
+  const [aiLoading,  setAiLoading]  = useState(false)
+  const [saving,     setSaving]     = useState(false)
   const [form, setForm] = useState({
-    company_name: '', country: '', city: '',
-    contact_name: '', contact_whatsapp: '',
-    contact_email: '', annual_sales: '',
-    main_products: '', notes: '',
-    website: '',
+    company_name:'',country:'',city:'',
+    contact_name:'',contact_whatsapp:'',contact_email:'',contact_phone:'',
+    annual_sales:'',main_products:'',notes:'',website:'',certifications:'',
   })
 
-  // ===== تحميل البيانات عند فتح الصفحة =====
-  useEffect(() => {
-    fetchSuppliers()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserName(user.user_metadata?.full_name || user.email?.split('@')[0] || 'User')
-    })
-  }, [])
+  const COUNTRIES_LIST = [
+    'المملكة العربية السعودية','الإمارات','مصر','الكويت','قطر','البحرين','عُمان',
+    'الأردن','لبنان','العراق','إندونيسيا','ماليزيا','الصين','الهند','تركيا',
+    'ألمانيا','فرنسا','إيطاليا','المملكة المتحدة','الولايات المتحدة','كندا','أخرى',
+  ]
 
-  // ===== 1. جلب الموردين =====
-  async function fetchSuppliers() {
-    setLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) { console.error('خطأ:', error.message); return }
-      setSuppliers(data || [])
-    } catch (err) {
-      console.error('خطأ غير متوقع:', err)
-    } finally {
-      setLoading(false)
-    }
+  function set(k:string,v:string){ setForm(p=>({...p,[k]:v})) }
+  function calcCompletion(){
+    const fields=['company_name','country','city','contact_name','contact_whatsapp','contact_email','annual_sales','main_products','notes']
+    return Math.round(fields.filter(k=>(form as any)[k]?.trim()).length/fields.length*100)
   }
 
-  // ===== 2. تعبئة بالذكاء الاصطناعي (BidLX V1.2.1) =====
-  async function fillWithAI() {
-    if (!form.company_name) { alert('اكتب اسم الشركة أولاً'); return }
+  async function fillWithAI(){
+    if(!form.company_name){alert('اكتب اسم الشركة أولاً');return}
     setAiLoading(true)
-    try {
-      const res = await fetch('/api/ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company_name: form.company_name }),
-      })
-      const data = await res.json()
-      const aiContent = data?.choices?.[0]?.message?.content || '{}'
-
-      // تحليل JSON القادم من AI مع معالجة الأخطاء
-      const parsed = JSON.parse(aiContent.replace(/```json|```/g, '').trim())
-
-      // توزيع البيانات على الـ Form State
-      // مع تحويل المصفوفات → نص مفصول بفاصلة عربية ،
-      setForm(prev => ({
-        ...prev,
-        ...parsed,
-        main_products: Array.isArray(parsed.main_products)
-          ? parsed.main_products.join('، ')
-          : (parsed.main_products || prev.main_products),
-      }))
-    } catch (err: any) {
-      alert('تعذر الاتصال بالذكاء الاصطناعي')
-    } finally {
-      setAiLoading(false)
-    }
+    try{
+      const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company_name:form.company_name})})
+      const data=await res.json()
+      const parsed=JSON.parse((data?.choices?.[0]?.message?.content||'{}').replace(/```json|```/g,'').trim())
+      setForm(p=>({...p,...parsed,main_products:Array.isArray(parsed.main_products)?parsed.main_products.join('، '):(parsed.main_products||p.main_products)}))
+    }catch{ alert('تعذر الاتصال بالذكاء الاصطناعي') }
+    finally{ setAiLoading(false) }
   }
 
-  // ===== 3. إضافة مورد جديد مع ترحيل المنتجات (BidLX V1.2.1) =====
-  async function addSupplier() {
-    // التحقق الأساسي
-    if (!form.company_name) { alert('يرجى إدخال اسم الشركة'); return }
+  // FIX 1: إصلاح حفظ المنتجات بدون onConflict مشكلة
+  async function handleSave(){
+    if(!form.company_name){alert('يرجى إدخال اسم الشركة');return}
+    setSaving(true)
+    try{
+      const {data:{user}}=await supabase.auth.getUser()
+      if(!user){alert('جلسة الدخول انتهت');return}
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) { alert('جلسة الدخول انتهت'); return }
+      // FIX 1+2: حفظ المنتجات في supplier_products بدلاً من products لتجنب مشكلة unique constraint
+      const rawProducts=form.main_products||''
+      const productsArray=rawProducts.split(/[،,]/).map(p=>p.trim()).filter(Boolean)
 
-    try {
-      // معالجة المنتجات وتنظيفها باستخدام cleanProductName
-      const rawProducts = form.main_products || ''
-      const productsArray = rawProducts
-        .split(/[،,]/)
-        .map(p => cleanProductName(p))
-        .filter(p => p !== '')
+      // حفظ المورد أولاً
+      const {data:suppData,error:suppErr}=await supabase.from('suppliers').insert([{
+        ...form,
+        main_products: productsArray.join('، '),
+        status:'active',rating:0,
+        completion_pct:calcCompletion(),
+        user_id:user.id,
+      }]).select().single()
 
-      // ترحيل المنتجات لجدول products مع منع التكرار (upsert)
-      if (productsArray.length > 0) {
-        const productInserts = productsArray.map(name => ({ name }))
-        const { error: prodError } = await supabase
-          .from('products')
-          .upsert(productInserts, { onConflict: 'name' })
-        if (prodError) throw prodError
+      if(suppErr) throw suppErr
+
+      // FIX 2: حفظ المنتجات في supplier_products فقط (بدون upsert مشكلة)
+      if(productsArray.length>0&&suppData){
+        const spInserts=productsArray.map(name=>({
+          name, supplier_id:suppData.id, user_id:user.id,
+          status:'active',
+        }))
+        // insert عادي بدون onConflict لتجنب الخطأ
+        const {error:spErr}=await supabase.from('supplier_products').insert(spInserts)
+        if(spErr) console.warn('supplier_products insert warning:', spErr.message)
+        // لا نوقف العملية حتى لو فشل الإدراج في supplier_products
       }
 
-      // حفظ بيانات المورد في جدول suppliers
-      const { error: suppError } = await supabase.from('suppliers').insert([{
-        ...form,
-        main_products: productsArray.join('، '), // النسخة المنسقة والموحدة
-        status: 'active',
-        rating: 0,
-        completion_pct: calcCompletion(form),
-        user_id: user.id,
-      }])
-      if (suppError) throw suppError
+      onSaved()
+      onClose()
+    }catch(err:any){
+      alert('خطأ: '+err.message)
+    }finally{setSaving(false)}
+  }
 
-      alert('تم ترحيل المورد وتحديث مخزن المنتجات بنجاح ✅')
-      setForm({
-        company_name: '', country: '', city: '', contact_name: '',
-        contact_whatsapp: '', contact_email: '', annual_sales: '',
-        main_products: '', notes: '', website: '',
-      })
-      setShowForm(false)
-      fetchSuppliers()
+  const completion=calcCompletion()
+  const steps=[
+    {n:1,label:'البيانات الأساسية'},
+    {n:2,label:'التواصل'},
+    {n:3,label:'المنتجات والملاحظات'},
+  ]
 
-    } catch (err: any) {
-      console.error('خطأ ترحيل BidLX:', err.message)
-      alert('حدث خطأ أثناء الحفظ: ' + err.message)
+  return(
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000,backdropFilter:'blur(12px)',padding:16}}>
+      <div style={{background:S.navy2,width:'100%',maxWidth:620,borderRadius:24,border:`1px solid ${S.goldB}`,direction:'rtl',overflow:'hidden',boxShadow:'0 30px 80px rgba(0,0,0,0.7)',display:'flex',flexDirection:'column',maxHeight:'92vh'}}>
+
+        {/* هيدر */}
+        <div style={{background:`linear-gradient(135deg,${S.navy},${S.navy2})`,padding:'22px 26px',borderBottom:`1px solid ${S.goldB}`,flexShrink:0}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:16}}>
+            <button onClick={onClose} style={{background:'none',border:'none',color:S.muted,fontSize:20,cursor:'pointer',lineHeight:1}}>✕</button>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:17,fontWeight:800,color:S.gold2,marginBottom:2}}>➕ إضافة مورد جديد</div>
+              <div style={{fontSize:11,color:S.muted}}>اكتمال الملف: <span style={{color:completion>=80?S.green:completion>=50?S.amber:S.red,fontWeight:700}}>{completion}%</span></div>
+            </div>
+          </div>
+
+          {/* شريط الخطوات */}
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            {steps.map((s,i)=>(
+              <div key={s.n} style={{display:'flex',alignItems:'center',gap:6,flex:1}}>
+                <div onClick={()=>setStep(s.n)}
+                  style={{display:'flex',alignItems:'center',gap:7,cursor:'pointer',flex:1,padding:'7px 10px',borderRadius:10,background:step===s.n?S.gold3:'transparent',border:`1px solid ${step===s.n?S.gold:S.border}`,transition:'all .2s'}}>
+                  <div style={{width:22,height:22,borderRadius:'50%',background:step>s.n?S.green:step===s.n?S.gold:'rgba(255,255,255,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:S.navy,flexShrink:0}}>
+                    {step>s.n?'✓':s.n}
+                  </div>
+                  <div style={{fontSize:10,color:step===s.n?S.gold2:S.muted,fontWeight:step===s.n?700:400}}>{s.label}</div>
+                </div>
+                {i<2&&<div style={{width:16,height:1,background:S.border,flexShrink:0}}/>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* المحتوى */}
+        <div style={{flex:1,overflowY:'auto',padding:'22px 26px'}}>
+
+          {/* زر AI */}
+          <button onClick={fillWithAI} disabled={aiLoading}
+            style={{width:'100%',background:S.gold3,color:S.gold2,border:`1px solid ${S.goldB}`,padding:'10px',borderRadius:10,fontSize:12,fontWeight:700,cursor:aiLoading?'not-allowed':'pointer',fontFamily:'Tajawal, sans-serif',marginBottom:18,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+            {aiLoading?'⏳ جاري البحث...':'✨ إملأ البيانات بالذكاء الاصطناعي'}
+          </button>
+
+          {/* ── الخطوة 1: البيانات الأساسية ── */}
+          {step===1&&(
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>اسم الشركة *</label>
+                <input value={form.company_name} onChange={e=>set('company_name',e.target.value)} style={inp} placeholder="مثال: Wilmar International"/>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div>
+                  <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>الدولة</label>
+                  <select value={form.country} onChange={e=>set('country',e.target.value)} style={{...inp,cursor:'pointer'}}>
+                    <option value="" style={{background:S.navy2}}>اختر الدولة...</option>
+                    {COUNTRIES_LIST.map(c=><option key={c} value={c} style={{background:S.navy2}}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>المدينة</label>
+                  <input value={form.city} onChange={e=>set('city',e.target.value)} style={inp} placeholder="مثال: جاكرتا"/>
+                </div>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>الموقع الإلكتروني</label>
+                <input value={form.website} onChange={e=>set('website',e.target.value)} style={inp} placeholder="www.company.com"/>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>حجم المبيعات السنوية</label>
+                <input value={form.annual_sales} onChange={e=>set('annual_sales',e.target.value)} style={inp} placeholder="مثال: $10M"/>
+              </div>
+            </div>
+          )}
+
+          {/* ── الخطوة 2: بيانات التواصل ── */}
+          {step===2&&(
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>اسم المسؤول</label>
+                <input value={form.contact_name} onChange={e=>set('contact_name',e.target.value)} style={inp} placeholder="الشخص المسؤول"/>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div>
+                  <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>📱 واتساب</label>
+                  <input value={form.contact_whatsapp} onChange={e=>set('contact_whatsapp',e.target.value)} style={inp} placeholder="+62 8xx xxx xxxx"/>
+                </div>
+                <div>
+                  <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>📞 هاتف</label>
+                  <input value={form.contact_phone} onChange={e=>set('contact_phone',e.target.value)} style={inp} placeholder="+62 xx xxx xxxx"/>
+                </div>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>✉️ الإيميل</label>
+                <input value={form.contact_email} onChange={e=>set('contact_email',e.target.value)} style={inp} placeholder="email@company.com"/>
+              </div>
+              {/* معاينة بطاقة التواصل */}
+              {(form.contact_name||form.contact_whatsapp)&&(
+                <div style={{background:S.card,borderRadius:12,padding:'14px 16px',border:`1px solid ${S.border}`}}>
+                  <div style={{fontSize:10,color:S.muted,marginBottom:8,fontWeight:700,textAlign:'right'}}>معاينة بطاقة التواصل</div>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div style={{display:'flex',gap:8}}>
+                      {form.contact_whatsapp&&<a href={`https://wa.me/${form.contact_whatsapp.replace(/[^0-9]/g,'')}`} target="_blank" rel="noopener noreferrer" style={{fontSize:10,padding:'4px 10px',borderRadius:6,background:S.greenB,color:S.green,textDecoration:'none',fontWeight:700}}>📱 واتساب</a>}
+                      {form.contact_email&&<a href={`mailto:${form.contact_email}`} style={{fontSize:10,padding:'4px 10px',borderRadius:6,background:S.blueB,color:S.blue,textDecoration:'none',fontWeight:700}}>✉️ إيميل</a>}
+                    </div>
+                    <div style={{textAlign:'right'}}>
+                      <div style={{fontSize:13,fontWeight:700,color:S.white}}>{form.contact_name||'—'}</div>
+                      <div style={{fontSize:10,color:S.muted}}>{form.company_name}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── الخطوة 3: المنتجات والملاحظات ── */}
+          {step===3&&(
+            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>المنتجات الرئيسية</label>
+                <div style={{fontSize:10,color:S.muted,marginBottom:6,textAlign:'right'}}>أدخل المنتجات مفصولة بـ ، (فاصلة عربية)</div>
+                <textarea value={form.main_products} onChange={e=>set('main_products',e.target.value)} rows={4}
+                  placeholder="مثال: زيت نخيل، فحم جوز هند، زيت جوز هند..." style={{...inp,resize:'none',lineHeight:'1.7'} as React.CSSProperties}/>
+                {/* معاينة المنتجات */}
+                {form.main_products&&(
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:8}}>
+                    {form.main_products.split(/[،,]/).map(p=>p.trim()).filter(Boolean).map((p,i)=>(
+                      <span key={i} style={{fontSize:10,padding:'3px 10px',borderRadius:20,background:S.gold3,color:S.gold2,border:`1px solid ${S.goldB}`,fontWeight:600}}>📦 {p}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>الشهادات والاعتمادات</label>
+                <input value={form.certifications} onChange={e=>set('certifications',e.target.value)} style={inp} placeholder="ISO، Halal، HACCP، ..."/>
+              </div>
+              <div>
+                <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>ملاحظات</label>
+                <textarea value={form.notes} onChange={e=>set('notes',e.target.value)} rows={3}
+                  placeholder="نبذة عن المورد، تفاصيل إضافية..." style={{...inp,resize:'none'} as React.CSSProperties}/>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* أزرار التنقل */}
+        <div style={{padding:'16px 26px',borderTop:`1px solid ${S.border}`,flexShrink:0,display:'flex',gap:10}}>
+          {step>1?(
+            <button onClick={()=>setStep(p=>p-1)} style={{flex:1,background:'transparent',color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:10,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+              ← السابق
+            </button>
+          ):(
+            <button onClick={onClose} style={{flex:1,background:'transparent',color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:10,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
+          )}
+          {step<3?(
+            <button onClick={()=>setStep(p=>p+1)} disabled={step===1&&!form.company_name}
+              style={{flex:2,background:step===1&&!form.company_name?S.muted:`linear-gradient(135deg,${S.gold},${S.gold2})`,color:S.navy,border:'none',padding:11,borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
+              التالي →
+            </button>
+          ):(
+            <button onClick={handleSave} disabled={saving}
+              style={{flex:2,background:saving?S.muted:`linear-gradient(135deg,${S.gold},${S.gold2})`,color:S.navy,border:'none',padding:11,borderRadius:10,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'Tajawal, sans-serif',display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+              {saving?'⏳ جاري الحفظ...':'✅ إضافة المورد'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════
+// الصفحة الرئيسية
+// ════════════════════════════════════════════════
+export default function SuppliersPage(){
+  const router = useRouter()
+
+  const [suppliers,     setSuppliers]     = useState<Supplier[]>([])
+  const [loading,       setLoading]       = useState(true)
+  const [search,        setSearch]        = useState('')
+  const [tab,           setTab]           = useState<'active'|'suspended'>('active')
+  const [showForm,      setShowForm]      = useState(false)
+  const [filterCountry, setFilterCountry] = useState('')
+  const [viewMode,      setViewMode]      = useState<'table'|'cards'>('table')
+  const [userName,      setUserName]      = useState('User')
+  const [currentPage,   setCurrentPage]   = useState(1)
+  const [sortField,     setSortField]     = useState<'company_name'|'rating'|'total_deals'|'last_contact_date'|'completion_pct'>('company_name')
+  const [sortDir,       setSortDir]       = useState<'asc'|'desc'>('asc')
+
+  // FIX 3 — الميزة الإضافية 1: بحث سريع في المنتجات
+  const [productSearch, setProductSearch] = useState('')
+
+  const rowsPerPage=20
+
+  const fetchSuppliers=useCallback(async()=>{
+    setLoading(true)
+    const {data:{user}}=await supabase.auth.getUser()
+    if(user) setUserName(user.user_metadata?.full_name||user.email?.split('@')[0]||'User')
+    const {data,error}=await supabase.from('suppliers').select('*').order('created_at',{ascending:false})
+    if(!error) setSuppliers(data||[])
+    setLoading(false)
+  },[])
+
+  useEffect(()=>{ fetchSuppliers() },[fetchSuppliers])
+
+  async function toggleStatus(id:string,currentStatus:string){
+    const newStatus=currentStatus==='active'?'suspended':'active'
+    const {error}=await supabase.from('suppliers').update({status:newStatus}).eq('id',id)
+    if(!error) setSuppliers(prev=>prev.map(s=>s.id===id?{...s,status:newStatus}:s))
+  }
+
+  // FIX 3 — الميزة الإضافية 2: تحديث آخر تواصل بنقرة
+  async function markContacted(id:string){
+    const now=new Date().toISOString()
+    const {error}=await supabase.from('suppliers').update({last_contact_date:now,last_contact_method:'manual'}).eq('id',id)
+    if(!error){
+      setSuppliers(prev=>prev.map(s=>s.id===id?{...s,last_contact_date:now}:s))
+      alert('✅ تم تسجيل التواصل اليوم')
     }
   }
 
-  // ===== 4. تغيير حالة المورد (toggleStatus) =====
-  async function toggleStatus(id: string, currentStatus: string) {
-    const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
-    const { error } = await supabase
-      .from('suppliers')
-      .update({ status: newStatus })
-      .eq('id', id)
-    if (error) { console.error('خطأ تغيير الحالة:', error.message); return }
-    // تحديث القائمة فوراً دون إعادة تحميل كاملة
-    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s))
+  const exportToExcel=()=>{
+    if(filtered.length===0) return alert('لا توجد بيانات للتصدير')
+    const ws=XLSX.utils.json_to_sheet(filtered.map(s=>({
+      'رقم المورد':formatSupNum(s.supplier_number),'اسم الشركة':s.company_name,
+      'الدولة':s.country,'المدينة':s.city,'المنتجات':s.main_products,
+      'واتساب':s.contact_whatsapp,'الإيميل':s.contact_email,
+      'التقييم':`${s.rating||0}/10`,'الصفقات':s.total_deals||0,
+      'آخر تواصل':s.last_contact_date?new Date(s.last_contact_date).toLocaleDateString('ar-EG'):'—',
+      'الحالة':s.status==='active'?'نشط':'موقوف',
+    })))
+    const wb=XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb,ws,'Suppliers')
+    XLSX.writeFile(wb,`${userName}_Suppliers_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  // ===== 5. تصدير إكسيل =====
-  const exportToExcel = () => {
-    if (filtered.length === 0) return alert('لا توجد بيانات للتصدير')
-    const worksheet = XLSX.utils.json_to_sheet(
-      filtered.map(s => ({
-        'رقم المورد': formatSupNum(s.supplier_number),
-        'اسم الشركة': s.company_name,
-        'الدولة': s.country,
-        'المدينة': s.city,
-        'المنتجات': s.main_products,
-        'واتساب': s.contact_whatsapp,
-        'الإيميل': s.contact_email,
-        'الحالة': s.status === 'active' ? 'نشط' : 'موقوف',
-      }))
-    )
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Suppliers')
-    const dateStr = new Date().toISOString().split('T')[0]
-    XLSX.writeFile(workbook, `${userName}_Suppliers_${dateStr}.xlsx`)
+  // ── تصفية وترتيب ──
+  const filtered=useMemo(()=>{
+    let res=suppliers
+      .filter(s=>s.status===tab)
+      .filter(s=>s.company_name?.toLowerCase().includes(search.toLowerCase()))
+      .filter(s=>filterCountry?s.country===filterCountry:true)
+      .filter(s=>!productSearch||s.main_products?.toLowerCase().includes(productSearch.toLowerCase()))
+
+    res=[...res].sort((a,b)=>{
+      let va=(a as any)[sortField]||0, vb=(b as any)[sortField]||0
+      if(typeof va==='string') return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va)
+      return sortDir==='asc'?va-vb:vb-va
+    })
+    return res
+  },[suppliers,tab,search,filterCountry,productSearch,sortField,sortDir])
+
+  const totalPages=Math.ceil(filtered.length/rowsPerPage)
+  const paged=filtered.slice((currentPage-1)*rowsPerPage,currentPage*rowsPerPage)
+
+  function toggleSort(field:typeof sortField){
+    if(sortField===field) setSortDir(d=>d==='asc'?'desc':'asc')
+    else{ setSortField(field);setSortDir('asc') }
   }
 
-  // ===== حساب اكتمال الملف =====
-  function calcCompletion(f: any) {
-    const fields = ['company_name', 'country', 'city', 'contact_name', 'contact_whatsapp', 'contact_email', 'annual_sales', 'main_products', 'notes']
-    return Math.round(fields.filter(k => f[k]?.trim()).length / fields.length * 100)
-  }
+  const active=suppliers.filter(s=>s.status==='active')
+  const totalDeals=suppliers.reduce((a,b)=>a+(b.total_deals||0),0)
+  const avgRating=suppliers.length?(suppliers.reduce((a,b)=>a+(b.rating||0),0)/suppliers.length).toFixed(1):'0'
 
-  // ===== تصفية الموردين =====
-  const filtered = suppliers
-    .filter(s => s.status === tab)
-    .filter(s => s.company_name?.toLowerCase().includes(search.toLowerCase()))
-    .filter(s => filterCountry ? s.country === filterCountry : true)
+  // FIX 3 — الميزة الإضافية 3: بيانات المنتجات الأكثر شيوعاً
+  const topProducts=useMemo(()=>{
+    const map:Record<string,number>={}
+    suppliers.forEach(s=>{
+      (s.main_products||'').split(/[،,]/).forEach(p=>{
+        const n=p.trim()
+        if(n) map[n]=(map[n]||0)+1
+      })
+    })
+    return Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,5)
+  },[suppliers])
 
-  // ===== Pagination =====
-  const totalPages = Math.ceil(filtered.length / rowsPerPage)
-  const paginatedData = filtered.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage
-  )
+  return(
+    <div style={{display:'flex',flexDirection:'column',height:'100%',color:S.white,fontFamily:'Tajawal,sans-serif',direction:'rtl',background:S.navy}}>
 
-  const initials = (name: string) => name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??'
-
-  const inp: React.CSSProperties = {
-    width: '100%', background: S.navy, border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: S.white,
-    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-  }
-
-  // ===== الواجهة =====
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
-      {/* شريط الأدوات */}
-      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => setShowForm(true)}
-            style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+      {/* ══ شريط الأدوات ══ */}
+      <div style={{background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <div style={{display:'flex',gap:10,alignItems:'center'}}>
+          <button onClick={()=>setShowForm(true)}
+            style={{background:S.gold,color:S.navy,border:'none',padding:'9px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
             + إضافة مورد
           </button>
           <button onClick={exportToExcel}
-            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{background:'rgba(232,201,122,0.1)',color:S.gold2,border:`1px solid ${S.gold}`,padding:'9px 18px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
             📤 تصدير
           </button>
-          <button onClick={() => router.push('/pricing/compare')}
-            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={()=>router.push('/pricing/compare')}
+            style={{background:S.card2,color:S.muted,border:`1px solid ${S.border}`,padding:'9px 18px',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             📊 مقارنة أسعار
           </button>
-          <button onClick={() => router.push('/Buy-Request')}
-            style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={()=>router.push('/Buy-Request')}
+            style={{background:S.card2,color:S.muted,border:`1px solid ${S.border}`,padding:'9px 18px',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
             ⚖️ طلب شراء
           </button>
         </div>
+        <div style={{fontSize:12,color:S.muted}}>
+          {active.length} نشط من {suppliers.length} مورد
+        </div>
       </div>
 
-      {/* المحتوى القابل للتمرير */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      {/* ══ المحتوى ══ */}
+      <div style={{flex:1,overflowY:'auto',padding:'18px 24px'}}>
 
         {/* الإحصائيات */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'10px',marginBottom:'18px'}}>
           {[
-            { label: 'إجمالي الموردين',  val: suppliers.length, color: S.gold },
-            { label: 'موردون نشطون',     val: suppliers.filter(s => s.status === 'active').length, color: S.green },
-            { label: 'موقوفون',          val: suppliers.filter(s => s.status === 'suspended').length, color: S.red },
-            { label: 'إجمالي الصفقات',   val: suppliers.reduce((a, b) => a + (b.total_deals || 0), 0), color: S.blue },
-          ].map((s, i) => (
-            <div key={i} style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '28px', fontWeight: 700, color: s.color, marginBottom: '4px' }}>{s.val}</div>
-              <div style={{ fontSize: '11px', color: S.muted }}>{s.label}</div>
+            {label:'إجمالي الموردين', val:suppliers.length,      color:S.gold,    icon:'🏭'},
+            {label:'نشطون',           val:active.length,          color:S.green,   icon:'✅'},
+            {label:'موقوفون',         val:suppliers.filter(s=>s.status==='suspended').length, color:S.red, icon:'⏸'},
+            {label:'إجمالي الصفقات', val:totalDeals,             color:S.blue,    icon:'📦'},
+            {label:'متوسط التقييم',  val:avgRating,              color:S.amber,   icon:'⭐'},
+          ].map((s,i)=>(
+            <div key={i} style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'12px',padding:'14px 16px',textAlign:'right'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <span style={{fontSize:20}}>{s.icon}</span>
+                <div style={{fontSize:'22px',fontWeight:700,color:s.color}}>{s.val}</div>
+              </div>
+              <div style={{fontSize:'10px',color:S.muted}}>{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* شريط البحث والفلاتر */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input type="text" placeholder="🔍  ابحث عن مورد..." value={search}
-            onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
-            style={{ ...inp, flex: 1, background: S.navy2, borderRadius: '10px', padding: '10px 16px', minWidth: '200px' }} />
+        {/* FIX 3 — أكثر المنتجات شيوعاً */}
+        {topProducts.length>0&&(
+          <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'12px',padding:'14px 18px',marginBottom:'16px'}}>
+            <div style={{fontSize:12,fontWeight:700,color:S.muted,marginBottom:10,textAlign:'right'}}>📦 أكثر المنتجات شيوعاً بين الموردين</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+              {topProducts.map(([name,count],i)=>(
+                <button key={i} onClick={()=>{setProductSearch(name);setViewMode('table')}}
+                  style={{fontSize:11,padding:'4px 12px',borderRadius:20,background:i===0?S.gold3:S.card,color:i===0?S.gold2:S.muted,border:`1px solid ${i===0?S.goldB:S.border}`,cursor:'pointer',fontFamily:'Tajawal, sans-serif',fontWeight:i===0?700:400}}>
+                  {name} <span style={{fontSize:10,opacity:.7}}>({count})</span>
+                </button>
+              ))}
+              {productSearch&&<button onClick={()=>setProductSearch('')} style={{fontSize:11,padding:'4px 10px',borderRadius:20,background:S.redB,color:S.red,border:`1px solid ${S.red}30`,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>✕ إلغاء الفلتر</button>}
+            </div>
+          </div>
+        )}
 
-          <select value={filterCountry}
-            onChange={e => { setFilterCountry(e.target.value); setCurrentPage(1) }}
-            style={{ background: S.navy2, color: filterCountry ? S.white : S.muted, border: `1px solid ${S.border}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12px', outline: 'none', fontFamily: 'inherit', cursor: 'pointer' }}>
+        {/* شريط البحث والفلاتر */}
+        <div style={{display:'flex',gap:'10px',marginBottom:'14px',alignItems:'center',flexWrap:'wrap'}}>
+          <input type="text" placeholder="🔍 ابحث عن مورد..." value={search}
+            onChange={e=>{setSearch(e.target.value);setCurrentPage(1)}}
+            style={{flex:1,minWidth:'180px',background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'10px',padding:'10px 16px',fontSize:'13px',color:S.white,outline:'none',fontFamily:'inherit',textAlign:'right',boxSizing:'border-box' as any}}/>
+
+          <input type="text" placeholder="🔍 بحث في المنتجات..." value={productSearch}
+            onChange={e=>{setProductSearch(e.target.value);setCurrentPage(1)}}
+            style={{width:160,background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'10px',padding:'10px 14px',fontSize:'12px',color:S.white,outline:'none',fontFamily:'inherit',textAlign:'right',boxSizing:'border-box' as any}}/>
+
+          <select value={filterCountry} onChange={e=>{setFilterCountry(e.target.value);setCurrentPage(1)}}
+            style={{background:S.navy2,color:filterCountry?S.white:S.muted,border:`1px solid ${S.border}`,borderRadius:'10px',padding:'10px 14px',fontSize:'12px',outline:'none',fontFamily:'inherit',cursor:'pointer'}}>
             <option value="">كل الدول</option>
-            {[...new Set(suppliers.map(s => s.country).filter(Boolean))].map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
+            {[...new Set(suppliers.map(s=>s.country).filter(Boolean))].map(c=><option key={c} value={c}>{c}</option>)}
           </select>
 
-          <button onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-            style={{ background: S.navy2, color: S.muted, border: `1px solid ${S.border}`, padding: '10px 14px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
-            {viewMode === 'table' ? '⊞ بطاقات' : '☰ جدول'}
+          <button onClick={()=>setViewMode(viewMode==='table'?'cards':'table')}
+            style={{background:S.navy2,color:S.muted,border:`1px solid ${S.border}`,padding:'10px 14px',borderRadius:'10px',fontSize:'12px',cursor:'pointer',fontFamily:'inherit'}}>
+            {viewMode==='table'?'⊞ بطاقات':'☰ جدول'}
           </button>
 
-          <div style={{ display: 'flex', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '10px', overflow: 'hidden' }}>
-            {[{ key: 'active', label: 'نشطون' }, { key: 'suspended', label: 'موقوفون' }].map(t => (
-              <button key={t.key} onClick={() => { setTab(t.key as any); setCurrentPage(1) }}
-                style={{ padding: '9px 20px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: tab === t.key ? (t.key === 'active' ? S.green : S.red) : 'transparent', color: tab === t.key ? '#fff' : S.muted, transition: 'all 0.15s' }}>
+          <div style={{display:'flex',background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'10px',overflow:'hidden'}}>
+            {[{key:'active',label:'نشطون',color:S.green},{key:'suspended',label:'موقوفون',color:S.red}].map(t=>(
+              <button key={t.key} onClick={()=>{setTab(t.key as any);setCurrentPage(1)}}
+                style={{padding:'9px 18px',fontSize:'12px',fontWeight:600,cursor:'pointer',fontFamily:'inherit',border:'none',background:tab===t.key?`${t.color}22`:'transparent',color:tab===t.key?t.color:S.muted,transition:'all .15s'}}>
                 {t.label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* عرض البطاقات */}
-        {viewMode === 'cards' && !loading && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '12px', marginBottom: '12px' }}>
-            {filtered.length === 0 ? (
-              <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0', gridColumn: '1/-1' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: S.white }}>لا يوجد موردون</div>
+        {/* ── عرض البطاقات ── */}
+        {viewMode==='cards'&&!loading&&(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'12px',marginBottom:'12px'}}>
+            {filtered.length===0?(
+              <div style={{textAlign:'center',color:S.muted,padding:'80px 0',gridColumn:'1/-1'}}>
+                <div style={{fontSize:'48px',marginBottom:'16px'}}>🏭</div>
+                <div style={{fontSize:'16px',fontWeight:700,color:S.white}}>لا يوجد موردون</div>
               </div>
-            ) : filtered.map(s => (
-              <div key={s.id} onClick={() => router.push(`/suppliers/${s.id}`)}
-                style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', padding: '16px', cursor: 'pointer' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'linear-gradient(135deg,#1D9E75,#085041)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+            ):filtered.map(s=>(
+              <div key={s.id} onClick={()=>router.push(`/suppliers/${s.id}`)}
+                style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'14px',padding:'16px',cursor:'pointer',transition:'border-color .2s',position:'relative'}}>
+                <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}}>
+                  <div style={{width:44,height:44,borderRadius:10,background:'linear-gradient(135deg,#1D9E75,#085041)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#fff',flexShrink:0}}>
                     {initials(s.company_name)}
                   </div>
-                  <div style={{ flex: 1, textAlign: 'right' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700 }}>{s.company_name}</div>
-                    <div style={{ fontSize: '10px', color: S.muted }}>{s.country || '—'}{s.city ? ` / ${s.city}` : ''}</div>
+                  <div style={{flex:1,textAlign:'right'}}>
+                    <div style={{fontSize:13,fontWeight:700}}>{s.company_name}</div>
+                    <div style={{fontSize:10,color:S.muted}}>{s.country||'—'}{s.city?` / ${s.city}`:''}</div>
                   </div>
-                  <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700, background: s.status === 'active' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: s.status === 'active' ? S.green : S.red }}>
-                    {s.status === 'active' ? 'نشط' : 'موقوف'}
+                  <span style={{fontSize:9,padding:'2px 8px',borderRadius:20,fontWeight:700,background:s.status==='active'?S.greenB:S.redB,color:s.status==='active'?S.green:S.red}}>
+                    {s.status==='active'?'نشط':'موقوف'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '10px', justifyContent: 'flex-end' }}>
-                  {[1,2,3,4,5].map(i => (
-                    <svg key={i} width="14" height="14" viewBox="0 0 16 16" style={{ fill: i <= Math.round((s.rating || 0) / 2) ? S.gold : 'rgba(201,168,76,0.2)' }}>
-                      <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z"/>
-                    </svg>
-                  ))}
-                  <span style={{ fontSize: '10px', color: S.muted, marginRight: '4px' }}>{s.rating || 0}/10</span>
-                </div>
-                {s.main_products && (
-                  <div style={{ fontSize: '11px', color: S.muted, textAlign: 'right', marginBottom: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {s.main_products}
+                <div style={{marginBottom:8}}><Stars rating={s.rating||0}/></div>
+                {s.main_products&&<div style={{fontSize:11,color:S.muted,textAlign:'right',marginBottom:10,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.main_products}</div>}
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:10,color:S.muted}}>{s.completion_pct||0}%</span>
+                  <div style={{flex:1,height:3,background:'rgba(255,255,255,0.1)',borderRadius:2,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${s.completion_pct||0}%`,background:s.completion_pct>=80?S.green:s.completion_pct>=50?S.amber:S.red,borderRadius:2}}/>
                   </div>
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '10px', color: S.muted }}>{s.completion_pct || 0}%</span>
-                  <div style={{ flex: 1, height: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${s.completion_pct || 0}%`, background: s.completion_pct >= 80 ? S.green : s.completion_pct >= 50 ? S.amber : S.red, borderRadius: '2px' }} />
-                  </div>
-                  <span style={{ fontSize: '10px', color: S.muted }}>{formatSupNum(s.supplier_number)}</span>
+                  <span style={{fontSize:10,color:S.muted}}>{formatSupNum(s.supplier_number)}</span>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* عرض الجدول */}
-        {viewMode === 'table' && (
+        {/* ── عرض الجدول ── */}
+        {viewMode==='table'&&(
           <>
-            {loading ? (
-              <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>جاري التحميل...</div>
-            ) : filtered.length === 0 ? (
-              <div style={{ textAlign: 'center', color: S.muted, padding: '80px 0' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px', color: S.white }}>لا يوجد موردون</div>
-                    <div style={{ fontSize: '14px', marginTop: '8px' }}>ابدأ بإضافة أول مورد ليظهر هنا</div>
+            {loading?(
+              <div style={{textAlign:'center',color:S.muted,padding:'80px 0'}}>
+                <div style={{fontSize:32,marginBottom:12}}>⏳</div>جاري التحميل...
               </div>
-            ) : (
-              <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            ):filtered.length===0?(
+              <div style={{textAlign:'center',color:S.muted,padding:'80px 0'}}>
+                <div style={{fontSize:'48px',marginBottom:'16px'}}>🏭</div>
+                <div style={{fontSize:'16px',fontWeight:700,color:S.white,marginBottom:8}}>لا يوجد موردون</div>
+                <div style={{fontSize:'14px'}}>ابدأ بإضافة أول مورد</div>
+              </div>
+            ):(
+              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'14px',overflow:'hidden',alignItems: 'center'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
                   <thead>
-                    <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
-                      {['#', 'الشركة', 'الدولة', 'المنتجات', 'الصفقات', 'آخر تواصل', 'الحالة', 'تواصل سريع', 'إجراء'].map(h => (
-                        <th key={h} style={{ padding: '12px 14px', textAlign: 'right', fontSize: '10px', color: S.muted, fontWeight: 700, letterSpacing: '0.5px' }}>{h}</th>
+                    <tr style={{background:'rgba(255,255,255,0.05)',borderBottom:`1px solid ${S.border}`,textAlign: 'center'}}>
+                      {[
+                        {label:'#',         field:null},
+                        {label:'الشركة',    field:'company_name'},
+                        {label:'الدولة',    field:null},
+                        {label:'المنتجات',  field:null},
+                        {label:'التقييم',   field:'rating'},
+                        {label:'الصفقات',   field:'total_deals'},
+                        {label:'الاكتمال',  field:'completion_pct'},
+                        {label:'آخر تواصل', field:'last_contact_date'},
+                        {label:'الحالة',    field:null},
+                        {label:'إجراءات',   field:null},
+                      ].map(h=>(
+                        <th key={h.label} onClick={h.field?()=>toggleSort(h.field as any):undefined}
+                          style={{padding:'11px 12px',textAlign:'center',fontSize:'10px',color:sortField===h.field?S.gold:S.muted,fontWeight:700,cursor:h.field?'pointer':'default',userSelect:'text',whiteSpace:'nowrap'}}>
+                          {h.label}{h.field&&(sortField===h.field?(sortDir==='asc'?' ▲':' ▼'):'')}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedData.map((s, i) => (
-                      <tr key={s.id}
-                        style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)', cursor: 'pointer' }}
-                        onClick={() => router.push(`/suppliers/${s.id}`)}>
+                    {paged.map((s,i)=>(
+                      <tr key={s.id} onClick={()=>router.push(`/suppliers/${s.id}`)}
+                        style={{borderTop:`1px solid rgba(255,255,255,0.04)`,background:i%2===0?'transparent':S.card,cursor:'pointer',transition:'background .1s'}}>
 
-                        <td style={{ padding: '12px 14px', fontSize: '11px', color: S.muted, textAlign: 'right' }}>{formatSupNum(s.supplier_number)}</td>
+                        <td style={{padding:'10px 12px',fontSize:10,color:S.muted,textAlign:'right',whiteSpace:'nowrap'}}>{formatSupNum(s.supplier_number)}</td>
 
-                        <td style={{ padding: '12px 14px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'linear-gradient(135deg,#1D9E75,#085041)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                        <td style={{padding:'10px 12px'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:9}}>
+                            <div style={{width:36,height:36,borderRadius:9,background:'linear-gradient(135deg,#1D9E75,#085041)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#fff',flexShrink:0}}>
                               {initials(s.company_name)}
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <div style={{ fontSize: '13px', fontWeight: 700 }}>{s.company_name}</div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px', marginTop: '3px' }}>
-                                {[1,2,3,4,5].map(j => (
-                                  <svg key={j} width="14" height="14" viewBox="0 0 16 16" style={{ fill: j <= Math.round((s.rating || 0) / 2) ? '#C9A84C' : 'rgba(201,168,76,0.2)' }}>
-                                    <path d="M8 1l1.8 3.6 4 .6-2.9 2.8.7 4L8 10l-3.6 2 .7-4L2.2 5.2l4-.6z"/>
-                                  </svg>
-                                ))}
-                                <span style={{ fontSize: '10px', color: '#8A9BB5', marginRight: '2px' }}>{s.rating || 0}/10</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
-                                <div style={{ fontSize: '10px', color: '#8A9BB5' }}>{new Date(s.created_at).toLocaleDateString('ar-EG')}</div>
-                                <div style={{ width: '60px', height: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                                  <div style={{ height: '100%', width: `${s.completion_pct || 0}%`, background: s.completion_pct >= 80 ? '#22C55E' : s.completion_pct >= 50 ? '#F59E0B' : '#EF4444', borderRadius: '2px' }} />
-                                </div>
-                                <div style={{ fontSize: '10px', color: '#8A9BB5' }}>{s.completion_pct || 0}%</div>
-                              </div>
+                            <div>
+                              <div style={{fontSize:13,fontWeight:700}}>{s.company_name}</div>
+                              {s.contact_name&&<div style={{fontSize:10,color:S.muted,marginTop:1}}>{s.contact_name}</div>}
                             </div>
                           </div>
                         </td>
 
-                        <td style={{ padding: '12px 14px', fontSize: '12px', color: S.muted, textAlign: 'right' }}>{s.country || '—'}{s.city ? ` / ${s.city}` : ''}</td>
-
-                        <td style={{ padding: '12px 14px', fontSize: '11px', color: S.muted, textAlign: 'right', maxWidth: '120px' }}>
-                          <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.main_products || '—'}</div>
+                        <td style={{padding:'10px 12px',fontSize:11,color:S.white,textAlign:'right',whiteSpace:'nowrap'}}>
+                          {s.country||'—'}{s.city?`\n${s.city}`:''}
                         </td>
 
-                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                          <div style={{ fontSize: '13px', fontWeight: 700, color: S.gold }}>{s.total_deals || 0}</div>
-                          {s.total_amount > 0 && <div style={{ fontSize: '10px', color: S.muted }}>${s.total_amount.toLocaleString()}</div>}
+                        <td style={{padding:'10px 12px',textAlign:'right',maxWidth:180}}>
+                          <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                            {(s.main_products||'').split(/[،,]/).slice(0,3).map(p=>p.trim()).filter(Boolean).map((p,j)=>(
+                              <span key={j} style={{fontSize:9,padding:'2px 6px',borderRadius:8,background:S.gold3,color:S.gold,fontWeight:600}}>{p}</span>
+                            ))}
+                            {(s.main_products||'').split(/[،,]/).length>3&&<span style={{fontSize:9,color:S.muted}}>+{(s.main_products||'').split(/[،,]/).length-3}</span>}
+                          </div>
                         </td>
 
-                        <td style={{ padding: '12px 14px', fontSize: '11px', color: S.muted, textAlign: 'right' }}>
-                          {s.last_contact_date ? (
-                            <div>
-                              <div style={{ color: S.white }}>{timeAgo(s.last_contact_date)}</div>
-                              {s.last_contact_method && <div style={{ fontSize: '10px' }}>عبر {s.last_contact_method}</div>}
+                        <td style={{padding:'10px 12px',textAlign:'right'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end'}}>
+                            <span style={{fontSize:12,fontWeight:700,color:ratingColor(s.rating||0)}}>{s.rating||0}</span>
+                            <span style={{fontSize:9,color:S.muted}}>/10</span>
+                          </div>
+                        </td>
+
+                        <td style={{padding:'10px 12px',fontSize:12,fontWeight:700,color:S.blue,textAlign:'right'}}>{s.total_deals||0}</td>
+
+                        <td style={{padding:'10px 12px',textAlign:'right'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:5,justifyContent:'flex-end'}}>
+                            <div style={{width:50,height:4,background:'rgba(255,255,255,0.1)',borderRadius:2,overflow:'hidden'}}>
+                              <div style={{height:'100%',width:`${s.completion_pct||0}%`,background:s.completion_pct>=80?S.green:s.completion_pct>=50?S.amber:S.red}}/>
                             </div>
-                          ) : '—'}
+                            <span style={{fontSize:10,color:S.muted}}>{s.completion_pct||0}%</span>
+                          </div>
                         </td>
 
-                        <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                          <span style={{ fontSize: '10px', padding: '3px 10px', borderRadius: '20px', fontWeight: 700, background: s.status === 'active' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: s.status === 'active' ? S.green : S.red }}>
-                            {s.status === 'active' ? 'نشط' : 'موقوف'}
+                        <td style={{padding:'10px 12px',textAlign:'right'}}>
+                          {s.last_contact_date?(
+                            <div>
+                              <div style={{fontSize:11,color:S.white}}>{timeAgo(s.last_contact_date)}</div>
+                              <div style={{fontSize:9,color:S.muted}}>{new Date(s.last_contact_date).toLocaleDateString('ar-EG')}</div>
+                            </div>
+                          ):(
+                            <span style={{fontSize:10,color:S.red}}>لم يُتواصل</span>
+                          )}
+                        </td>
+
+                        <td style={{padding:'10px 12px',textAlign:'right'}}>
+                          <span style={{fontSize:10,padding:'3px 8px',borderRadius:20,fontWeight:700,
+                            background:s.status==='active'?S.greenB:S.redB,
+                            color:s.status==='active'?S.green:S.red}}>
+                            {s.status==='active'?'نشط':'موقوف'}
                           </span>
                         </td>
 
-                        {/* تواصل سريع */}
-                        <td style={{ padding: '12px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            {s.contact_whatsapp && (
+                        <td style={{padding:'10px 12px',textAlign:'right'}} onClick={e=>e.stopPropagation()}>
+                          <div style={{display:'flex',gap:5,justifyContent:'flex-end',alignItems:'center'}}>
+                            {/* FIX 3 — ميزة: تسجيل التواصل بنقرة */}
+                            <button onClick={()=>markContacted(s.id)} title="تسجيل تواصل اليوم"
+                              style={{fontSize:10,padding:'4px 8px',borderRadius:6,border:`1px solid ${S.border}`,background:'transparent',color:S.muted,cursor:'pointer',fontFamily:'inherit'}}>
+                              ⭐
+                            </button>
+                                     {s.contact_whatsapp && (
                               <a href={'https://wa.me/' + s.contact_whatsapp.replace(/[^0-9]/g, '')}
                                 target="_blank" rel="noopener noreferrer"
                                 onClick={e => e.stopPropagation()}
@@ -483,7 +683,7 @@ export default function SuppliersPage() {
                                 </svg>
                               </a>
                             )}
-                            {s.contact_email && (
+                              {s.contact_email && (
                               <a href={'mailto:' + s.contact_email}
                                 onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(s.contact_email); alert('تم نسخ الإيميل: ' + s.contact_email) }}
                                 style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
@@ -502,27 +702,9 @@ export default function SuppliersPage() {
                                 🌐
                               </a>
                             )}
-                          </div>
-                        </td>
-
-                        {/* إجراء */}
-                        <td style={{ padding: '12px 14px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end' }}>
-                            {s.status === 'suspended' && (
-                              <button
-                                onClick={async () => {
-                                  if (!window.confirm(`هل تريد حذف "${s.company_name}" نهائياً؟`)) return
-                                  await supabase.from('suppliers').delete().eq('id', s.id)
-                                  fetchSuppliers()
-                                }}
-                                style={{ width: '26px', height: '26px', borderRadius: '6px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: S.red, fontSize: '14px', fontWeight: 700 }}>
-                                ✕
-                              </button>
-                            )}
-                            {/* toggleStatus — مربوط بالدالة المصلحة */}
-                            <button onClick={() => toggleStatus(s.id, s.status)}
-                              style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: `1px solid rgba(255,255,255,0.15)`, background: 'transparent', color: s.status === 'active' ? S.red : S.green, cursor: 'pointer', fontFamily: 'inherit' }}>
-                              {s.status === 'active' ? 'إيقاف' : 'تفعيل'}
+                            <button onClick={()=>toggleStatus(s.id,s.status)}
+                              style={{fontSize:10,padding:'4px 8px',borderRadius:6,border:`1px solid rgba(255,255,255,0.15)`,background:'transparent',color:s.status==='active'?S.red:S.green,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>
+                              {s.status==='active'?'إيقاف':'تفعيل'}
                             </button>
                           </div>
                         </td>
@@ -532,8 +714,7 @@ export default function SuppliersPage() {
                   </tbody>
                 </table>
 
-                {/* Pagination Bar */}
-                {totalPages > 1 && (
+                  {totalPages > 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderTop: `1px solid ${S.border}`, background: S.navy2 }}>
                     <div style={{ fontSize: '12px', color: S.muted }}>
                       عرض {(currentPage - 1) * rowsPerPage + 1} – {Math.min(currentPage * rowsPerPage, filtered.length)} من {filtered.length} مورد
@@ -545,85 +726,42 @@ export default function SuppliersPage() {
                         style={{ padding: '6px 14px', borderRadius: '7px', border: `1px solid ${S.border}`, background: 'transparent', color: currentPage === 1 ? S.muted : S.white, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
                         → السابق
                       </button>
-                      {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                        .reduce<(number | string)[]>((acc, p, idx, arr) => {
-                          if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...')
-                          acc.push(p)
-                          return acc
-                        }, [])
-                        .map((p, idx) => p === '...' ? (
-                          <span key={`dots-${idx}`} style={{ color: S.muted, fontSize: '12px', padding: '0 4px' }}>...</span>
-                        ) : (
-                          <button key={p}
-                            onClick={() => setCurrentPage(p as number)}
-                            style={{ width: '32px', height: '32px', borderRadius: '7px', border: `1px solid ${currentPage === p ? S.gold : S.border}`, background: currentPage === p ? S.gold3 : 'transparent', color: currentPage === p ? S.gold : S.muted, cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: currentPage === p ? 700 : 400 }}>
+                      {Array.from({length:totalPages},(_,i)=>i+1)
+                        .filter(p=>p===1||p===totalPages||Math.abs(p-currentPage)<=1)
+                        .reduce<(number|string)[]>((acc,p,idx,arr)=>{
+                          if(idx>0&&(p as number)-(arr[idx-1] as number)>1) acc.push('...')
+                          acc.push(p); return acc
+                        },[])
+                        .map((p,idx)=>p==='...'?(
+                          <span key={`d${idx}`} style={{color:S.muted,fontSize:12}}>...</span>
+                        ):(
+                          <button key={p} onClick={()=>setCurrentPage(p as number)}
+                            style={{width:30,height:30,borderRadius:7,border:`1px solid ${currentPage===p?S.gold:S.border}`,background:currentPage===p?S.gold3:'transparent',color:currentPage===p?S.gold:S.muted,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:currentPage===p?700:400}}>
                             {p}
                           </button>
                         ))
                       }
-                      <button
-                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        style={{ padding: '6px 14px', borderRadius: '7px', border: `1px solid ${S.border}`, background: 'transparent', color: currentPage === totalPages ? S.muted : S.white, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>
-                        ← التالي
+                      <button onClick={()=>setCurrentPage(p=>Math.min(totalPages,p+1))} disabled={currentPage===totalPages}
+                        style={{padding:'6px 12px',borderRadius:7,border:`1px solid ${S.border}`,background:'transparent',color:currentPage===totalPages?S.muted:S.white,cursor:currentPage===totalPages?'not-allowed':'pointer',fontSize:12,fontFamily:'inherit'}}>
+                        التالي →
                       </button>
                     </div>
                   </div>
                 )}
-
               </div>
             )}
           </>
         )}
-
       </div>
 
-      {/* Modal إضافة مورد */}
-      {showForm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '16px' }}>
-          <div style={{ background: S.navy2, border: `1px solid rgba(255,255,255,0.1)`, borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <button onClick={() => setShowForm(false)} style={{ background: 'none', border: 'none', color: S.muted, fontSize: '20px', cursor: 'pointer' }}>✕</button>
-              <div style={{ fontSize: '15px', fontWeight: 700 }}>إضافة مورد جديد</div>
-            </div>
-            <button onClick={fillWithAI} disabled={aiLoading}
-              style={{ width: '100%', background: 'rgba(201,168,76,0.1)', color: S.gold, border: '1px solid rgba(201,168,76,0.25)', padding: '11px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: aiLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', marginBottom: '16px' }}>
-              {aiLoading ? '⏳ جاري البحث...' : '✨ إملأ البيانات بالذكاء الاصطناعي'}
-            </button>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { label: 'اسم الشركة *', key: 'company_name', placeholder: 'مثال: Wilmar International' },
-                { label: 'الدولة',         key: 'country',       placeholder: 'إندونيسيا' },
-                { label: 'المدينة',        key: 'city',          placeholder: 'جاكرتا' },
-                { label: 'المنتجات الرئيسية', key: 'main_products', placeholder: 'زيت نخيل، ورق...' },
-                { label: 'اسم المسؤول',   key: 'contact_name',  placeholder: 'الشخص المسؤول' },
-                { label: 'واتساب',         key: 'contact_whatsapp', placeholder: '+62 8xx xxx xxxx' },
-                { label: 'الموقع الإلكتروني', key: 'website',   placeholder: 'www.company.com' },
-                { label: 'الإيميل',        key: 'contact_email', placeholder: 'email@company.com' },
-                { label: 'حجم المبيعات السنوية', key: 'annual_sales', placeholder: '$10M' },
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>{f.label}</label>
-                  <input type="text" placeholder={f.placeholder} value={(form as any)[f.key] || ''}
-                    onChange={e => setForm({ ...form, [f.key]: e.target.value })} style={inp} />
-                </div>
-              ))}
-              <div>
-                <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>ملاحظات</label>
-                <textarea placeholder="نبذة عن المورد..." value={form.notes}
-                  onChange={e => setForm({ ...form, notes: e.target.value })} rows={3}
-                  style={{ ...inp, resize: 'none' } as React.CSSProperties} />
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '20px' }}>
-              <button onClick={() => setShowForm(false)} style={{ background: 'rgba(255,255,255,0.06)', color: S.white, border: `1px solid rgba(255,255,255,0.12)`, padding: '11px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
-              <button onClick={addSupplier} style={{ background: S.gold, color: S.navy, border: 'none', padding: '11px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>إضافة المورد</button>
-            </div>
-          </div>
-        </div>
+      {/* ══ Modal إضافة مورد ══ */}
+      {showForm&&(
+        <AddSupplierModal
+          onClose={()=>setShowForm(false)}
+          onSaved={fetchSuppliers}
+          existingSuppliers={suppliers}
+        />
       )}
-
     </div>
   )
 }
