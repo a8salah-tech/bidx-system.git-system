@@ -592,7 +592,7 @@ export default function ProductsPage() {
                           <td style={{padding:'10px 14px',textAlign:'right'}}>
                             <div style={{display:'flex',alignItems:'center',gap:'8px'}}>
                               <span onClick={e=>{e.stopPropagation();router.push(`/products/${encodeURIComponent(name)}`)}}
-                                style={{fontSize:'13px',fontWeight:600,color:S.gold,cursor:'pointer',textDecoration:'underline',textUnderlineOffset:'3px'}}>
+                                style={{fontSize:'13px',fontWeight:600,color:'#FFFFFF',cursor:'pointer',textDecoration:'none'}}>
                                 📦 {name}
                               </span>
                               {i===0&&<span style={{fontSize:'8px',padding:'2px 6px',borderRadius:'8px',background:'rgba(201,168,76,0.12)',color:S.gold,fontWeight:700}}>الأكثر</span>}
