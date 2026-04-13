@@ -478,7 +478,7 @@ export default function SuppliersPage(){
         {topProducts.length>0&&(
           <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'12px',padding:'14px 18px',marginBottom:'16px'}}>
             <div style={{fontSize:12,fontWeight:700,color:S.muted,marginBottom:10,textAlign:'right'}}>📦 أكثر المنتجات شيوعاً بين الموردين</div>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'flex-start'}}>
               {topProducts.map(([name,count],i)=>(
                 <button key={i} onClick={()=>{setProductSearch(name);setViewMode('table')}}
                   style={{fontSize:11,padding:'4px 12px',borderRadius:20,background:i===0?S.gold3:S.card,color:i===0?S.gold2:S.muted,border:`1px solid ${i===0?S.goldB:S.border}`,cursor:'pointer',fontFamily:'Tajawal, sans-serif',fontWeight:i===0?700:400}}>
