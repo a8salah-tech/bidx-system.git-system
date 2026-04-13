@@ -18,9 +18,9 @@ const navItems = [
   { label: 'إدارة الموردين', href: '/suppliers', color: '#7F77DD' },
   { label: 'إدرة المنتجات', href: '/products', color: S.gold },
   { label: 'إدرة العملاء', href: '/customers', color: '#FAFAF8' },
-  { label: 'إدرة الحسابات', href: '/accounting', color: '#EF4444' },
   { label: 'إدرة الموارد البشرية', href: '/hr', color: '#22C55E' },
-    { label: 'إدرة التسويق', href: '/marketing', color: '#F59E0B' },
+  { label: 'إدرة التسويق', href: '/marketing', color: '#F59E0B' },
+  { label: 'إدرة الحسابات', href: '/accounting', color: '#EF4444' },
 
 
 ]
