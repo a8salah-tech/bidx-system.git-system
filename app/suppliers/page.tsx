@@ -63,7 +63,6 @@ function Stars({rating,max=10,size=10}:{rating:number;max?:number;size?:number})
     </div>
   )
 }
-
 // ════════════════════════════════════════════════
 // Modal إضافة مورد — تصميم جديد متعدد الخطوات
 // ════════════════════════════════════════════════
@@ -98,12 +97,10 @@ function AddSupplierModal({onClose,onSaved,existingSuppliers}:{
       const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({company_name:form.company_name})})
       const data=await res.json()
       const parsed=JSON.parse((data?.choices?.[0]?.message?.content||'{}').replace(/```json|```/g,'').trim())
-      setForm(p=>({...p,...parsed,main_products:Array.isArray(parsed.main_products)?parsed.main_products.join('، '):(parsed.main_products||p.main_products)}))
-    }catch{ alert('تعذر الاتصال بالذكاء الاصطناعي') }
+setForm(p => ({ ...p, ...parsed, main_products: Array.isArray(parsed.main_products) ? parsed.main_products.join('، ') : (parsed.main_products || p.main_products) }));    }catch{ alert('تعذر الاتصال بالذكاء الاصطناعي') }
     finally{ setAiLoading(false) }
   }
 
-  // FIX 1: إصلاح حفظ المنتجات بدون onConflict مشكلة
   async function handleSave(){
     if(!form.company_name){alert('يرجى إدخال اسم الشركة');return}
     setSaving(true)
@@ -111,14 +108,25 @@ function AddSupplierModal({onClose,onSaved,existingSuppliers}:{
       const {data:{user}}=await supabase.auth.getUser()
       if(!user){alert('جلسة الدخول انتهت');return}
 
-      // FIX 1+2: حفظ المنتجات في supplier_products بدلاً من products لتجنب مشكلة unique constraint
-      const rawProducts=form.main_products||''
-      const productsArray=rawProducts.split(/[،,]/).map(p=>p.trim()).filter(Boolean)
+      const rawProducts = form.main_products || ''
+      const productsArray = rawProducts
+        .split(/[،,]/)
+        .map(p => p.trim())
+        .filter(Boolean)
 
-      // حفظ المورد أولاً
+      // --- 🚀 FIX: تنظيف البيانات ومنع خطأ malformed array literal ---
+      const cleanedForm = { ...form };
+      
+      // التأكد من أن حقل certifications إما مصفوفة أو NULL (وليس نصاً فارغاً)
+      if (cleanedForm.certifications === "") {
+        (cleanedForm as any).certifications = null;
+      }
+      // -------------------------------------------------------------
+
+      // حفظ المورد أولاً باستخدام cleanedForm
       const {data:suppData,error:suppErr}=await supabase.from('suppliers').insert([{
-        ...form,
-        main_products: productsArray.join('، '),
+        ...cleanedForm,
+        main_products: productsArray, // إرسال المصفوفة المنظمة
         status:'active',rating:0,
         completion_pct:calcCompletion(),
         user_id:user.id,
@@ -126,16 +134,43 @@ function AddSupplierModal({onClose,onSaved,existingSuppliers}:{
 
       if(suppErr) throw suppErr
 
-      // FIX 2: حفظ المنتجات في supplier_products فقط (بدون upsert مشكلة)
+      // حفظ المنتجات في الربط (supplier_products)
       if(productsArray.length>0&&suppData){
-        const spInserts=productsArray.map(name=>({
-          name, supplier_id:suppData.id, user_id:user.id,
-          status:'active',
-        }))
-        // insert عادي بدون onConflict لتجنب الخطأ
-        const {error:spErr}=await supabase.from('supplier_products').insert(spInserts)
-        if(spErr) console.warn('supplier_products insert warning:', spErr.message)
-        // لا نوقف العملية حتى لو فشل الإدراج في supplier_products
+        const spInserts = []
+
+        for (const name of productsArray) {
+          let productId = null
+          const { data: existing } = await supabase
+            .from('products')
+            .select('id')
+            .eq('name', name)
+            .maybeSingle()
+
+          if (!existing) {
+            const { data: newProd } = await supabase
+              .from('products')
+              .insert([{ name, user_id: user.id }])
+              .select()
+              .single()
+            productId = newProd?.id
+          } else {
+            productId = existing.id
+          }
+
+          if (productId) {
+            spInserts.push({
+              supplier_id: suppData.id,
+              product_id: productId,
+              user_id: user.id,
+              status: 'active',
+            })
+          }
+        }
+
+        if (spInserts.length > 0) {
+          const {error:spErr} = await supabase.from('supplier_products').insert(spInserts)
+          if(spErr) console.warn('supplier_products insert warning:', spErr.message)
+        }
       }
 
       onSaved()

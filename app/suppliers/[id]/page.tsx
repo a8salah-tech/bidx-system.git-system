@@ -7,32 +7,14 @@ import { supabase } from '../../../lib/supabase'
 
 
 interface Supplier {
-  id: string
-  created_at: string
-  supplier_number: number
-  company_name: string
-  country: string
-  city: string
-  status: string
-  rating: number
-  completion_pct: number
-  contact_name: string
-  contact_whatsapp: string
-  contact_email: string
-  annual_sales: string
-  notes: string
-  total_deals: number
-  total_amount: number
-  main_products: string
-  last_contact_date: string
-  last_contact_method: string
-  website: string
-  registration_number: string
-  quality_rating: number
-  delivery_rating: number
-  comm_rating: number
-  price_rating: number
-  flex_rating: number
+  id: string; created_at: string; supplier_number: number; company_name: string
+  country: string; city: string; status: string; rating: number; completion_pct: number
+  contact_name: string; contact_whatsapp: string; contact_email: string; contact_phone: string
+  annual_sales: string; notes: string; total_deals: number; total_amount: number
+  main_products: string; last_contact_date: string; last_contact_method: string
+  website: string; registration_number: string; certifications: string
+  quality_rating: number; delivery_rating: number; comm_rating: number
+  price_rating: number; flex_rating: number; user_id: string; suspended_reason: string
 }
 
 function timeAgo(date: string) {
@@ -50,21 +32,15 @@ function formatSupNum(n: number) {
 }
 
 const S = {
-  navy: '#0A1628',
-  navy2: '#0F2040',
-  navy3: '#152A52',
-  gold: '#C9A84C',
-  gold2: '#E8C97A',
-  gold3: 'rgba(201,168,76,0.12)',
-  white: '#FAFAF8',
-  muted: '#8A9BB5',
-  border: 'rgba(255,255,255,0.08)',
-  green: '#22C55E',
-  red: '#EF4444',
-  blue: '#3B82F6',
-  amber: '#F59E0B',
-  card: 'rgba(255,255,255,0.04)',
-  card2: 'rgba(255,255,255,0.08)',
+  navy:'#0A1628',navy2:'#0F2040',navy3:'#152A52',
+  gold:'#C9A84C',gold2:'#E8C97A',gold3:'rgba(201,168,76,0.12)',goldB:'rgba(201,168,76,0.22)',
+  white:'#FAFAF8',muted:'#8A9BB5',border:'rgba(255,255,255,0.08)',
+  green:'#22C55E',greenB:'rgba(34,197,94,0.12)',
+  red:'#EF4444',redB:'rgba(239,68,68,0.12)',
+  blue:'#3B82F6',blueB:'rgba(59,130,246,0.12)',
+  amber:'#F59E0B',amberB:'rgba(245,158,11,0.12)',
+  purple:'#8B5CF6',purpleB:'rgba(139,92,246,0.12)',
+  card:'rgba(255,255,255,0.04)',card2:'rgba(255,255,255,0.08)',
 }
 
 // ===== مكون جهات التواصل والوثائق =====
@@ -346,29 +322,7 @@ useEffect(() => {
               <div style={{ fontSize: '13px', fontWeight: 500, color: '#93C5FD' }}>{supplier.website || '—'}</div>
             )}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>آخر تواصل</div>
-            {editOfficial ? (
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input type="date" value={officialData.last_contact_date}
-                  onChange={e => setOfficialData({ ...officialData, last_contact_date: e.target.value })}
-                  style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as any, colorScheme: 'dark' as any }} />
-                <select value={officialData.last_contact_method}
-                  onChange={e => setOfficialData({ ...officialData, last_contact_method: e.target.value })}
-                  style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit' }}>
-                  <option value="">وسيلة التواصل</option>
-                  <option value="واتساب">واتساب</option>
-                  <option value="إيميل">إيميل</option>
-                  <option value="مكالمة">مكالمة</option>
-                  <option value="اجتماع">اجتماع</option>
-                </select>
-              </div>
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: S.white }}>
-                {supplier.last_contact_date ? `${timeAgo(supplier.last_contact_date)}${supplier.last_contact_method ? ` — عبر ${supplier.last_contact_method}` : ''}` : '—'}
-              </div>
-            )}
-          </div>
+
         </div>
       </div>
 

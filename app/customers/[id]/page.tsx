@@ -878,7 +878,7 @@ const scoreFields = [
               {/* سجل التواصل */}
               <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: S.muted, fontFamily: 'Tajawal, sans-serif' }}> سجل التواصل</div>
                     {firstContact && (
                       <div style={{ fontSize: 10, color: S.gold, marginTop: 2, fontFamily: 'Tajawal, sans-serif' }}>
@@ -1005,7 +1005,7 @@ const scoreFields = [
                 {[
                   { title: 'أول اتصال',  done: !!customer.last_contact_date,                   icon: '📞', val: customer.last_contact_date ? timeAgo(customer.last_contact_date) : 'لم يتم بعد' },
                   { title: 'عرض أسعار',  done: !!customer.interest,                             icon: '📋', val: customer.interest || 'لم يتم بعد' },
-                  { title: 'أول صفقة',   done: parseInt(customer.total_deals || '0') >= 1,      icon: '🤝', val: parseInt(customer.total_deals || '0') >= 1 ? `${customer.total_deals} صفقة` : 'لم تتم بعد' },
+                  { title: 'أول صفقة',   done: deals.length >= 1,      icon: '🤝', val: deals.length >= 1 ? `${deals.length} صفقة` : 'لم تتم بعد' },
                   { title: 'عميل متكرر', done: parseInt(customer.total_deals || '0') >= 3,      icon: '🔄', val: parseInt(customer.total_deals || '0') >= 3 ? 'عميل منتظم ✓' : 'مطلوب 3 صفقات' },
                   { title: 'عميل مميز',  done: parseInt(customer.total_deals || '0') >= 5,      icon: '⭐', val: parseInt(customer.total_deals || '0') >= 5 ? 'عميل VIP ✓' : 'مطلوب 5 صفقات' },
                 ].map((step, i) => (
