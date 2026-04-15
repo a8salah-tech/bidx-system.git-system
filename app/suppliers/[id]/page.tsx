@@ -1221,19 +1221,31 @@ function DealsTab({ supplierId, supplier, setSupplier, priceHistory, setPriceHis
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     const amount = Number(form.price.replace(/[^0-9.]/g, '')) || 0
+// تأكد من وجود تاريخ، وإلا استخدم تاريخ اليوم كخيار احتياطي
+const dealDate = form.deal_date ? new Date(form.deal_date).toISOString() : new Date().toISOString();
+
 const { data: newDeal, error } = await supabase.from('supplier_prices_history').insert([{
   supplier_id: supplierId,
   product_name: form.product_name,
-  price: amount,
-  status: form.status,
+  price: parseFloat(`${amount}`), 
+  status: 'مقبول', // ✅ هذه الكلمة التي ينتظرها الجدول حرفياً
   notes: form.notes || null,
-  currency: form.currency,
+  currency: form.currency || 'USD',
   quantity: form.quantity || null,
   incoterms: form.incoterms,
   payment_method: form.payment_method,
   user_id: user?.id,
-  created_at: new Date(form.deal_date).toISOString(),
-}]).select().single()
+  created_at: form.deal_date ? new Date(form.deal_date).toISOString() : new Date().toISOString(),
+}]).select().single();
+
+if (error) {
+  console.error("❌ خطأ متبقي:", error.message);
+  alert(`حدث خطأ: ${error.message}`);
+} else {
+  console.log("✅ تمت الصفقة بنجاح يا رئيس!");
+  // تحديث الصفحة لرؤية الصفقة في الجدول
+  window.location.reload(); 
+}
     if (!error && newDeal) {
       // FIX 5: تحديث إحصائيات المورد في نفس الوقت
       const newTotal  = (supplier.total_deals  || 0) + 1
@@ -1303,18 +1315,6 @@ const { data: newDeal, error } = await supabase.from('supplier_prices_history').
               <input value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} style={inp2} placeholder="مثال: 22 MT" />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>Incoterms</label>
-              <select value={form.incoterms} onChange={e => setForm(p => ({ ...p, incoterms: e.target.value }))} style={{ ...inp2, cursor: 'pointer' }}>
-                {['CIF', 'FOB', 'EXW', 'DDP', 'CFR'].map(t => <option key={t} value={t} style={{ background: S.navy2 }}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>شروط الدفع</label>
-              <select value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))} style={{ ...inp2, cursor: 'pointer' }}>
-                {['LC', 'TT', 'TT 30-70', 'CAD', 'Advance'].map(t => <option key={t} value={t} style={{ background: S.navy2 }}>{t}</option>)}
-              </select>
-            </div>
-            <div>
               <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>تاريخ الصفقة</label>
               <input type="date" value={form.deal_date} onChange={e => setForm(p => ({ ...p, deal_date: e.target.value }))}
                 style={{ ...inp2, colorScheme: 'dark' as any }} />
@@ -1352,8 +1352,6 @@ const { data: newDeal, error } = await supabase.from('supplier_prices_history').
           {priceHistory.map((d, i) => {
             const sc = statusColors[d.status] || { c: S.muted, b: S.card }
             const noteParts = [
-  d.incoterms && `Incoterms: ${d.incoterms}`,
-  d.payment_method && `الدفع: ${d.payment_method}`,
   d.quantity && `الكمية: ${d.quantity}`,
   d.notes,
 ].filter(Boolean) as string[]        
