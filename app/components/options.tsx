@@ -122,6 +122,7 @@ export const COUNTRIES = [
   { id: 'AU', label: 'أستراليا', value: 'أستراليا' },
 ];
 export const PRODUCT_CATEGORIES = [
+{ id: 'Food', label: ' المنتجات الغذائية (Food products)', value: '  المنتجات الغذائية' },
 { id: 'oils', label: 'الزيوت والدهون (Oils & Fats)', value: 'زيوت ودهون غذائية' },
 { id: 'poultry', label: 'الدواجن واللحوم (Poultry & Meats)', value: 'دواجن ولحوم' },
 { id: 'seafood', label: 'الأسماك والمأكولات البحرية (Seafood)', value: 'أسماك ومأكولات بحرية' },
