@@ -131,43 +131,35 @@ const {data:suppData,error:suppErr}=await supabase.from('suppliers').insert([{
       if(suppErr) throw suppErr
 
       // حفظ المنتجات في الربط (supplier_products)
-      if(productsArray.length>0&&suppData){
-        const spInserts = []
+if (productsArray.length > 0 && suppData) {
+  for (const name of productsArray) {
+    // 1. شيك هل المنتج موجود بالاسم ده؟
+    const { data: existing } = await supabase
+      .from('products')
+      .select('id')
+      .eq('name', name.trim())
+      .maybeSingle();
 
-        for (const name of productsArray) {
-          let productId = null
-          const { data: existing } = await supabase
-            .from('products')
-            .select('id')
-            .eq('name', name)
-            .maybeSingle()
-
-          if (!existing) {
-            const { data: newProd } = await supabase
-              .from('products')
-              .insert([{ name, user_id: user.id }])
-              .select()
-              .single()
-            productId = newProd?.id
-          } else {
-            productId = existing.id
-          }
-
-          if (productId) {
-            spInserts.push({
-              supplier_id: suppData.id,
-              product_id: productId,
-              user_id: user.id,
-              status: 'active',
-            })
-          }
-        }
-
-        if (spInserts.length > 0) {
-          const {error:spErr} = await supabase.from('supplier_products').insert(spInserts)
-          if(spErr) console.warn('supplier_products insert warning:', spErr.message)
-        }
-      }
+    if (!existing) {
+      // 2. لو مش موجود: انشئه واربطه بالمورد فوراً في نفس السطر
+      await supabase
+        .from('products')
+        .insert([{ 
+          name: name.trim(), 
+          user_id: user.id,
+          supplier_id: suppData.id, // الربط المباشر هنا هو السر
+          status: 'active',
+          origin_country: cleanedForm.country // المنشأ عشان يظهر في الفلاتر
+        }]);
+    } else {
+      // 3. لو موجود: حدث بياناته وخليه يرتبط بالمورد ده (أو سيبه لو ده السيستم بتاعك)
+      await supabase
+        .from('products')
+        .update({ supplier_id: suppData.id })
+        .eq('id', existing.id);
+    }
+  }
+}
 
       onSaved()
       onClose()
