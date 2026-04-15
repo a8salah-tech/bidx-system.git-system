@@ -149,7 +149,8 @@ if (productsArray.length > 0 && suppData) {
           user_id: user.id,
           supplier_id: suppData.id, // الربط المباشر هنا هو السر
           status: 'active',
-          origin_country: cleanedForm.country // المنشأ عشان يظهر في الفلاتر
+          origin_country: cleanedForm.country, // المنشأ عشان يظهر في الفلاتر
+          category: "تصنيف تجريبي", // ضع نصاً ثابتاً هنا للتجربة
         }]);
     } else {
       // 3. لو موجود: حدث بياناته وخليه يرتبط بالمورد ده (أو سيبه لو ده السيستم بتاعك)

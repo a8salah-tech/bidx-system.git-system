@@ -43,6 +43,136 @@ const S = {
   card:'rgba(255,255,255,0.04)',card2:'rgba(255,255,255,0.08)',
 }
 
+// ===== مكون أرشيف سجل التواصل =====
+function ContactLogArchive({ supplier, supplierId, setSupplier }: { supplier: any, supplierId: string, setSupplier: any }) {
+  const [logs, setLogs] = useState<any[]>([])
+  const [showAddLog, setShowAddLog] = useState(false)
+  const [savingLog, setSavingLog] = useState(false)
+  const [logForm, setLogForm] = useState({
+    date: new Date().toISOString().split('T')[0],
+    method: 'واتساب',
+    notes: '',
+  })
+
+  useEffect(() => {
+    // جلب سجل التواصل من supplier_notes مع فلتر نوع = contact_log
+    supabase.from('supplier_notes')
+      .select('*')
+      .eq('supplier_id', supplierId)
+      .eq('company_id', 'contact_log')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setLogs(data || []))
+  }, [supplierId])
+
+  async function addLog() {
+    if (!logForm.date || !logForm.method) { alert('يرجى إدخال التاريخ والوسيلة'); return }
+    setSavingLog(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    // حفظ سجل التواصل
+    const { data: newLog, error } = await supabase.from('supplier_notes').insert([{
+      supplier_id: supplierId,
+      note: logForm.notes || '—',
+      company_id: 'contact_log',   // marker للتمييز
+      user_id: user?.id,
+      created_by: user?.id,
+      created_at: new Date(logForm.date).toISOString(),
+    }]).select().single()
+    if (!error && newLog) {
+      setLogs([{ ...newLog, meta_method: logForm.method }, ...logs])
+      // تحديث آخر تواصل في جدول suppliers
+      await supabase.from('suppliers').update({
+        last_contact_date: new Date(logForm.date).toISOString(),
+        last_contact_method: logForm.method,
+      }).eq('id', supplierId)
+      setSupplier((prev: any) => ({ ...prev, last_contact_date: new Date(logForm.date).toISOString(), last_contact_method: logForm.method }))
+    }
+    setShowAddLog(false)
+    setLogForm({ date: new Date().toISOString().split('T')[0], method: 'واتساب', notes: '' })
+    setSavingLog(false)
+  }
+
+  const methodIcons: Record<string, string> = { واتساب: '📱', إيميل: '✉️', مكالمة: '📞', اجتماع: '🤝', زيارة: '🏢' }
+
+  return (
+    <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
+      {/* هيدر + آخر تواصل بارز */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <button onClick={() => setShowAddLog(!showAddLog)}
+          style={{ background: S.gold, color: S.navy, border: 'none', padding: '6px 14px', borderRadius: '7px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          + تسجيل تواصل
+        </button>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: S.gold }}>📋 سجل التواصل</div>
+      </div>
+
+      {/* آخر تواصل — بارز ومميز */}
+      {supplier?.last_contact_date ? (
+        <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '10px', padding: '10px 14px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px', color: S.green, fontWeight: 700 }}>
+            {methodIcons[supplier.last_contact_method] || '📋'} {supplier.last_contact_method || '—'}
+          </span>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: S.green }}>آخر تواصل: {timeAgo(supplier.last_contact_date)}</div>
+            <div style={{ fontSize: '10px', color: S.muted }}>{new Date(supplier.last_contact_date).toLocaleDateString('ar-EG')}</div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px', padding: '10px 14px', marginBottom: '12px', textAlign: 'center', fontSize: '12px', color: S.red }}>
+          ⚠️ لم يتم التواصل بعد مع هذا المورد
+        </div>
+      )}
+
+      {/* فورم إضافة سجل */}
+      {showAddLog && (
+        <div style={{ background: S.navy2, border: `1px solid rgba(201,168,76,0.2)`, borderRadius: '10px', padding: '14px', marginBottom: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.gold, fontWeight: 700, marginBottom: '4px' }}>التاريخ</label>
+              <input type="date" value={logForm.date} onChange={e => setLogForm(p => ({ ...p, date: e.target.value }))}
+                style={{ width: '100%', background: S.navy, border: '1px solid rgba(255,255,255,0.1)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', colorScheme: 'dark' as any, boxSizing: 'border-box' as any }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>وسيلة التواصل</label>
+              <select value={logForm.method} onChange={e => setLogForm(p => ({ ...p, method: e.target.value }))}
+                style={{ width: '100%', background: S.navy, border: '1px solid rgba(255,255,255,0.1)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', direction: 'rtl' }}>
+                {['واتساب', 'إيميل', 'مكالمة', 'اجتماع', 'زيارة'].map(m => <option key={m} value={m} style={{ background: S.navy2 }}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>ملاحظات التواصل</label>
+            <textarea value={logForm.notes} onChange={e => setLogForm(p => ({ ...p, notes: e.target.value }))} rows={2}
+              placeholder="ماذا جرى في هذا التواصل؟"
+              style={{ width: '100%', background: S.navy, border: '1px solid rgba(255,255,255,0.1)', borderRadius: '7px', padding: '8px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any, resize: 'none' }} />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => setShowAddLog(false)} style={{ flex: 1, background: 'transparent', color: S.muted, border: `1px solid ${S.border}`, padding: '7px', borderRadius: '7px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+            <button onClick={addLog} disabled={savingLog}
+              style={{ flex: 2, background: savingLog ? S.muted : S.gold, color: S.navy, border: 'none', padding: '7px', borderRadius: '7px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {savingLog ? '⏳...' : '✅ حفظ التواصل'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* الأرشيف */}
+      {logs.length === 0 ? (
+        <div style={{ textAlign: 'center', color: S.muted, padding: '16px 0', fontSize: '12px' }}>لا يوجد سجل تواصل بعد</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '260px', overflowY: 'auto' }}>
+          {logs.map((l, i) => (
+            <div key={l.id || i} style={{ background: S.card2, borderRadius: '9px', padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ fontSize: '10px', color: S.muted, flexShrink: 0 }}>{new Date(l.created_at).toLocaleDateString('ar-EG')}</div>
+              <div style={{ textAlign: 'right', flex: 1, marginRight: '10px' }}>
+                <div style={{ fontSize: '11px', color: S.white, lineHeight: '1.6' }}>{l.note !== '—' ? l.note : ''}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ===== مكون جهات التواصل والوثائق =====
 function ContactTab({ supplier, supplierId, setSupplier }: { supplier: any, supplierId: string, setSupplier: any }) {  // 1. حالات إدارة الملفات والرفع
   const [selectedDoc, setSelectedDoc] = useState<any>(null)
@@ -202,6 +332,9 @@ useEffect(() => {
     
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
+      {/* FIX 2: سجل التواصل — في أعلى القسم، ظاهر */}
+      <ContactLogArchive supplier={supplier} supplierId={supplierId} setSupplier={setSupplier} />
+
       {/* جهات التواصل */}
       <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -265,10 +398,9 @@ useEffect(() => {
         )}
       </div>
 
-      {/* بيانات التواصل الرسمية */}
-      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>بيانات التواصل الرسمية</div>
+      {/* FIX 7: بيانات التواصل الرسمية — تصميم محسّن */}
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(201,168,76,0.06)', borderBottom: `1px solid ${S.border}`, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button
             onClick={async () => {
               if (editOfficial) {
@@ -290,39 +422,68 @@ useEffect(() => {
               }
               setEditOfficial(!editOfficial)
             }}
-            style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editOfficial ? S.gold : 'transparent', color: editOfficial ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-            {editOfficial ? 'حفظ' : 'تعديل'}
+            style={{ fontSize: '11px', padding: '5px 14px', borderRadius: '7px', border: `1px solid ${editOfficial ? S.gold : S.border}`, background: editOfficial ? S.gold : 'transparent', color: editOfficial ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+            {editOfficial ? '💾 حفظ' : '✏️ تعديل'}
           </button>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: S.gold }}>🔗 بيانات التواصل الرسمية</div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>الإيميل الرسمي</div>
-            {editOfficial ? (
-              <input type="email" value={officialData.contact_email} onChange={e => setOfficialData({ ...officialData, contact_email: e.target.value })}
-                style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: '#93C5FD' }}>{supplier.contact_email || '—'}</div>
+        <div style={{ padding: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            {/* الإيميل */}
+            <div style={{ background: S.card2, borderRadius: '10px', padding: '12px 14px', textAlign: 'right' }}>
+              <div style={{ fontSize: '9px', color: S.muted, fontWeight: 700, marginBottom: '5px', letterSpacing: '0.5px' }}>✉️ الإيميل الرسمي</div>
+              {editOfficial ? (
+                <input type="email" value={officialData.contact_email} onChange={e => setOfficialData({ ...officialData, contact_email: e.target.value })}
+                  style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
+              ) : (
+                <a href={`mailto:${supplier.contact_email}`} style={{ fontSize: '13px', fontWeight: 600, color: '#93C5FD', textDecoration: 'none' }}>
+                  {supplier.contact_email || '—'}
+                </a>
+              )}
+            </div>
+            {/* واتساب */}
+            <div style={{ background: S.card2, borderRadius: '10px', padding: '12px 14px', textAlign: 'right' }}>
+              <div style={{ fontSize: '9px', color: S.muted, fontWeight: 700, marginBottom: '5px', letterSpacing: '0.5px' }}>📱 واتساب</div>
+              {editOfficial ? (
+                <input type="text" value={officialData.contact_whatsapp} onChange={e => setOfficialData({ ...officialData, contact_whatsapp: e.target.value })}
+                  style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
+              ) : (
+                <a href={`https://wa.me/${(supplier.contact_whatsapp || '').replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', fontWeight: 600, color: S.green, textDecoration: 'none' }}>
+                  {supplier.contact_whatsapp || '—'}
+                </a>
+              )}
+            </div>
+            {/* الموقع */}
+            <div style={{ background: S.card2, borderRadius: '10px', padding: '12px 14px', textAlign: 'right' }}>
+              <div style={{ fontSize: '9px', color: S.muted, fontWeight: 700, marginBottom: '5px', letterSpacing: '0.5px' }}>🌐 الموقع الإلكتروني</div>
+              {editOfficial ? (
+                <input type="text" value={officialData.website} onChange={e => setOfficialData({ ...officialData, website: e.target.value })}
+                  style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
+              ) : (
+                supplier.website ? (
+                  <a href={supplier.website.startsWith('http') ? supplier.website : `https://${supplier.website}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', fontWeight: 600, color: S.gold, textDecoration: 'none' }}>
+                    🔗 {supplier.website}
+                  </a>
+                ) : <div style={{ fontSize: '13px', color: S.muted }}>—</div>
+              )}
+            </div>
+            {/* آخر تواصل — حقل التعديل فقط */}
+            {editOfficial && (
+              <div style={{ background: S.card2, borderRadius: '10px', padding: '12px 14px', textAlign: 'right' }}>
+                <div style={{ fontSize: '9px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>📅 تعديل آخر تواصل</div>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <select value={officialData.last_contact_method}
+                    onChange={e => setOfficialData({ ...officialData, last_contact_method: e.target.value })}
+                    style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '6px 8px', fontSize: '11px', color: S.white, outline: 'none', fontFamily: 'inherit', direction: 'rtl' }}>
+                    {['واتساب', 'إيميل', 'مكالمة', 'اجتماع'].map(m => <option key={m} value={m} style={{ background: S.navy2 }}>{m}</option>)}
+                  </select>
+                  <input type="date" value={officialData.last_contact_date}
+                    onChange={e => setOfficialData({ ...officialData, last_contact_date: e.target.value })}
+                    style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '6px 8px', fontSize: '11px', color: S.white, outline: 'none', fontFamily: 'inherit', colorScheme: 'dark' as any, boxSizing: 'border-box' as any }} />
+                </div>
+              </div>
             )}
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>واتساب</div>
-            {editOfficial ? (
-              <input type="text" value={officialData.contact_whatsapp} onChange={e => setOfficialData({ ...officialData, contact_whatsapp: e.target.value })}
-                style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: S.green }}>{supplier.contact_whatsapp || '—'}</div>
-            )}
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>الموقع الإلكتروني</div>
-            {editOfficial ? (
-              <input type="text" value={officialData.website} onChange={e => setOfficialData({ ...officialData, website: e.target.value })}
-                style={{ width: '100%', background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '7px 10px', fontSize: '12px', color: S.white, outline: 'none', fontFamily: 'inherit', textAlign: 'right', boxSizing: 'border-box' as any }} />
-            ) : (
-              <div style={{ fontSize: '13px', fontWeight: 500, color: '#93C5FD' }}>{supplier.website || '—'}</div>
-            )}
-          </div>
-
         </div>
       </div>
 
@@ -719,8 +880,7 @@ const avg = Math.round(
     await supabase.from('suppliers').update({ rating: avg, quality_rating: ratings.quality, delivery_rating: ratings.delivery, comm_rating: ratings.communication, price_rating: ratings.price, flex_rating: ratings.flexibility }).eq('id', supplierId)
     setSaving(false)
     alert('✅ تم حفظ التقييم بنجاح')
-    sessionStorage.setItem('activeTab', 'rating')
-    window.location.reload()
+    // FIX 5: لا يوجد reload — التقييم يُحدَّث محلياً
   }
 
   async function addNote() {
@@ -819,6 +979,158 @@ const avg = Math.round(
     </div>
   )
 }
+// ===== FIX 3: مكون قدرات التجارة الجديد — رسم بياني + مؤشرات ذكية =====
+function TradingCapabilityTab({ supplierId, supplier, priceHistory }: { supplierId: string, supplier: any, priceHistory: any[] }) {
+  const products = (supplier.main_products || '').split(/[،,]/).map((p: string) => p.trim()).filter(Boolean)
+
+  // حساب توزيع الأسعار لكل منتج من سجل الأسعار
+  const productPriceMap: Record<string, number[]> = {}
+  priceHistory.forEach(r => {
+    if (!r.product_name) return
+    if (!productPriceMap[r.product_name]) productPriceMap[r.product_name] = []
+    if (r.price) productPriceMap[r.product_name].push(Number(r.price))
+  })
+
+  // مؤشرات الأداء التجاري
+  const totalAmount = supplier.total_amount || 0
+  const totalDeals  = supplier.total_deals  || 0
+  const avgDeal     = totalDeals ? Math.round(totalAmount / totalDeals) : 0
+  const priceCount  = priceHistory.length
+  const lastPrice   = priceHistory[0]
+  const prevPrice   = priceHistory[1]
+  const priceChange = lastPrice && prevPrice
+    ? (((Number(lastPrice.price) - Number(prevPrice.price)) / Number(prevPrice.price)) * 100).toFixed(1)
+    : null
+
+  // بيانات الرسم البياني (Bar Chart SVG) — الصفقات السنوية
+  const monthlyDeals: Record<string, number> = {}
+  priceHistory.forEach(r => {
+    const m = new Date(r.created_at).toLocaleDateString('ar-EG', { month: 'short', year: '2-digit' })
+    monthlyDeals[m] = (monthlyDeals[m] || 0) + 1
+  })
+  const chartData = Object.entries(monthlyDeals).slice(-6)
+  const maxVal = Math.max(...chartData.map(([, v]) => v), 1)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* مؤشرات الأداء */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' }}>
+        {[
+          { label: 'إجمالي المبلغ',   val: totalAmount ? `$${totalAmount.toLocaleString()}` : '$0', icon: '💵', color: S.green },
+          { label: 'متوسط الصفقة',    val: avgDeal ? `$${avgDeal.toLocaleString()}` : '—', icon: '📊', color: S.blue },
+          { label: 'سجلات الأسعار',   val: priceCount, icon: '🗂️', color: S.amber },
+        ].map((m, i) => (
+          <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px 16px', textAlign: 'right' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+              <span style={{ fontSize: '22px' }}>{m.icon}</span>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: m.color }}>{m.val}</div>
+            </div>
+            <div style={{ fontSize: '10px', color: S.muted }}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* FIX 3: رسم بياني SVG — نشاط الصفقات */}
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+          {priceChange !== null && (
+            <span style={{ fontSize: '11px', fontWeight: 700, color: Number(priceChange) >= 0 ? S.green : S.red }}>
+              {Number(priceChange) >= 0 ? '▲' : '▼'} {Math.abs(Number(priceChange))}% تغير السعر
+            </span>
+          )}
+          <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>📈 نشاط الصفقات (آخر 6 أشهر)</div>
+        </div>
+        {chartData.length === 0 ? (
+          <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: '12px' }}>لا توجد بيانات كافية للرسم البياني</div>
+        ) : (
+          <svg viewBox={`0 0 ${chartData.length * 60} 100`} style={{ width: '100%', height: '120px', direction: 'ltr' }}>
+            {/* خطوط الشبكة */}
+            {[0, 25, 50, 75, 100].map(y => (
+              <line key={y} x1="0" y1={y} x2={chartData.length * 60} y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="0.5" />
+            ))}
+            {/* الأعمدة */}
+            {chartData.map(([month, val], i) => {
+              const barH = (val / maxVal) * 75
+              const x = i * 60 + 10
+              const y = 80 - barH
+              return (
+                <g key={month}>
+                  <rect x={x} y={y} width="40" height={barH} rx="4"
+                    fill={`url(#grad${i})`} opacity="0.9" />
+                  <defs>
+                    <linearGradient id={`grad${i}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={S.gold} />
+                      <stop offset="100%" stopColor={S.gold2} stopOpacity="0.4" />
+                    </linearGradient>
+                  </defs>
+                  <text x={x + 20} y="96" textAnchor="middle" fill={S.muted} fontSize="7" fontFamily="Tajawal,sans-serif">{month}</text>
+                  {val > 0 && <text x={x + 20} y={y - 3} textAnchor="middle" fill={S.gold2} fontSize="8" fontWeight="700">{val}</text>}
+                </g>
+              )
+            })}
+          </svg>
+        )}
+      </div>
+
+      {/* حركة الأسعار */}
+      {priceHistory.length > 0 && (
+        <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '12px', textAlign: 'right' }}>💰 آخر أسعار مسجّلة</div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {priceHistory.slice(0, 5).map((p, i) => (
+              <div key={i} style={{ background: S.card2, borderRadius: '10px', padding: '10px 14px', textAlign: 'center', minWidth: '100px' }}>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: S.gold }}>${Number(p.price || 0).toLocaleString()}</div>
+                <div style={{ fontSize: '9px', color: S.muted, marginTop: '2px' }}>{(p.product_name || '—').slice(0, 14)}</div>
+                <div style={{ fontSize: '9px', color: S.muted }}>{new Date(p.created_at).toLocaleDateString('ar-EG')}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* الشهادات والاعتمادات */}
+{/* 1. التحقق المزدوج: التأكد من وجود البيانات وأنها نصية */}
+{typeof supplier?.certifications === 'string' && supplier.certifications.trim() !== '' && (
+  <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
+    <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '12px', textAlign: 'right' }}>🏅 الشهادات والاعتمادات</div>
+    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      {/* 2. التأمين باستخدام (supplier.certifications || "") قبل الـ split */}
+      {(supplier.certifications || "").split(/[،,]/).map((c: string, i: number) => c.trim() && (
+        <span key={i} style={{ 
+          fontSize: '11px', 
+          padding: '5px 14px', 
+          borderRadius: '20px', 
+          background: 'rgba(34,197,94,0.1)', 
+          color: S.green, 
+          border: '1px solid rgba(34,197,94,0.2)', 
+          fontWeight: 600 
+        }}>
+          ✓ {c.trim()}
+        </span>
+      ))}
+    </div>
+  </div>
+)}
+
+      {/* القدرات الإنتاجية — المبيعات السنوية + الصفقات */}
+      <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>⚡ القدرات التجارية</div>
+        {[
+          { label: 'المبيعات السنوية',    val: supplier.annual_sales || '—', big: true, color: S.gold },
+          { label: 'الصفقات المنجزة',     val: `${supplier.total_deals || 0} صفقة`, color: S.blue },
+          { label: 'إجمالي قيمة التعامل', val: totalAmount ? `$${totalAmount.toLocaleString()}` : '$0', color: S.green },
+        ].map(f => (
+          <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '10px', borderBottom: `1px solid ${S.border}` }}>
+            <div style={{ fontSize: f.big ? '18px' : '13px', fontWeight: 700, color: f.color }}>{f.val}</div>
+            <div style={{ fontSize: '11px', color: S.muted }}>{f.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ===== مكون المنتجات =====
 function ProductsTab({ supplierId, mainProducts }: { supplierId: string, mainProducts: string }) {
   const [products, setProducts] = useState<any[]>(
@@ -876,6 +1188,196 @@ function ProductsTab({ supplierId, mainProducts }: { supplierId: string, mainPro
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ===== FIX 4+5: مكون سجل الصفقات المفعّل =====
+function DealsTab({ supplierId, supplier, setSupplier, priceHistory, setPriceHistory }: {
+  supplierId: string; supplier: any; setSupplier: any; priceHistory: any[]; setPriceHistory: any
+}) {
+  const [showAdd, setShowAdd] = useState(false)
+  const [saving,  setSaving]  = useState(false)
+  const [openId,  setOpenId]  = useState<string | null>(null)
+  const [form, setForm] = useState({
+    product_name: '', price: '', quantity: '', currency: 'USD',
+    deal_date: new Date().toISOString().split('T')[0],
+    status: 'مكتملة', notes: '', incoterms: 'CIF', payment_method: 'LC',
+  })
+
+  const totalAmount = priceHistory.reduce((a, d) => a + (Number(d.price) || 0), 0)
+  const totalDeals  = priceHistory.length
+  const avgDeal     = totalDeals ? Math.round(totalAmount / totalDeals) : 0
+  const statusColors: Record<string, { c: string; b: string }> = {
+    'مكتملة': { c: S.green, b: 'rgba(34,197,94,0.1)' },
+    'جارية':  { c: S.blue,  b: 'rgba(59,130,246,0.1)' },
+    'معلقة':  { c: S.amber, b: 'rgba(245,158,11,0.1)' },
+    'ملغاة':  { c: S.red,   b: 'rgba(239,68,68,0.1)' },
+  }
+
+  async function addDeal() {
+    if (!form.product_name || !form.price) { alert('يرجى إدخال المنتج والمبلغ'); return }
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const amount = Number(form.price.replace(/[^0-9.]/g, '')) || 0
+    const { data: newDeal, error } = await supabase.from('supplier_prices_history').insert([{
+      supplier_id: supplierId,
+      product_name: form.product_name,
+      price: amount,
+      status: form.status,
+      notes: [form.incoterms, form.payment_method, form.quantity ? `الكمية: ${form.quantity}` : '', form.notes].filter(Boolean).join(' | '),
+      user_id: user?.id,
+      created_at: new Date(form.deal_date).toISOString(),
+    }]).select().single()
+    if (!error && newDeal) {
+      // FIX 5: تحديث إحصائيات المورد في نفس الوقت
+      const newTotal  = (supplier.total_deals  || 0) + 1
+      const newAmount = (supplier.total_amount || 0) + amount
+      await supabase.from('suppliers').update({ total_deals: newTotal, total_amount: newAmount }).eq('id', supplierId)
+      setSupplier((prev: any) => ({ ...prev, total_deals: newTotal, total_amount: newAmount }))
+      setPriceHistory((prev: any[]) => [newDeal, ...prev])
+    }
+    setShowAdd(false)
+    setForm({ product_name: '', price: '', quantity: '', currency: 'USD', deal_date: new Date().toISOString().split('T')[0], status: 'مكتملة', notes: '', incoterms: 'CIF', payment_method: 'LC' })
+    setSaving(false)
+  }
+
+  const inp2: React.CSSProperties = {
+    width: '100%', background: S.navy, border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px', padding: '8px 11px', fontSize: '12px', color: S.white,
+    outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', direction: 'rtl', textAlign: 'right',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' }}>
+        {[
+          { label: 'إجمالي الصفقات', val: totalDeals, color: S.gold },
+          { label: 'إجمالي المبلغ', val: totalAmount ? `$${totalAmount.toLocaleString()}` : '$0', color: S.green },
+          { label: 'متوسط الصفقة', val: avgDeal ? `$${avgDeal.toLocaleString()}` : '—', color: S.blue },
+        ].map((m, i) => (
+          <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px', textAlign: 'right' }}>
+            <div style={{ fontSize: '22px', fontWeight: 700, color: m.color, marginBottom: '3px' }}>{m.val}</div>
+            <div style={{ fontSize: '10px', color: S.muted }}>{m.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* رأس الأرشيف + زر الإضافة */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={() => setShowAdd(!showAdd)}
+          style={{ background: S.gold, color: S.navy, border: 'none', padding: '8px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+          + إضافة صفقة
+        </button>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>📋 أرشيف الصفقات ({totalDeals})</div>
+      </div>
+
+      {/* فورم إضافة صفقة */}
+      {showAdd && (
+        <div style={{ background: S.navy2, border: `1px solid rgba(201,168,76,0.25)`, borderRadius: '14px', padding: '18px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 800, color: S.gold2, marginBottom: '14px', textAlign: 'right' }}>📦 تسجيل صفقة جديدة</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '10px', color: S.gold, fontWeight: 700, marginBottom: '4px' }}>اسم المنتج *</label>
+              <input value={form.product_name} onChange={e => setForm(p => ({ ...p, product_name: e.target.value }))} style={inp2} placeholder="مثال: Refined Palm Olein Oil" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>المبلغ *</label>
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
+                  style={{ ...inp2, width: '65px', flexShrink: 0, cursor: 'pointer' }}>
+                  {['USD', 'EUR', 'SAR', 'AED'].map(c => <option key={c} value={c} style={{ background: S.navy2 }}>{c}</option>)}
+                </select>
+                <input value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} style={inp2} placeholder="0.00" />
+              </div>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>الكمية</label>
+              <input value={form.quantity} onChange={e => setForm(p => ({ ...p, quantity: e.target.value }))} style={inp2} placeholder="مثال: 22 MT" />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>Incoterms</label>
+              <select value={form.incoterms} onChange={e => setForm(p => ({ ...p, incoterms: e.target.value }))} style={{ ...inp2, cursor: 'pointer' }}>
+                {['CIF', 'FOB', 'EXW', 'DDP', 'CFR'].map(t => <option key={t} value={t} style={{ background: S.navy2 }}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>شروط الدفع</label>
+              <select value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))} style={{ ...inp2, cursor: 'pointer' }}>
+                {['LC', 'TT', 'TT 30-70', 'CAD', 'Advance'].map(t => <option key={t} value={t} style={{ background: S.navy2 }}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>تاريخ الصفقة</label>
+              <input type="date" value={form.deal_date} onChange={e => setForm(p => ({ ...p, deal_date: e.target.value }))}
+                style={{ ...inp2, colorScheme: 'dark' as any }} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>الحالة</label>
+              <select value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))} style={{ ...inp2, cursor: 'pointer' }}>
+                {['مكتملة', 'جارية', 'معلقة', 'ملغاة'].map(s => <option key={s} value={s} style={{ background: S.navy2 }}>{s}</option>)}
+              </select>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>ملاحظات الصفقة</label>
+              <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={2}
+                style={{ ...inp2, resize: 'none' } as React.CSSProperties} placeholder="تفاصيل إضافية..." />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+            <button onClick={() => setShowAdd(false)} style={{ flex: 1, background: 'transparent', color: S.muted, border: `1px solid ${S.border}`, padding: '9px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>إلغاء</button>
+            <button onClick={addDeal} disabled={saving}
+              style={{ flex: 2, background: saving ? S.muted : S.gold, color: S.navy, border: 'none', padding: '9px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              {saving ? '⏳...' : '✅ حفظ الصفقة'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* قائمة الصفقات */}
+      {priceHistory.length === 0 ? (
+        <div style={{ textAlign: 'center', color: S.muted, padding: '40px 0', fontSize: '13px', background: S.card, borderRadius: '12px', border: `1px solid ${S.border}` }}>
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>📋</div>
+          لم تُسجَّل صفقات بعد
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {priceHistory.map((d, i) => {
+            const sc = statusColors[d.status] || { c: S.muted, b: S.card }
+            const noteParts = (d.notes || '').split(' | ').filter(Boolean)
+            const isOpen = openId === (d.id || String(i))
+            return (
+              <div key={d.id || i} onClick={() => setOpenId(isOpen ? null : (d.id || String(i)))}
+                style={{ background: S.card, border: `1px solid ${isOpen ? S.gold : S.border}`, borderRadius: '12px', padding: '14px 16px', cursor: 'pointer', transition: 'border-color .2s' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isOpen ? '12px' : 0 }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 800, color: S.gold }}>
+                      {d.price ? `$${Number(d.price).toLocaleString()}` : '—'}
+                    </span>
+                    <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700, background: sc.b, color: sc.c }}>{d.status || 'غير محدد'}</span>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: S.white }}>📦 {d.product_name || '—'}</div>
+                    <div style={{ fontSize: '10px', color: S.muted, marginTop: '2px' }}>{new Date(d.created_at).toLocaleDateString('ar-EG')}</div>
+                  </div>
+                </div>
+                {isOpen && noteParts.length > 0 && (
+                  <div style={{ borderTop: `1px solid ${S.border}`, paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {noteParts.map((part: string, j: number) => (
+                      <div key={j} style={{ fontSize: '11px', color: S.muted, textAlign: 'right', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <span>{part.trim()}</span>
+                        <span style={{ color: S.gold }}>›</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -1033,14 +1535,26 @@ fetchPriceHistory()
           </div>
         </div>
 
-        {/* شريط الحالة */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.14)', borderRadius: '8px', padding: '8px 14px', marginBottom: '12px' }}>
-          <span style={{ fontSize: '10px', padding: '2px 9px', borderRadius: '20px', fontWeight: 600, background: 'rgba(34,197,94,0.12)', color: S.green }}>مورد موثّق ✓</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: S.green, fontWeight: 500 }}>
-            {supplier.last_contact_date ? `آخر تواصل: ${timeAgo(supplier.last_contact_date)}` : 'لم يتم التواصل بعد'}
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: S.green }} />
-          </div>
-        </div>
+        {/* FIX 1: شريط الحالة — تصنيف ديناميكي بناءً على اكتمال الملف */}
+        {(() => {
+          // تصنيف الشارة بناءً على نسبة الاكتمال
+          const badge = comp >= 100
+            ? { label: 'موثّق بالكامل ✓', color: S.green, bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', dot: S.green }
+            : comp >= 80
+            ? { label: 'متقدم ◎', color: S.blue, bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.18)', dot: S.blue }
+            : comp >= 60
+            ? { label: 'أساسي △', color: S.amber, bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.18)', dot: S.amber }
+            : { label: 'غير مكتمل ✗', color: S.red, bg: 'rgba(239,68,68,0.06)', border: 'rgba(239,68,68,0.18)', dot: S.red }
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: badge.bg, border: `1px solid ${badge.border}`, borderRadius: '8px', padding: '8px 14px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '10px', padding: '2px 9px', borderRadius: '20px', fontWeight: 700, background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>{badge.label}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: badge.color, fontWeight: 500 }}>
+                {supplier.last_contact_date ? `آخر تواصل: ${timeAgo(supplier.last_contact_date)}` : 'لم يتم التواصل بعد'}
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: badge.dot }} />
+              </div>
+            </div>
+          )
+        })()}
 
         {/* الإحصائيات */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '14px' }}>
@@ -1073,8 +1587,14 @@ fetchPriceHistory()
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted }}>معلومات الشركة</div>
                 <button onClick={async () => {
-                  if (editMode) { await supabase.from('suppliers').update(editData).eq('id', id); window.location.reload() }
-                  setEditMode(!editMode)
+                  if (editMode) {
+                    await supabase.from('suppliers').update(editData).eq('id', id)
+                    // FIX 5: تحديث الـ state مباشرة بدون reload
+                    setSupplier((prev: any) => ({ ...prev, ...editData }))
+                    setEditMode(false)
+                  } else {
+                    setEditMode(true)
+                  }
                 }} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '6px', border: `1px solid ${S.border}`, background: editMode ? S.gold : 'transparent', color: editMode ? S.navy : S.muted, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
                   {editMode ? 'حفظ' : 'تعديل'}
                 </button>
@@ -1269,51 +1789,11 @@ fetchPriceHistory()
         {tab === 'products' && <ProductsTab supplierId={id} mainProducts={supplier.main_products} />}
 
         {tab === 'trading' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>القدرات التجارية</div>
-              {[
-                { label: 'المبيعات السنوية', val: supplier.annual_sales || '—', big: true },
-                { label: 'الصفقات معنا', val: `${supplier.total_deals || 0} صفقة` },
-                { label: 'إجمالي المبلغ', val: supplier.total_amount ? `$${supplier.total_amount.toLocaleString()}` : '$0' },
-              ].map(f => (
-                <div key={f.label} style={{ marginBottom: '14px', textAlign: 'right' }}>
-                  <div style={{ fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '3px' }}>{f.label}</div>
-                  <div style={{ fontSize: f.big ? '22px' : '13px', fontWeight: 700, color: f.big ? S.gold : S.white }}>{f.val}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '14px', textAlign: 'right' }}>المنتجات</div>
-              {supplier.main_products ? (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' }}>
-                  {supplier.main_products.split('،').map((p, i) => (
-                    <span key={i} style={{ fontSize: '11px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(59,130,246,0.1)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 500 }}>{p.trim()}</span>
-                  ))}
-                </div>
-              ) : <div style={{ color: S.muted, fontSize: '12px', textAlign: 'right' }}>لم تُضف منتجات بعد</div>}
-            </div>
-          </div>
+          <TradingCapabilityTab supplierId={id} supplier={supplier} priceHistory={priceHistory} />
         )}
 
         {tab === 'deals' && (
-          <div style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: S.muted, marginBottom: '16px', textAlign: 'right' }}>سجل الصفقات</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '16px' }}>
-              {[
-                { label: 'إجمالي الصفقات', val: supplier.total_deals || 0, color: S.gold },
-                { label: 'إجمالي المبلغ', val: supplier.total_amount ? `$${supplier.total_amount.toLocaleString()}` : '$0', color: S.green },
-                { label: 'متوسط الصفقة', val: supplier.total_deals ? `$${Math.round((supplier.total_amount || 0) / supplier.total_deals).toLocaleString()}` : '—', color: S.blue },
-                { label: 'نسبة الالتزام', val: '100%', color: S.green },
-              ].map((m, i) => (
-                <div key={i} style={{ background: S.card2, borderRadius: '10px', padding: '12px', textAlign: 'right' }}>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: m.color, marginBottom: '3px' }}>{m.val}</div>
-                  <div style={{ fontSize: '10px', color: S.muted }}>{m.label}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ textAlign: 'center', color: S.muted, padding: '30px 0', fontSize: '13px' }}>سيتم إضافة تفاصيل الصفقات قريباً</div>
-          </div>
+          <DealsTab supplierId={id} supplier={supplier} setSupplier={setSupplier} priceHistory={priceHistory} setPriceHistory={setPriceHistory} />
         )}
 
         {tab === 'docs' && <DocsTab supplierId={id} />}
