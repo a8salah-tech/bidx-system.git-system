@@ -3,6 +3,7 @@
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { CURRENCIES } from '../../components/options'
 
 
 
@@ -59,7 +60,7 @@ function ContactLogArchive({ supplier, supplierId, setSupplier }: { supplier: an
     supabase.from('supplier_notes')
       .select('*')
       .eq('supplier_id', supplierId)
-      .eq('company_id', 'contact_log')
+      .eq('note_type', 'contact_log')
       .order('created_at', { ascending: false })
       .then(({ data }) => setLogs(data || []))
   }, [supplierId])
@@ -72,7 +73,7 @@ function ContactLogArchive({ supplier, supplierId, setSupplier }: { supplier: an
     const { data: newLog, error } = await supabase.from('supplier_notes').insert([{
       supplier_id: supplierId,
       note: logForm.notes || '—',
-      company_id: 'contact_log',   // marker للتمييز
+      note_type: 'contact_log',   // marker للتمييز
       user_id: user?.id,
       created_by: user?.id,
       created_at: new Date(logForm.date).toISOString(),
@@ -1220,15 +1221,19 @@ function DealsTab({ supplierId, supplier, setSupplier, priceHistory, setPriceHis
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     const amount = Number(form.price.replace(/[^0-9.]/g, '')) || 0
-    const { data: newDeal, error } = await supabase.from('supplier_prices_history').insert([{
-      supplier_id: supplierId,
-      product_name: form.product_name,
-      price: amount,
-      status: form.status,
-      notes: [form.incoterms, form.payment_method, form.quantity ? `الكمية: ${form.quantity}` : '', form.notes].filter(Boolean).join(' | '),
-      user_id: user?.id,
-      created_at: new Date(form.deal_date).toISOString(),
-    }]).select().single()
+const { data: newDeal, error } = await supabase.from('supplier_prices_history').insert([{
+  supplier_id: supplierId,
+  product_name: form.product_name,
+  price: amount,
+  status: form.status,
+  notes: form.notes || null,
+  currency: form.currency,
+  quantity: form.quantity || null,
+  incoterms: form.incoterms,
+  payment_method: form.payment_method,
+  user_id: user?.id,
+  created_at: new Date(form.deal_date).toISOString(),
+}]).select().single()
     if (!error && newDeal) {
       // FIX 5: تحديث إحصائيات المورد في نفس الوقت
       const newTotal  = (supplier.total_deals  || 0) + 1
@@ -1288,7 +1293,7 @@ function DealsTab({ supplierId, supplier, setSupplier, priceHistory, setPriceHis
               <div style={{ display: 'flex', gap: '5px' }}>
                 <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
                   style={{ ...inp2, width: '65px', flexShrink: 0, cursor: 'pointer' }}>
-                  {['USD', 'EUR', 'SAR', 'AED'].map(c => <option key={c} value={c} style={{ background: S.navy2 }}>{c}</option>)}
+                  {CURRENCIES.map(c => <option key={c.id} value={c.value} style={{ background: S.navy2 }}>{c.id}</option>)}
                 </select>
                 <input value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} style={inp2} placeholder="0.00" />
               </div>
@@ -1346,8 +1351,13 @@ function DealsTab({ supplierId, supplier, setSupplier, priceHistory, setPriceHis
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {priceHistory.map((d, i) => {
             const sc = statusColors[d.status] || { c: S.muted, b: S.card }
-            const noteParts = (d.notes || '').split(' | ').filter(Boolean)
-            const isOpen = openId === (d.id || String(i))
+            const noteParts = [
+  d.incoterms && `Incoterms: ${d.incoterms}`,
+  d.payment_method && `الدفع: ${d.payment_method}`,
+  d.quantity && `الكمية: ${d.quantity}`,
+  d.notes,
+].filter(Boolean) as string[]        
+    const isOpen = openId === (d.id || String(i))
             return (
               <div key={d.id || i} onClick={() => setOpenId(isOpen ? null : (d.id || String(i)))}
                 style={{ background: S.card, border: `1px solid ${isOpen ? S.gold : S.border}`, borderRadius: '12px', padding: '14px 16px', cursor: 'pointer', transition: 'border-color .2s' }}>
@@ -1535,33 +1545,13 @@ fetchPriceHistory()
           </div>
         </div>
 
-        {/* FIX 1: شريط الحالة — تصنيف ديناميكي بناءً على اكتمال الملف */}
-        {(() => {
-          // تصنيف الشارة بناءً على نسبة الاكتمال
-          const badge = comp >= 100
-            ? { label: 'موثّق بالكامل ✓', color: S.green, bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', dot: S.green }
-            : comp >= 80
-            ? { label: 'متقدم ◎', color: S.blue, bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.18)', dot: S.blue }
-            : comp >= 60
-            ? { label: 'أساسي △', color: S.amber, bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.18)', dot: S.amber }
-            : { label: 'غير مكتمل ✗', color: S.red, bg: 'rgba(239,68,68,0.06)', border: 'rgba(239,68,68,0.18)', dot: S.red }
-          return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: badge.bg, border: `1px solid ${badge.border}`, borderRadius: '8px', padding: '8px 14px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '10px', padding: '2px 9px', borderRadius: '20px', fontWeight: 700, background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}>{badge.label}</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', fontSize: '12px', color: badge.color, fontWeight: 500 }}>
-                {supplier.last_contact_date ? `آخر تواصل: ${timeAgo(supplier.last_contact_date)}` : 'لم يتم التواصل بعد'}
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: badge.dot }} />
-              </div>
-            </div>
-          )
-        })()}
-
         {/* الإحصائيات */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '14px' }}>
           {[
             { label: 'إجمالي الصفقات', val: supplier.total_deals || 0, color: S.gold },
             { label: 'إجمالي المبلغ', val: supplier.total_amount ? `$${supplier.total_amount.toLocaleString()}` : '$0', color: S.green },
-{ label: 'التقييم', val: `${avg > 0 ? avg : (supplier?.rating || 0)}/10`, color: S.blue },            { label: 'المبيعات السنوية', val: supplier.annual_sales || '—', color: S.amber },
+            { label: 'التقييم', val: `${avg > 0 ? avg : (supplier?.rating || 0)}/10`, color: S.blue },
+           { label: 'المبيعات السنوية', val: supplier.annual_sales || '—', color: S.amber },
           ].map((m, i) => (
             <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px', textAlign: 'right' }}>
               <div style={{ fontSize: '22px', fontWeight: 700, color: m.color, marginBottom: '4px' }}>{m.val}</div>
