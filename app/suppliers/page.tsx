@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
+import { COUNTRIES } from '@/app/components/options';
 
 // ── نظام الألوان ──
 const S = {
@@ -78,11 +79,6 @@ function AddSupplierModal({onClose,onSaved,existingSuppliers}:{
     annual_sales:'',main_products:'',notes:'',website:'',certifications:'',
   })
 
-  const COUNTRIES_LIST = [
-    'المملكة العربية السعودية','الإمارات','مصر','الكويت','قطر','البحرين','عُمان',
-    'الأردن','لبنان','العراق','إندونيسيا','ماليزيا','الصين','الهند','تركيا',
-    'ألمانيا','فرنسا','إيطاليا','المملكة المتحدة','الولايات المتحدة','كندا','أخرى',
-  ]
 
   function set(k:string,v:string){ setForm(p=>({...p,[k]:v})) }
   function calcCompletion(){
@@ -124,9 +120,9 @@ setForm(p => ({ ...p, ...parsed, main_products: Array.isArray(parsed.main_produc
       // -------------------------------------------------------------
 
       // حفظ المورد أولاً باستخدام cleanedForm
-      const {data:suppData,error:suppErr}=await supabase.from('suppliers').insert([{
+const {data:suppData,error:suppErr}=await supabase.from('suppliers').insert([{
         ...cleanedForm,
-        main_products: productsArray, // إرسال المصفوفة المنظمة
+        main_products: productsArray.join('، '), // تحويل المصفوفة لنص نظيف قبل الحفظ
         status:'active',rating:0,
         completion_pct:calcCompletion(),
         user_id:user.id,
@@ -237,10 +233,14 @@ setForm(p => ({ ...p, ...parsed, main_products: Array.isArray(parsed.main_produc
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                 <div>
                   <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>الدولة</label>
-                  <select value={form.country} onChange={e=>set('country',e.target.value)} style={{...inp,cursor:'pointer'}}>
-                    <option value="" style={{background:S.navy2}}>اختر الدولة...</option>
-                    {COUNTRIES_LIST.map(c=><option key={c} value={c} style={{background:S.navy2}}>{c}</option>)}
-                  </select>
+                 <select value={form.country} onChange={e=>set('country',e.target.value)} style={{...inp, cursor:'pointer', backgroundColor: S.blueB, color: '#fff'}}>
+                   <option value="" style={{background:S.blueB, color: '#fff'}}>اختر الدولة...</option>
+                    {COUNTRIES.map((c) => ( 
+                      <option key={c.id || c.value} value={c.value} style={{background: '#0F2040', color: '#fff'}}> 
+                       {c.label} 
+                 </option> 
+                  ))}
+                </select>
                 </div>
                 <div>
                   <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>المدينة</label>
