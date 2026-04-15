@@ -231,17 +231,21 @@ const {data:suppData,error:suppErr}=await supabase.from('suppliers').insert([{
                 <input value={form.company_name} onChange={e=>set('company_name',e.target.value)} style={inp} placeholder="مثال: Wilmar International"/>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <div>
-                  <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>الدولة</label>
-                 <select value={form.country} onChange={e=>set('country',e.target.value)} style={{...inp, cursor:'pointer', backgroundColor: S.blueB, color: '#fff'}}>
-                   <option value="" style={{background:S.blueB, color: '#fff'}}>اختر الدولة...</option>
-                    {COUNTRIES.map((c) => ( 
-                      <option key={c.id || c.value} value={c.value} style={{background: '#0F2040', color: '#fff'}}> 
-                       {c.label} 
-                 </option> 
+              <div>
+                <label style={{display:'block',fontSize:'11px',color:S.muted,marginBottom:'7px',textAlign:'right'}}>الدولة </label>
+                <select 
+                  style={{...inp, cursor:'pointer', backgroundColor: '#0F2040', color: '#fff'}} 
+                  value={form.country} // 
+                  onChange={e => set('country', e.target.value)} 
+                >
+                  <option value="" style={{background: S.blueB, color: '#fff'}}>اختر...</option>
+                  {COUNTRIES.map(c => (
+                    <option key={c.id || c.value} value={c.value} style={{background: '#0F2040', color: '#fff'}}>
+                      {c.label}
+                    </option>
                   ))}
                 </select>
-                </div>
+              </div>
                 <div>
                   <label style={{display:'block',fontSize:11,color:S.muted,fontWeight:700,marginBottom:6,textAlign:'right'}}>المدينة</label>
                   <input value={form.city} onChange={e=>set('city',e.target.value)} style={inp} placeholder="مثال: جاكرتا"/>
@@ -371,7 +375,6 @@ export default function SuppliersPage(){
   const [currentPage,   setCurrentPage]   = useState(1)
   const [sortField,     setSortField]     = useState<'company_name'|'rating'|'total_deals'|'last_contact_date'|'completion_pct'>('company_name')
   const [sortDir,       setSortDir]       = useState<'asc'|'desc'>('asc')
-
   // FIX 3 — الميزة الإضافية 1: بحث سريع في المنتجات
   const [productSearch, setProductSearch] = useState('')
 
