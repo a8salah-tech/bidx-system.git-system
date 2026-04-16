@@ -469,21 +469,7 @@ useEffect(() => {
               )}
             </div>
             {/* آخر تواصل — حقل التعديل فقط */}
-            {editOfficial && (
-              <div style={{ background: S.card2, borderRadius: '10px', padding: '12px 14px', textAlign: 'right' }}>
-                <div style={{ fontSize: '9px', color: S.muted, fontWeight: 700, marginBottom: '5px' }}>📅 تعديل آخر تواصل</div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <select value={officialData.last_contact_method}
-                    onChange={e => setOfficialData({ ...officialData, last_contact_method: e.target.value })}
-                    style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '6px 8px', fontSize: '11px', color: S.white, outline: 'none', fontFamily: 'inherit', direction: 'rtl' }}>
-                    {['واتساب', 'إيميل', 'مكالمة', 'اجتماع'].map(m => <option key={m} value={m} style={{ background: S.navy2 }}>{m}</option>)}
-                  </select>
-                  <input type="date" value={officialData.last_contact_date}
-                    onChange={e => setOfficialData({ ...officialData, last_contact_date: e.target.value })}
-                    style={{ flex: 1, background: S.navy2, border: `1px solid rgba(201,168,76,0.3)`, borderRadius: '6px', padding: '6px 8px', fontSize: '11px', color: S.white, outline: 'none', fontFamily: 'inherit', colorScheme: 'dark' as any, boxSizing: 'border-box' as any }} />
-                </div>
-              </div>
-            )}
+  
           </div>
         </div>
       </div>
@@ -1018,8 +1004,8 @@ function TradingCapabilityTab({ supplierId, supplier, priceHistory }: { supplier
       {/* مؤشرات الأداء */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px' }}>
         {[
-          { label: 'إجمالي المبلغ',   val: totalAmount ? `$${totalAmount.toLocaleString()}` : '$0', icon: '💵', color: S.green },
-          { label: 'متوسط الصفقة',    val: avgDeal ? `$${avgDeal.toLocaleString()}` : '—', icon: '📊', color: S.blue },
+          { label: 'إجمالي المبلغ',   val: totalAmount ? `${priceHistory[0]?.currency || '$'}${totalAmount.toLocaleString()}` : '0', icon: '💵', color: S.green },
+          { label: 'متوسط الصفقة',    val: avgDeal ? `${priceHistory[0]?.currency || '$'}${avgDeal.toLocaleString()}` : '—', icon: '📊', color: S.blue },
           { label: 'سجلات الأسعار',   val: priceCount, icon: '🗂️', color: S.amber },
         ].map((m, i) => (
           <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px 16px', textAlign: 'right' }}>
@@ -1120,7 +1106,7 @@ function TradingCapabilityTab({ supplierId, supplier, priceHistory }: { supplier
         {[
           { label: 'المبيعات السنوية',    val: supplier.annual_sales || '—', big: true, color: S.gold },
           { label: 'الصفقات المنجزة',     val: `${supplier.total_deals || 0} صفقة`, color: S.blue },
-          { label: 'إجمالي قيمة التعامل', val: totalAmount ? `$${totalAmount.toLocaleString()}` : '$0', color: S.green },
+          { label: 'إجمالي قيمة التعامل', val: totalAmount ? `${priceHistory[0]?.currency || '$'}${totalAmount.toLocaleString()}` : '0', color: S.green },
         ].map(f => (
           <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', paddingBottom: '10px', borderBottom: `1px solid ${S.border}` }}>
             <div style={{ fontSize: f.big ? '18px' : '13px', fontWeight: 700, color: f.color }}>{f.val}</div>
@@ -1201,7 +1187,7 @@ function DealsTab({ supplierId, supplier, setSupplier, priceHistory, setPriceHis
   const [saving,  setSaving]  = useState(false)
   const [openId,  setOpenId]  = useState<string | null>(null)
   const [form, setForm] = useState({
-    product_name: '', price: '', quantity: '', currency: 'USD',
+    product_name: '', price: '', quantity: '', currency: priceHistory.length > 0 ? (priceHistory[0].currency || 'USD') : 'USD',
     deal_date: new Date().toISOString().split('T')[0],
     status: 'مكتملة', notes: '', incoterms: 'CIF', payment_method: 'LC',
   })
@@ -1273,7 +1259,7 @@ if (error) {
         {[
           { label: 'إجمالي الصفقات', val: totalDeals, color: S.gold },
           { label: 'إجمالي المبلغ', val: totalAmount ? `$${totalAmount.toLocaleString()}` : '$0', color: S.green },
-          { label: 'متوسط الصفقة', val: avgDeal ? `$${avgDeal.toLocaleString()}` : '—', color: S.blue },
+          { label: 'متوسط الصفقة', val: avgDeal ? `${priceHistory[0]?.currency || '$'}${avgDeal.toLocaleString()}` : '—', color: S.blue },
         ].map((m, i) => (
           <div key={i} style={{ background: S.card, border: `1px solid ${S.border}`, borderRadius: '12px', padding: '14px', textAlign: 'right' }}>
             <div style={{ fontSize: '22px', fontWeight: 700, color: m.color, marginBottom: '3px' }}>{m.val}</div>
@@ -1303,10 +1289,15 @@ if (error) {
             <div>
               <label style={{ display: 'block', fontSize: '10px', color: S.muted, fontWeight: 700, marginBottom: '4px' }}>المبلغ *</label>
               <div style={{ display: 'flex', gap: '5px' }}>
-                <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
-                  style={{ ...inp2, width: '65px', flexShrink: 0, cursor: 'pointer' }}>
-                  {CURRENCIES.map(c => <option key={c.id} value={c.value} style={{ background: S.navy2 }}>{c.id}</option>)}
-                </select>
+                {priceHistory.length > 0 ? (
+  <div style={{ ...inp2, width: '65px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: S.gold, fontWeight: 700 }}>
+    {form.currency}
+  </div>
+) : (
+  <select value={form.currency} onChange={e => setForm(p => ({ ...p, currency: e.target.value }))} style={{ ...inp2, width: '65px', flexShrink: 0, cursor: 'pointer' }}>
+    {CURRENCIES.map(c => <option key={c.id} value={c.value} style={{ background: S.navy2 }}>{c.id}</option>)}
+  </select>
+)}
                 <input value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} style={inp2} placeholder="0.00" />
               </div>
             </div>
@@ -1362,7 +1353,7 @@ if (error) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isOpen ? '12px' : 0 }}>
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <span style={{ fontSize: '20px', fontWeight: 800, color: S.gold }}>
-                      {d.price ? `$${Number(d.price).toLocaleString()}` : '—'}
+                      {d.price ? `${d.currency || '$'}${Number(d.price).toLocaleString()}` : '—'}
                     </span>
                     <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: '20px', fontWeight: 700, background: sc.b, color: sc.c }}>{d.status || 'غير محدد'}</span>
                   </div>
@@ -1445,25 +1436,39 @@ fetchPriceHistory()
     { label: 'المسؤول', key: 'contact_name', points: 10 },
     { label: 'واتساب', key: 'contact_whatsapp', points: 15 },
     { label: 'الإيميل', key: 'contact_email', points: 10 },
-    { label: 'المبيعات', key: 'annual_sales', points: 10 },
+    { label: 'تقييم', key: '_has_rating', points: 10 },
     { label: 'الموقع', key: 'website', points: 5 },
-    { label: 'التسجيل', key: 'registration_number', points: 10 },
-    { label: 'تعاقد', key: '_contract', points: 5 },
+    { label: 'السجل التجاري', key: 'registration_number', points: 10 },
+    { label: 'صفقة أولى', key: '_first_deal', points: 5 },
   ]
-
-  const comp = scoreFields.reduce((total, f) => {
-    if (f.key === '_contract') return total
-    return total + ((supplier as any)[f.key] ? f.points : 0)
-  }, 0)
-
-  const compFields = scoreFields.map(f => ({
-    label: f.label, points: f.points,
-    done: f.key === '_contract' ? false : !!(supplier as any)[f.key],
-  }))
-
   const avg = Math.round(
     ((supplier.quality_rating || 0) + (supplier.delivery_rating || 0) + (supplier.comm_rating || 0) + (supplier.price_rating || 0) + (supplier.flex_rating || 0)) / 5 * 10
   ) / 10
+  
+const comp = scoreFields.reduce((total, f) => {
+  if (f.key === '_first_deal') {
+    return total + (priceHistory.length > 0 ? f.points : 0)
+  }
+
+  if (f.key === '_has_rating') {
+    return total + (avg > 0 ? f.points : 0)
+  }
+
+  return total + ((supplier as any)[f.key] ? f.points : 0)
+}, 0)
+
+const compFields = scoreFields.map(f => ({
+  label: f.label,
+  points: f.points,
+  done:
+    f.key === '_first_deal'
+      ? priceHistory.length > 0
+      : f.key === '_has_rating'
+      ? avg > 0
+      : !!(supplier as any)[f.key],
+}))
+
+
 
   const tabs = [
     { key: 'overview', label: 'نظرة عامة' },
@@ -1547,7 +1552,7 @@ fetchPriceHistory()
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '14px' }}>
           {[
             { label: 'إجمالي الصفقات', val: supplier.total_deals || 0, color: S.gold },
-            { label: 'إجمالي المبلغ', val: supplier.total_amount ? `$${supplier.total_amount.toLocaleString()}` : '$0', color: S.green },
+            { label: 'إجمالي المبلغ', val: supplier.total_amount ? `${priceHistory[0]?.currency || '$'}${supplier.total_amount.toLocaleString()}` : '0', color: S.green },
             { label: 'التقييم', val: `${avg > 0 ? avg : (supplier?.rating || 0)}/10`, color: S.blue },
            { label: 'المبيعات السنوية', val: supplier.annual_sales || '—', color: S.amber },
           ].map((m, i) => (
