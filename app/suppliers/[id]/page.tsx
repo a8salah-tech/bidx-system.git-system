@@ -1066,7 +1066,8 @@ function TradingCapabilityTab({ supplierId, supplier, priceHistory }: { supplier
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {priceHistory.slice(0, 5).map((p, i) => (
               <div key={i} style={{ background: S.card2, borderRadius: '10px', padding: '10px 14px', textAlign: 'center', minWidth: '100px' }}>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: S.gold }}>{p.currency || ''}{Number(p.price || 0).toLocaleString()}</div>                <div style={{ fontSize: '9px', color: S.muted, marginTop: '2px' }}>{(p.product_name || '—').slice(0, 14)}</div>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: S.gold }}> {/* التحقق من وجود العملة في السجل نفسه أو استخدام رمز افتراضي */} {p.currency ? p.currency : ''} {Number(p.price || 0).toLocaleString()} </div>
+               <div style={{ fontSize: '9px', color: S.muted, marginTop: '2px' }}>{(p.product_name || '—').slice(0, 14)}</div>
                 <div style={{ fontSize: '9px', color: S.muted }}>{new Date(p.created_at).toLocaleDateString('ar-EG')}</div>
               </div>
             ))}
@@ -1753,7 +1754,7 @@ function handleExportPDF() {
           priceHistory.map((item, index) => (
             <tr key={index} style={{ borderBottom: `1px solid ${S.border}44`, fontSize: '12px' }}>
               <td style={{ padding: '10px', color: S.white }}>{item.product_name}</td>
-              <td style={{ padding: '10px', fontWeight: 700, color: S.gold }}>${item.price?.toLocaleString()}</td>
+              <td style={{ padding: '10px', fontWeight: 700, color: S.gold }}> {item.currency || ''} {item.price?.toLocaleString()} </td>
               <td style={{ padding: '10px' }}>
                 <span style={{ 
                   padding: '2px 8px', borderRadius: '4px', fontSize: '10px',
