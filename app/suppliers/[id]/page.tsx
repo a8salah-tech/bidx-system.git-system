@@ -4,8 +4,7 @@ import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 import { CURRENCIES } from '../../components/options'
-
-
+import { useRef } from 'react'
 
 interface Supplier {
   id: string; created_at: string; supplier_number: number; company_name: string
@@ -1067,8 +1066,7 @@ function TradingCapabilityTab({ supplierId, supplier, priceHistory }: { supplier
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             {priceHistory.slice(0, 5).map((p, i) => (
               <div key={i} style={{ background: S.card2, borderRadius: '10px', padding: '10px 14px', textAlign: 'center', minWidth: '100px' }}>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: S.gold }}>${Number(p.price || 0).toLocaleString()}</div>
-                <div style={{ fontSize: '9px', color: S.muted, marginTop: '2px' }}>{(p.product_name || '—').slice(0, 14)}</div>
+                <div style={{ fontSize: '15px', fontWeight: 700, color: S.gold }}>{p.currency || ''}{Number(p.price || 0).toLocaleString()}</div>                <div style={{ fontSize: '9px', color: S.muted, marginTop: '2px' }}>{(p.product_name || '—').slice(0, 14)}</div>
                 <div style={{ fontSize: '9px', color: S.muted }}>{new Date(p.created_at).toLocaleDateString('ar-EG')}</div>
               </div>
             ))}
@@ -1468,7 +1466,113 @@ const compFields = scoreFields.map(f => ({
       : !!(supplier as any)[f.key],
 }))
 
+function handleExportPDF() {
+  if (!supplier) {
+    alert('لا يوجد مورد');
+    return;
+  }
 
+  const currency = (priceHistory && priceHistory[0]?.currency) || '$';
+
+  const totalAmount = (priceHistory || []).reduce(
+    (a: number, d: any) => a + (Number(d?.price) || 0),
+    0
+  );
+
+  const totalDeals = priceHistory ? priceHistory.length : 0;
+
+  const avgDeal = totalDeals
+    ? Math.round(totalAmount / totalDeals)
+    : 0;
+
+  // متوسط التقييم
+  const ratings = [
+    supplier?.quality_rating || 0,
+    supplier?.delivery_rating || 0,
+    supplier?.comm_rating || 0,
+    supplier?.price_rating || 0,
+    supplier?.flex_rating || 0,
+  ];
+
+  const avg =
+    ratings.reduce((a, b) => a + b, 0) / ratings.length || 0;
+
+  const html = `
+  <html dir="rtl">
+  <body style="font-family:Arial;padding:20px">
+
+    <h2>${supplier?.company_name || ''}</h2>
+
+    <p>
+      ${supplier?.country || ''} 
+      ${supplier?.city ? ' / ' + supplier.city : ''}
+    </p>
+
+    <hr/>
+
+    <p>إجمالي الصفقات: ${totalDeals}</p>
+    <p>إجمالي المبلغ: ${currency}${totalAmount}</p>
+    <p>متوسط الصفقة: ${currency}${avgDeal}</p>
+    <p>التقييم: ${avg.toFixed(1)} / 10</p>
+
+    ${
+      supplier?.main_products
+        ? `
+      <h3>المنتجات</h3>
+      <div>
+        ${String(supplier.main_products)
+          .split(/[،,]/)
+          .map((p: any) => `<span>${p.trim()}</span>`)
+          .join('<br/>')}
+      </div>
+    `
+        : ''
+    }
+
+    ${
+      priceHistory && priceHistory.length
+        ? `
+      <h3>الصفقات</h3>
+      <table border="1" style="width:100%;border-collapse:collapse">
+        <tr>
+          <th>المنتج</th>
+          <th>السعر</th>
+          <th>التاريخ</th>
+        </tr>
+        ${priceHistory
+          .map(
+            (d: any) => `
+          <tr>
+            <td>${d?.product_name || ''}</td>
+            <td>${Number(d?.price || 0)}</td>
+            <td>${new Date(d?.created_at).toLocaleDateString()}</td>
+          </tr>
+        `
+          )
+          .join('')}
+      </table>
+    `
+        : ''
+    }
+
+  </body>
+  </html>
+  `;
+
+  const win = window.open('', '_blank');
+
+  if (!win) {
+    alert('افتح popups');
+    return;
+  }
+
+  win.document.write(html);
+  win.document.close();
+
+  setTimeout(() => {
+    win.print();
+  }, 300);
+}
 
   const tabs = [
     { key: 'overview', label: 'نظرة عامة' },
@@ -1507,8 +1611,10 @@ const compFields = scoreFields.map(f => ({
             style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: 'none', background: S.gold, color: S.navy }}>
             ✨ تحليل AI
           </button>
-          <button style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'rgba(59,130,246,0.15)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}>تصدير PDF</button>
-        </div>
+<button onClick={handleExportPDF}
+  style={{ padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', background: 'rgba(59,130,246,0.15)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.3)' }}>
+  📄 تصدير PDF
+</button>        </div>
       </div>
 
       {/* المحتوى */}
