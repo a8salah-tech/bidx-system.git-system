@@ -595,12 +595,12 @@ export default function AccountingPage(){
               <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:18,textAlign:'right'}}>
                 <div style={{fontSize:9,color:S.muted,marginBottom:8}}>التدفقات النقدية (سندات نشطة)</div>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                  <span style={{fontSize:13,fontWeight:700,color:S.green,fontFamily:'monospace'}}>{fmt(receipts,sym)}</span>
                   <span style={{fontSize:10,color:S.muted}}>📥 قبض</span>
+                  <span style={{fontSize:13,fontWeight:700,color:S.green,fontFamily:'monospace'}}>{fmt(receipts,sym)}</span>
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <span style={{fontSize:13,fontWeight:700,color:S.red,fontFamily:'monospace'}}>{fmt(payments,sym)}</span>
                   <span style={{fontSize:10,color:S.muted}}>📤 صرف</span>
+                  <span style={{fontSize:13,fontWeight:700,color:S.red,fontFamily:'monospace'}}>{fmt(payments,sym)}</span>
                 </div>
               </div>
             </div>
@@ -613,13 +613,14 @@ export default function AccountingPage(){
                   const vt=VOUCHER_TYPES[v.voucher_type]||VOUCHER_TYPES.journal
                   const vSym=CURRENCY_SYMBOLS[v.currency]||sym
                   return(
+                    
                     <div key={v.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',background:S.card,borderRadius:10,border:`1px solid ${S.border}`}}>
-                      <span style={{fontSize:14,fontWeight:800,color:v.voucher_type==='receipt'?S.green:S.red,fontFamily:'monospace'}}>{v.voucher_type==='receipt'?'+':'-'}{fmt(v.amount||0,vSym)}</span>
-                      <div style={{textAlign:'right'}}>
+                                            <div style={{textAlign:'right'}}>
                         <span style={{fontSize:11,color:S.gold,fontFamily:'monospace',marginLeft:8}}>{v.voucher_number}</span>
                         <span style={{fontSize:11,color:S.white}}>{v.party_name||v.description||'—'}</span>
                         <div style={{fontSize:10,color:S.muted,marginTop:2}}>{v.voucher_date?new Date(v.voucher_date).toLocaleDateString('ar-EG'):'—'}</div>
                       </div>
+                      <span style={{fontSize:14,fontWeight:800,color:v.voucher_type==='receipt'?S.green:S.red,fontFamily:'monospace'}}>{v.voucher_type==='receipt'?'+':'-'}{fmt(v.amount||0,vSym)}</span>
                     </div>
                   )
                 })}
