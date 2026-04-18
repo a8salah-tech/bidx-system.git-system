@@ -56,11 +56,15 @@ function AddSupplierModal({
       if (mode === 'new') {
         if (!newSupp.company_name) { alert('أدخل اسم الشركة'); return }
         // إنشاء مورد جديد
-        const { data: newSupData, error: supErr } = await supabase.from('suppliers').insert([{
-          company_name: newSupp.company_name, country: newSupp.country,
-          city: newSupp.city, phone: newSupp.phone, email: newSupp.email,
-          user_id: currentUser.id, status: 'active',
-        }]).select().single()
+const { data: newSupData, error: supErr } = await supabase.from('suppliers').insert([{
+  company_name: newSupp.company_name,
+  country: newSupp.country,
+  city: newSupp.city,
+  contact_phone: newSupp.phone,   // ✅ هنا التعديل
+  contact_email: newSupp.email,
+  user_id: currentUser.id,
+  status: 'active',
+}]).select().single()
         if (supErr) { alert('خطأ: ' + supErr.message); return }
         supplierId = newSupData.id
       } else {
@@ -196,9 +200,22 @@ export default function ProductsPage() {
     setCurrentUser(user)
 
     // الموردين
-    const { data: suppData } = await supabase.from('suppliers')
-      .select('id,company_name,rating,country,city,status,main_products')
-      .eq('user_id', user.id)
+// 🚀 نحن هنا نخبر النظام: اجلب contact_email وسمِّه email مؤقتاً ليرتاح الكود
+const { data: suppData, error: suppError } = await supabase
+  .from('suppliers')
+  .select(`
+    id, 
+    company_name, 
+    country, 
+    city, 
+    status, 
+    rating, 
+    main_products, 
+    contact_email,
+    email:contact_email, 
+    user_id
+  `) 
+  .eq('user_id', user.id);
 
     // FIX 4: جلب من جدول products أولاً
     const { data: prodsMaster } = await supabase.from('products')
