@@ -82,31 +82,62 @@ button {
   }
 }
 
-/* 🚀 الحل الذكي والمستهدف للجداول فقط */
+/* 🚀 النسخة الاحترافية الكاملة للموبايل */
+
 @media (max-width: 768px) {
   
-  /* استهدف فقط الحاوية اللي جواها بيانات الجدول */
-  .leads-container, .table-wrapper {
+  /* 1. القائمة الجانبية (Sidebar): منع التداخل وتثبيتها فوق المحتوى */
+  .sidebar, aside {
+    display: flex !important;
+    flex-direction: column;
+    position: fixed !important; /* تثبيت القائمة فوق أي عنصر آخر */
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 280px !important; /* عرض احترافي للموبايل */
+    z-index: 9999 !important; /* ضمان بقائها في الأعلى دائماً */
+    background-color: #0A1628 !important; /* خلفية معتمة تمنع رؤية ما خلفها */
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5); /* فصل بصري واضح عن الجداول */
+    transition: transform 0.3s ease-in-out;
+    padding-top: 20px;
+  }
+
+  /* 2. حاوية الجداول: السماح بالتمرير العرضي السلس */
+  .leads-container, .table-wrapper, .scroll-area {
     overflow-x: auto !important;
     display: block !important;
-    -webkit-overflow-scrolling: touch;
     width: 100%;
+    -webkit-overflow-scrolling: touch; /* تمرير ناعم في الأيفون */
+    padding-bottom: 15px;
   }
 
-  /* منع ضغط النصوص داخل الخلايا عشان متدخلش في بعضها */
+  /* 3. صفوف البيانات: منع انضغاط الأعمدة */
   .lead-row {
-    min-width: 800px !important; /* يضمن وجود مساحة عرضية كافية للتمرير */
-    display: flex !important; /* يحافظ على توزيع الأعمدة جنب بعضها */
+    min-width: 900px !important; /* يضمن مساحة كافية لكل الأعمدة دون تداخل */
+    display: flex !important;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.02);
+    margin-bottom: 4px;
+    padding: 10px;
+    border-radius: 8px;
   }
 
-  /* تكبير مساحة اللمس للأزرار (معايير Apple & Google) */
-  button, .action-btn {
-    min-height: 44px;
+  /* 4. تحسين الأزرار واللمس */
+  button, .action-btn, a {
+    min-height: 44px; /* مساحة لمس مريحة لليد */
     min-width: 44px;
+    cursor: pointer;
   }
 
-  /* حماية القائمة الجنبية: نمنع تأثرها بالبلوك */
-  .sidebar, aside {
-    display: flex !important; /* نرجعه لأصله عشان ميتخفيش */
+  /* 5. ضبط المحتوى الرئيسي (Main Content) */
+  main, .content-area {
+    width: 100% !important;
+    padding: 10px !important;
+    overflow-x: hidden; /* منع الصفحة نفسها من الاهتزاز عرضياً */
+  }
+
+  /* 6. إخفاء العناصر غير الضرورية في الموبايل لزيادة التركيز */
+  .hide-mobile {
+    display: none !important;
   }
 }
