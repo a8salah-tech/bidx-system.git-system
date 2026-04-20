@@ -308,7 +308,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
                   {l:'الإيميل', v:lead.email||'—'},
                   {l:'الموقع',  v:lead.website||'—'},
                   {l:'المصدر',  v:lead.source||'—'},
-                  {l:'آخر إجراء',v:timeAgo(urgColor(lead))},
+                  { l: 'آخر إجراء', v: timeAgo(lead.updated_at || lead.created_at || new Date()) },
                   {l:'المتابعة',v:lead.next_followup_at?new Date(lead.next_followup_at).toLocaleDateString('ar-EG'):'—'},
                 ].map((f,i)=>(
                   <div key={i} style={{background:S.card,borderRadius:7,padding:'8px 10px',textAlign:'right'}}>

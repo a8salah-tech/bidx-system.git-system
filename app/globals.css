@@ -82,24 +82,31 @@ button {
   }
 }
 
-/* 🚀 حل سحري لكل الجداول في الموبيل */
+/* 🚀 الحل الذكي والمستهدف للجداول فقط */
 @media (max-width: 768px) {
-  /* أي حاوية جدول أو قائمة خليها تقبل التمرير العرضي */
-  div[style*="display: flex"], 
-  div[style*="display:flex"],
-  .table-container {
+  
+  /* استهدف فقط الحاوية اللي جواها بيانات الجدول */
+  .leads-container, .table-wrapper {
     overflow-x: auto !important;
-    display: block !important; /* يحولها لكتلة تسمح بالتمرير */
+    display: block !important;
     -webkit-overflow-scrolling: touch;
+    width: 100%;
   }
 
-  /* منع العناصر إنها تصغر بزيادة وتدخل في بعضها */
-  div[style*="flex:"] {
-    min-width: fit-content !important;
+  /* منع ضغط النصوص داخل الخلايا عشان متدخلش في بعضها */
+  .lead-row {
+    min-width: 800px !important; /* يضمن وجود مساحة عرضية كافية للتمرير */
+    display: flex !important; /* يحافظ على توزيع الأعمدة جنب بعضها */
   }
 
-  /* تكبير مساحة اللمس للأزرار في الموبيل */
-  button {
+  /* تكبير مساحة اللمس للأزرار (معايير Apple & Google) */
+  button, .action-btn {
     min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* حماية القائمة الجنبية: نمنع تأثرها بالبلوك */
+  .sidebar, aside {
+    display: flex !important; /* نرجعه لأصله عشان ميتخفيش */
   }
 }
