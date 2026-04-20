@@ -219,7 +219,7 @@ const { data: suppData, error: suppError } = await supabase
 
     // FIX 4: جلب من جدول products أولاً
     const { data: prodsMaster } = await supabase.from('products')
-      .select('id,name,description,status,category,created_at')
+      .select('id,name,description,status,category,created_at,origin_country,market_country')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -229,7 +229,23 @@ const { data: suppData, error: suppError } = await supabase
 
     setSuppliers(suppData || [])
     setAllProducts(prodsMaster || [])
-    setProducts(spData || [])
+    const mergedProducts = (spData || []).map(sp => {
+  const master = (prodsMaster || []).find(p =>
+    p.id === sp.product_id ||
+    p.name?.trim().toLowerCase() === sp.name?.trim().toLowerCase()
+  )
+
+  return master
+    ? {
+        ...sp,
+        category: sp.category || master.category,
+        origin_country: sp.origin_country || master.origin_country,
+        market_country: sp.market_country || master.market_country,
+      }
+    : sp
+})
+
+setProducts(mergedProducts)
     setLoading(false)
   }, [])
 

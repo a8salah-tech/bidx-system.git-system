@@ -81,3 +81,25 @@ button {
     table-layout: auto !important;
   }
 }
+
+/* 🚀 حل سحري لكل الجداول في الموبيل */
+@media (max-width: 768px) {
+  /* أي حاوية جدول أو قائمة خليها تقبل التمرير العرضي */
+  div[style*="display: flex"], 
+  div[style*="display:flex"],
+  .table-container {
+    overflow-x: auto !important;
+    display: block !important; /* يحولها لكتلة تسمح بالتمرير */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* منع العناصر إنها تصغر بزيادة وتدخل في بعضها */
+  div[style*="flex:"] {
+    min-width: fit-content !important;
+  }
+
+  /* تكبير مساحة اللمس للأزرار في الموبيل */
+  button {
+    min-height: 44px;
+  }
+}
