@@ -185,7 +185,8 @@ export default function ProductsPage() {
   const [saving,           setSaving]           = useState(false)
   const [showAddProduct,   setShowAddProduct]   = useState(false)
   const [addSupplierFor,   setAddSupplierFor]   = useState<string|null>(null) // FIX 1
-
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 20
   const [newProduct, setNewProduct] = useState({
     name:'',category:'',price:'',currency:'',unit:'',
     stock_quantity:'',moq:'',description:'',certifications:'',
@@ -392,7 +393,9 @@ setProducts(mergedProducts)
   const stoppedCount   = Object.entries(productStatusMap).filter(([,v]) => v === 'stopped').length
   const totalSuppliers = suppliers.length
   const mostPopular    = sortedProducts[0]
-
+  const totalPagesCount = Math.ceil(sortedProducts.length / PAGE_SIZE)
+  const pagedProducts = sortedProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  
   return (
     <div style={{display:'flex',flexDirection:'column',height:'100%',color:S.white,fontFamily:'Tajawal,sans-serif',direction:'rtl'}}>
 
@@ -605,7 +608,8 @@ setProducts(mergedProducts)
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedProducts.map(([name, sups], i) => {
+                    
+                    {pagedProducts.map(([name, sups], i) => {
                       const safeSups = Array.isArray(sups) ? sups : []
                       const count    = safeSups.length
                       const avgRating = count > 0 ? (safeSups.reduce((a,s)=>a+(s.rating||0),0)/count).toFixed(1) : 0
@@ -691,7 +695,23 @@ setProducts(mergedProducts)
                     })}
                   </tbody>
                 </table>
+                {totalPagesCount > 1 && (
+  <div style={{ display: 'flex', justifyContent: 'left', alignItems: 'center', gap: 8, marginTop: 14 }}>
+    <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1}
+      style={{ padding:'6px 14px', borderRadius:7, border:`1px solid ${S.border}`, background:'transparent', color:currentPage===1?S.muted:S.white, cursor:currentPage===1?'not-allowed':'pointer', fontSize:12, fontFamily:'inherit' }}>
+      → السابقة
+    </button>
+    <span style={{ fontSize:12, color:S.muted }}>
+      {currentPage} / {totalPagesCount} — {sortedProducts.length} منتج
+    </span>
+    <button onClick={() => setCurrentPage(p => Math.min(totalPagesCount, p+1))} disabled={currentPage === totalPagesCount}
+      style={{ padding:'6px 14px', borderRadius:7, border:`1px solid ${S.border}`, background:'transparent', color:currentPage===totalPagesCount?S.muted:S.white, cursor:currentPage===totalPagesCount?'not-allowed':'pointer', fontSize:12, fontFamily:'inherit' }}>
+      ← التالية
+    </button>
+  </div>
+)}
               </div>
+              
             )}
 
             {/* ── البطاقات ── */}
@@ -714,6 +734,7 @@ setProducts(mergedProducts)
                         <span style={{fontSize:'12px',fontWeight:700,color:S.gold}}>{sups.length} مورد</span>
                       </div>
                     </div>
+                    
                   )
                 })}
               </div>
