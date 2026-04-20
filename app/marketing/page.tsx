@@ -341,7 +341,7 @@ function LeadCard({lead,stage,stages,templates,onMove,onDelete,onAddNote,onMarkC
                 {(lead.activity_log||[]).length===0?(
                   <div style={{textAlign:'center',color:S.muted,padding:'10px',fontSize:11}}>لا يوجد نشاط مسجل بعد</div>
                 ):(lead.activity_log||[]).map((act:any,i:number)=>(
-                  <div key={i} style={{display:'flex',gap:8,marginBottom:7,flexDirection:'row-reverse'}}>
+                  <div key={i} style={{display:'flex',gap:8,marginBottom:7, flexDirection:'row', alignItems:'flex-start', justifyContent:'flex-start'}}>
                     <div style={{width:6,height:6,borderRadius:'50%',background:S.gold,flexShrink:0,marginTop:5}}/>
                     <div style={{textAlign:'right'}}>
                       <div style={{fontSize:11,color:S.white}}>{act.note}</div>
