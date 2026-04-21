@@ -230,20 +230,30 @@ const { data: suppData, error: suppError } = await supabase
 
     setSuppliers(suppData || [])
     setAllProducts(prodsMaster || [])
+
     const mergedProducts = (spData || []).map(sp => {
   const master = (prodsMaster || []).find(p =>
-    p.id === sp.product_id ||
+    (sp.product_id && p.id === sp.product_id) ||
     p.name?.trim().toLowerCase() === sp.name?.trim().toLowerCase()
   )
 
-  return master
-    ? {
-        ...sp,
-        category: sp.category || master.category,
-        origin_country: sp.origin_country || master.origin_country,
-        market_country: sp.market_country || master.market_country,
-      }
-    : sp
+  if (!master) return sp
+
+  return {
+    ...sp,
+
+    // 🔥 أهم تعديل
+    name: master.name || sp.name,
+
+    // 🔥 خلي master هو الأساس
+    category:       master.category       ?? sp.category,
+    origin_country: master.origin_country ?? sp.origin_country,
+    market_country: master.market_country ?? sp.market_country,
+
+    // اختياري مهم
+    description: master.description ?? sp.notes,
+    status:      master.status      ?? sp.status,
+  }
 })
 
 setProducts(mergedProducts)
