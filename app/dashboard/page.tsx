@@ -105,19 +105,36 @@ function SectionHead({ title, icon, color, href, router }: {
   title: string; icon: string; color: string; href?: string; router: ReturnType<typeof useRouter>;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-      {href ? (
-        <button onClick={() => router.push(href)}
-          style={{ fontSize: 11, color, background: `${color}18`, border: `1px solid ${color}40`, padding: '4px 12px', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
-          عرض الكل ←
-        </button>
-      ) : <span/>}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 16 }}>{icon}</span>
-        <span style={{ fontSize: 14, fontWeight: 800, color: S.white }}>{title}</span>
-        <div style={{ width: 4, height: 18, background: color, borderRadius: 2 }}/>
-      </div>
-    </div>
+<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+  
+  {/* 👈 ده هيبقى الشمال */}
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <span style={{ fontSize: 16 }}>{icon}</span>
+    <span style={{ fontSize: 14, fontWeight: 800, color: S.white }}>{title}</span>
+    <div style={{ width: 4, height: 18, background: color, borderRadius: 2 }}/>
+  </div>
+
+  {/* 👈 ده هيبقى اليمين */}
+  {href ? (
+    <button
+      onClick={() => router.push(href)}
+      style={{
+        fontSize: 11,
+        color,
+        background: `${color}18`,
+        border: `1px solid ${color}40`,
+        padding: '4px 12px',
+        borderRadius: 6,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        fontWeight: 700
+      }}
+    >
+      عرض الكل ←
+    </button>
+  ) : <span/>}
+
+</div>
   )
 }
 
@@ -398,7 +415,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ─── 1. إدارة الموردين ─── */}
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 20, direction: 'rtl', textAlign: 'right' }}>
           <SectionHead title="إدارة الموردين" icon="🏭" color={S.gold} href="/suppliers" router={router}/>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <Card label="إجمالي الموردين"    value={suppTotal}     color={S.gold}  icon="🏭" chart={suppChart} onClick={() => router.push('/suppliers')}/>
@@ -429,7 +446,32 @@ export default function DashboardPage() {
             <Card label="العمليات المكتملة"  value={custDone}      color={S.gold}  icon="✅" sub="صفقة ناجحة"/>
           </div>
         </div>
-
+        {/* ─── 6. الموارد البشرية ─── */}
+        <div style={{ marginBottom: 24 }}>
+          <SectionHead title="إدارة الموارد البشرية" icon="👨‍💼" color={S.green} router={router}/>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            <Card label="إجمالي الموظفين"        value={hrCount}                          color={S.green} icon="👨‍💼"/>
+            <Card label="إجمالي الرواتب الشهرية" value={`$${hrSalaries.toLocaleString()}`} color={S.gold}  icon="💵" sub="شهرياً"/>
+            <Card label="العهد والالتزامات"       value={`$${hrTrust.toLocaleString()}`}    color={S.amber} icon="📋"/>
+            {/* إجازة قادمة */}
+            <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
+              <span style={{ fontSize: 20 }}>🏖️</span>
+              <div style={{ fontSize: 14, fontWeight: 700, color: S.blue, margin: '8px 0 4px' }}>{hrLeave}</div>
+              <div style={{ fontSize: 11, color: S.muted, fontWeight: 600 }}>الإجازة القادمة</div>
+              <div style={{ fontSize: 10, color: S.muted, marginTop: 3 }}>أقرب موظف في إجازة</div>
+            </div>
+          </div>
+        </div>
+                {/* ─── 5. إدارة التشغيل ─── */}
+        <div style={{ marginBottom: 20 }}>
+          <SectionHead title="إدارة التسويق" icon="⚙️" color={S.purple} href="/purchase-orders" router={router}/>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            <Card label="طلبات جديدة (استلام)"   value={opNew}     color={S.blue}   icon="📥" chart={opChart} onClick={() => router.push('/purchase-orders')}/>
+            <Card label="قيد التجهيز"             value={opProcess} color={S.amber}  icon="⚙️"/>
+            <Card label="جاهزة للتسليم"           value={opReady}   color={S.purple} icon="📦"/>
+            <Card label="مكتملة (تم التسليم)"     value={opDone}    color={S.green}  icon="✅" sub="طلب ناجح"/>
+          </div>
+        </div>
         {/* ─── 4. إدارة الحسابات ─── */}
         <div style={{ marginBottom: 20 }}>
           <SectionHead title="إدارة الحسابات" icon="💰" color={S.amber} router={router}/>
@@ -479,35 +521,6 @@ export default function DashboardPage() {
 
           </div>
         </div>
-
-        {/* ─── 5. إدارة التشغيل ─── */}
-        <div style={{ marginBottom: 20 }}>
-          <SectionHead title="إدارة التشغيل" icon="⚙️" color={S.purple} href="/purchase-orders" router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
-            <Card label="طلبات جديدة (استلام)"   value={opNew}     color={S.blue}   icon="📥" chart={opChart} onClick={() => router.push('/purchase-orders')}/>
-            <Card label="قيد التجهيز"             value={opProcess} color={S.amber}  icon="⚙️"/>
-            <Card label="جاهزة للتسليم"           value={opReady}   color={S.purple} icon="📦"/>
-            <Card label="مكتملة (تم التسليم)"     value={opDone}    color={S.green}  icon="✅" sub="طلب ناجح"/>
-          </div>
-        </div>
-
-        {/* ─── 6. الموارد البشرية ─── */}
-        <div style={{ marginBottom: 24 }}>
-          <SectionHead title="إدارة الموارد البشرية" icon="👨‍💼" color={S.green} router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
-            <Card label="إجمالي الموظفين"        value={hrCount}                          color={S.green} icon="👨‍💼"/>
-            <Card label="إجمالي الرواتب الشهرية" value={`$${hrSalaries.toLocaleString()}`} color={S.gold}  icon="💵" sub="شهرياً"/>
-            <Card label="العهد والالتزامات"       value={`$${hrTrust.toLocaleString()}`}    color={S.amber} icon="📋"/>
-            {/* إجازة قادمة */}
-            <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 12, padding: 16 }}>
-              <span style={{ fontSize: 20 }}>🏖️</span>
-              <div style={{ fontSize: 14, fontWeight: 700, color: S.blue, margin: '8px 0 4px' }}>{hrLeave}</div>
-              <div style={{ fontSize: 11, color: S.muted, fontWeight: 600 }}>الإجازة القادمة</div>
-              <div style={{ fontSize: 10, color: S.muted, marginTop: 3 }}>أقرب موظف في إجازة</div>
-            </div>
-          </div>
-        </div>
-
       </div>
 
       {/* ══ Modal إنشاء حساب موظف ══ */}
