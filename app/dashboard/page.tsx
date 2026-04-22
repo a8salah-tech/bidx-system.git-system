@@ -448,7 +448,7 @@ export default function DashboardPage() {
         </div>
         {/* ─── 6. الموارد البشرية ─── */}
         <div style={{ marginBottom: 24 }}>
-          <SectionHead title="إدارة الموارد البشرية" icon="👨‍💼" color={S.green} router={router}/>
+          <SectionHead title="إدارة الموارد البشرية" icon="👨‍💼" color={S.green}href="/hr" router={router}/>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <Card label="إجمالي الموظفين"        value={hrCount}                          color={S.green} icon="👨‍💼"/>
             <Card label="إجمالي الرواتب الشهرية" value={`$${hrSalaries.toLocaleString()}`} color={S.gold}  icon="💵" sub="شهرياً"/>
