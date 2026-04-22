@@ -355,6 +355,7 @@ setProducts(uniqueProducts)
     if (!name) return
     if (!productMap[name]) productMap[name] = []
     const sup = suppliers.find(s => s.id === p.supplier_id)
+    if (p.supplier_id && productMap[name].some(x => x.supplier_id === p.supplier_id)) return
     productMap[name].push({
       ...p, supplier_id: p.supplier_id, name,
       category: p.category || 'غير محدد',
