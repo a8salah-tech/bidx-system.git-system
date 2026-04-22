@@ -172,7 +172,7 @@ export default function DashboardPage() {
   // ── معلومات المستخدم ──
   const [userName,    setUserName]    = useState('')
   const [userRole,    setUserRole]    = useState('admin')
-  const [companyName] = useState('Bridge Edge Trade Solutions')
+  const [companyName] = useState('لوحة التحكم الرئيسية')
   const [currentTime, setCurrentTime] = useState('')
 
   // ── رسم بياني ──

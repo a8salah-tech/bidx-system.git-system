@@ -15,6 +15,7 @@ const S = {
 }
 
 const navItems = [
+  { label: ' لوحة التحكم', href: '/dashboard', color: '#0A1628' },
   { label: 'إدارة الموردين', href: '/suppliers', color: '#7F77DD' },
   { label: 'إدرة المنتجات', href: '/products', color: S.gold },
   { label: 'إدرة العملاء', href: '/customers', color: '#FAFAF8' },
