@@ -462,7 +462,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-                {/* ─── 5. إدارة التشغيل ─── */}
+                {/* ─── 5. إدارة التسويق ─── */}
         <div style={{ marginBottom: 20 }}>
           <SectionHead title="إدارة التسويق" icon="⚙️" color={S.purple} href="/purchase-orders" router={router}/>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
@@ -474,7 +474,7 @@ export default function DashboardPage() {
         </div>
         {/* ─── 4. إدارة الحسابات ─── */}
         <div style={{ marginBottom: 20 }}>
-          <SectionHead title="إدارة الحسابات" icon="💰" color={S.amber} router={router}/>
+          <SectionHead title="إدارة الحسابات" icon="💰" href="/accounting" color={S.amber} router={router}/>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
 
             {/* سندات القبض */}
