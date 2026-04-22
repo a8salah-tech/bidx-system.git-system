@@ -231,32 +231,34 @@ const { data: suppData, error: suppError } = await supabase
     setSuppliers(suppData || [])
     setAllProducts(prodsMaster || [])
 
-    const mergedProducts = (spData || []).map(sp => {
+const mergedProducts = (spData || []).map(sp => {
   const master = (prodsMaster || []).find(p =>
-    (sp.product_id && p.id === sp.product_id) ||
-    p.name?.trim().toLowerCase() === sp.name?.trim().toLowerCase()
+    sp.product_id === p.id
   )
 
   if (!master) return sp
+  
 
   return {
     ...sp,
-
-    // 🔥 أهم تعديل
     name: master.name || sp.name,
-
-    // 🔥 خلي master هو الأساس
-    category:       master.category       ?? sp.category,
+    category: master.category ?? sp.category,
     origin_country: master.origin_country ?? sp.origin_country,
     market_country: master.market_country ?? sp.market_country,
-
-    // اختياري مهم
     description: master.description ?? sp.notes,
-    status:      master.status      ?? sp.status,
+    status: master.status ?? sp.status,
   }
 })
+const uniqueProducts = Array.from(
+  new Map(
+    mergedProducts.map(item => [
+      item.supplier_id + '-' + item.product_id,
+      item
+    ])
+  ).values()
+)
 
-setProducts(mergedProducts)
+setProducts(uniqueProducts)
     setLoading(false)
   }, [])
 
@@ -288,6 +290,7 @@ setProducts(mergedProducts)
       }]).select().single()
 
       if (pErr) { alert('خطأ products: ' + pErr.message); return }
+      
 
       // إضافة في supplier_products مع product_id
       const { error: spErr } = await supabase.from('supplier_products').insert([{
@@ -368,23 +371,7 @@ setProducts(mergedProducts)
     if (p.status === 'stopped') productStatusMap[name] = 'stopped'
   })
 
-  // من main_products في الموردين
-  suppliers.forEach(s => {
-    if (!s.main_products) return
-    s.main_products.split(/[،,\n\r]/).forEach((prod: string) => {
-      const name = prod.trim()
-      if (!name) return
-      if (!productMap[name]) productMap[name] = []
-      if (productMap[name].some(p => p.supplier_id === s.id)) return
-      productMap[name].push({
-        supplier_id: s.id, name, category: 'غير محدد',
-        country: s.country || '—',
-        origin_country: s.country || '', market_country: '',
-        rating: s.rating || 0, company_name: s.company_name || '—', city: s.city || '',
-        status: 'active',
-      })
-    })
-  })
+
 
   // FIX 5: فلتر الحالة — "نشط" أو "موقف"
   const sortedProducts = Object.entries(productMap)

@@ -674,9 +674,9 @@ export default function MarketingPage() {
         const customIds = stR.data.map((s: any) => s.stage_id)
         const filtered = DEFAULT_STAGES.filter(d => !customIds.includes(d.id))
         const customStages = stR.data.map((s: any) => ({
-          id: s.stage_id, label: s.label, icon: s.icon || '📌',
-          color: s.color || S.teal, desc: s.desc || 'مرحلة مخصصة',
-        }))
+            id: s.stage_id, label: s.label, icon: s.icon || '📌',
+            color: s.color || S.teal, desc: s.description || 'مرحلة مخصصة',
+          }))
         setStages([...DEFAULT_STAGES.filter(d => !stR.data.find((s: any) => s.stage_id === d.id)), ...customStages])
       }
     } catch (e) { console.error(e) }
@@ -758,10 +758,10 @@ export default function MarketingPage() {
     const newStage = { id: stageId, label: newStageLbl, icon: '📌', color: S.teal, desc: 'مرحلة مخصصة' }
     setStages(prev => [...prev, newStage])
     // حفظ في Supabase
-    await supabase.from('marketing_stages').insert([{
-      stage_id: stageId, label: newStageLbl, icon: '📌',
-      color: S.teal, desc: 'مرحلة مخصصة', created_by: currentUser?.id,
-    }])
+await supabase.from('marketing_stages').insert([{
+  stage_id: stageId, label: newStageLbl, icon: '📌',
+  color: S.teal, description: 'مرحلة مخصصة', created_by: currentUser?.id,
+}])
     setNewStageLbl(''); setShowAddStage(false)
   }
 
