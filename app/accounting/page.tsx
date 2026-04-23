@@ -195,37 +195,37 @@ export default function AccountingPage(){
   })
 
   // ── load ──
-const loadAll = useCallback(async()=>{
-  setLoading(true)
-  const {data:{session}} = await supabase.auth.getSession()
-  const uid = session?.user?.id
+  const loadAll = useCallback(async()=>{
+    setLoading(true)
+    const {data:{session}} = await supabase.auth.getSession()
+    const [aR,vR,cR,sR,stR,jR] = await Promise.all([
+      supabase.from('accounts').select('*').order('account_code'),
+      supabase.from('vouchers').select('*').order('created_at',{ascending:false}),
+      supabase.from('customers').select('id,full_name,company_name').order('full_name'),
+      supabase.from('suppliers').select('id,company_name').order('company_name'),
+      supabase.from('company_settings').select('default_currency').limit(1).single(),
+      supabase.from('journal_entries').select(`*,journal_lines(id,account_id,debit,credit,accounts(account_code,account_name))`).order('entry_date',{ascending:false}),
+    ])
+    setAccounts(aR.data||[])
+    setVouchers(vR.data||[])
+    setCustomers(cR.data||[])
+    setSuppliers(sR.data||[])
+    setJournalEntries(jR.data||[])
+    if(stR.data?.default_currency) setCurrency(stR.data.default_currency)
+    const nextN = getNext('receipt',vR.data||[])
+    setVchForm(prev=>({...prev,voucher_number:nextN,currency}))
+    setLoading(false)
+  },[])
 
-  const [aR, bR, vR, cR, sR, stR, jR] = await Promise.all([
-    supabase.from('accounts').select('*').order('account_code'),
-    supabase.from('account_balances').select('*').eq('user_id', uid),
-    supabase.from('vouchers').select('*').eq('user_id', uid).order('created_at',{ascending:false}),
-    supabase.from('customers').select('id,full_name,company_name').order('full_name'),
-    supabase.from('suppliers').select('id,company_name').order('company_name'),
-    supabase.from('company_settings').select('default_currency').limit(1).single(),
-    supabase.from('journal_entries').select(`*,journal_lines(id,account_id,debit,credit,accounts(account_code,account_name))`).eq('user_id', uid).order('entry_date',{ascending:false}),
-  ])
+  useEffect(()=>{loadAll()},[loadAll])
 
-  // دمج الأرصدة مع الحسابات — كل مستخدم يرى رصيده فقط
-  const accountsWithBalance = (aR.data || []).map(acc => {
-    const bal = (bR.data || []).find(b => b.account_id === acc.id)
-    return { ...acc, balance: bal?.balance || 0, currency: bal?.currency || 'USD' }
-  })
-
-  setAccounts(accountsWithBalance)
-  setVouchers(vR.data || [])
-  setCustomers(cR.data || [])
-  setSuppliers(sR.data || [])
-  setJournalEntries(jR.data || [])
-  if(stR.data?.default_currency) setCurrency(stR.data.default_currency)
-  const nextN = getNext('receipt', vR.data || [])
-  setVchForm(prev=>({...prev, voucher_number:nextN, currency}))
-  setLoading(false)
-},[])
+  async function saveCurrency(cur:string){
+    setCurrency(cur)
+    setVchForm(p=>({...p,currency:cur}))
+    const {data:ex}=await supabase.from('company_settings').select('id').limit(1).maybeSingle()
+    if(ex?.id) await supabase.from('company_settings').update({default_currency:cur}).eq('id',ex.id)
+    else await supabase.from('company_settings').insert([{default_currency:cur}])
+  }
 
   async function handleSaveAccount(){
     if(!accForm.account_code||!accForm.account_name){alert('أدخل الكود والاسم');return}
@@ -546,7 +546,7 @@ const loadAll = useCallback(async()=>{
             📒 قيد يدوي
           </button>
         </div>
-        <CurrencyBar currency={currency} setCurrency={setCurrency}/>
+        <CurrencyBar currency={currency} setCurrency={saveCurrency}/>
       </div>
 
       {/* ── التبويبات ── */}
