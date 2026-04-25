@@ -15,12 +15,12 @@ const S = {
 }
 
 const navItems = [
-  { label: ' لوحة التحكم', href: '/dashboard', color: '#0A1628' },
-  { label: 'إدارة الموردين', href: '/suppliers', color: '#7F77DD' },
-  { label: 'إدرة المنتجات', href: '/products', color: S.gold },
-  { label: 'إدرة العملاء', href: '/customers', color: '#FAFAF8' },
-  { label: 'إدرة الموارد البشرية', href: '/hr', color: '#22C55E' },
-  { label: 'إدرة التسويق', href: '/marketing', color: '#F59E0B' },
+  { label: ' لوحة التحكم', href: '/dashboard' },
+  { label: 'إدارة الموردين', href: '/suppliers'},
+  { label: 'إدرة المنتجات', href: '/products'},
+  { label: 'إدرة العملاء', href: '/customers'},
+  { label: 'إدرة الموارد البشرية', href: '/hr'},
+  { label: 'إدرة التسويق', href: '/marketing'},
   { label: 'إدرة الحسابات', href: '/accounting', color: '#EF4444' },
 
 

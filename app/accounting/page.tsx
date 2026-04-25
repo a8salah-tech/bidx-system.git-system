@@ -197,24 +197,39 @@ export default function AccountingPage(){
   // ── load ──
   const loadAll = useCallback(async()=>{
     setLoading(true)
-    const {data:{session}} = await supabase.auth.getSession()
-    const [aR,vR,cR,sR,stR,jR] = await Promise.all([
-      supabase.from('accounts').select('*').order('account_code'),
-      supabase.from('vouchers').select('*').order('created_at',{ascending:false}),
-      supabase.from('customers').select('id,full_name,company_name').order('full_name'),
-      supabase.from('suppliers').select('id,company_name').order('company_name'),
-      supabase.from('company_settings').select('default_currency').limit(1).single(),
-      supabase.from('journal_entries').select(`*,journal_lines(id,account_id,debit,credit,accounts(account_code,account_name))`).order('entry_date',{ascending:false}),
-    ])
-    setAccounts(aR.data||[])
-    setVouchers(vR.data||[])
-    setCustomers(cR.data||[])
-    setSuppliers(sR.data||[])
-    setJournalEntries(jR.data||[])
-    if(stR.data?.default_currency) setCurrency(stR.data.default_currency)
-    const nextN = getNext('receipt',vR.data||[])
-    setVchForm(prev=>({...prev,voucher_number:nextN,currency}))
-    setLoading(false)
+    try{
+      const {data:{session}} = await supabase.auth.getSession()
+      const uid = session?.user?.id
+
+      const [aR,bR,vR,cR,sR,stR,jR] = await Promise.all([
+        supabase.from('accounts').select('*').order('account_code'),
+        supabase.from('account_balances').select('*').eq('user_id', uid||''),
+        supabase.from('vouchers').select('*').eq('user_id', uid||'').order('created_at',{ascending:false}),
+        supabase.from('customers').select('id,full_name,company_name').order('full_name'),
+        supabase.from('suppliers').select('id,company_name').order('company_name'),
+        supabase.from('company_settings').select('default_currency').limit(1).maybeSingle(),
+        supabase.from('journal_entries').select(`*,journal_lines(id,account_id,debit,credit,accounts(account_code,account_name))`).eq('user_id', uid||'').order('entry_date',{ascending:false}),
+      ])
+
+      // دمج أرصدة المستخدم مع دليل الحسابات المشترك
+      const accountsWithBalance = (aR.data||[]).map((acc:any) => {
+        const bal = (bR.data||[]).find((b:any) => b.account_id === acc.id)
+        return { ...acc, balance: bal?.balance || 0, currency: bal?.currency || 'USD' }
+      })
+
+      setAccounts(accountsWithBalance)
+      setVouchers(vR.data||[])
+      setCustomers(cR.data||[])
+      setSuppliers(sR.data||[])
+      setJournalEntries(jR.data||[])
+      if(stR.data?.default_currency) setCurrency(stR.data.default_currency)
+      const nextN = getNext('receipt',vR.data||[])
+      setVchForm(prev=>({...prev,voucher_number:nextN,currency}))
+    }catch(err){
+      console.error('loadAll error:',err)
+    }finally{
+      setLoading(false)
+    }
   },[])
 
   useEffect(()=>{loadAll()},[loadAll])
@@ -271,19 +286,23 @@ export default function AccountingPage(){
       }]).select().single()
       if(ve) throw ve
 
-      // 2. تحديث رصيد الحساب المختار (القيد المزدوج الصحيح)
+      // 2. تحديث رصيد الحساب المختار (account_balances — منفصل لكل مستخدم)
       if(selectedAcc){
         const debit=isReceipt?0:amount
         const credit=isReceipt?amount:0
         const newBal=(selectedAcc.balance||0)+(debit-credit)
-        await supabase.from('accounts').update({balance:newBal}).eq('id',selectedAcc.id)
+        await supabase.from('account_balances').upsert({
+          account_id:selectedAcc.id, user_id:uid, balance:newBal, currency:vchForm.currency
+        },{onConflict:'account_id,user_id'})
       }
       // 3. تحديث حساب الخزينة/الصندوق
       if(cashAcc){
         const debit=isReceipt?amount:0
         const credit=isReceipt?0:amount
         const newBal=(cashAcc.balance||0)+(debit-credit)
-        await supabase.from('accounts').update({balance:newBal}).eq('id',cashAcc.id)
+        await supabase.from('account_balances').upsert({
+          account_id:cashAcc.id, user_id:uid, balance:newBal, currency:vchForm.currency
+        },{onConflict:'account_id,user_id'})
       }
 
       // 4. قيد يومية تلقائي
@@ -346,19 +365,22 @@ export default function AccountingPage(){
       const selectedAcc=accounts.find(a=>a.id===v.account_id)
       const cashAcc=accounts.find(a=>a.account_code==='1001'||a.account_name.includes('صندوق')||a.account_name.includes('خزينة'))
 
-      // 2. عكس أرصدة الحسابات
+      // 2. عكس أرصدة الحسابات (account_balances)
       if(selectedAcc){
         const debit=isReceipt?0:amount
         const credit=isReceipt?amount:0
-        // عكس: نطرح بدل ما نجمع
         const newBal=(selectedAcc.balance||0)-(debit-credit)
-        await supabase.from('accounts').update({balance:newBal}).eq('id',selectedAcc.id)
+        await supabase.from('account_balances').upsert({
+          account_id:selectedAcc.id, user_id:uid, balance:newBal, currency:v.currency||'USD'
+        },{onConflict:'account_id,user_id'})
       }
       if(cashAcc){
         const debit=isReceipt?amount:0
         const credit=isReceipt?0:amount
         const newBal=(cashAcc.balance||0)-(debit-credit)
-        await supabase.from('accounts').update({balance:newBal}).eq('id',cashAcc.id)
+        await supabase.from('account_balances').upsert({
+          account_id:cashAcc.id, user_id:uid, balance:newBal, currency:v.currency||'USD'
+        },{onConflict:'account_id,user_id'})
       }
 
       // 3. قيد عكسي في دفتر اليومية
@@ -431,12 +453,14 @@ export default function AccountingPage(){
       }))
       await supabase.from('journal_lines').insert(lines)
 
-      // 3. تحديث أرصدة الحسابات
+      // 3. تحديث أرصدة الحسابات (account_balances)
       for(const l of validLines){
-        const acc=accounts.find(a=>a.id===l.account_id)
+        const acc=accounts.find((a:any)=>a.id===l.account_id)
         if(acc){
           const newBal=(acc.balance||0)+((parseFloat(l.debit)||0)-(parseFloat(l.credit)||0))
-          await supabase.from('accounts').update({balance:newBal}).eq('id',acc.id)
+          await supabase.from('account_balances').upsert({
+            account_id:acc.id, user_id:uid, balance:newBal, currency:jCurrency
+          },{onConflict:'account_id,user_id'})
         }
       }
 
