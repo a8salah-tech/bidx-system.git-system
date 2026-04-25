@@ -192,11 +192,47 @@ export default function DashboardPage() {
   const [companyName] = useState('لوحة التحكم الرئيسية')
   const [currentTime, setCurrentTime] = useState('')
 
-  // ── رسم بياني ──
-  const suppChart = [4, 7, 5, 9, 8, 12, 10]
-  const custChart = [1, 3, 2, 6, 4, 8, 7]
-  const opChart   = [2, 5, 3, 7, 5, 9, 8]
-  const prodChart = [3, 4, 6, 5, 8, 7, 9]
+  // ── الحسابات المرتبطة ──
+  const [accAssets,     setAccAssets]     = useState(0)
+  const [accLiabilities,setAccLiabilities]= useState(0)
+  const [accEquity,     setAccEquity]     = useState(0)
+  const [accNetProfit,  setAccNetProfit]  = useState(0)
+  const [accCurrency,   setAccCurrency]   = useState('$')
+
+  // ── التسويق المرتبط ──
+  const [mktTotal,      setMktTotal]      = useState(0)
+  const [mktHot,        setMktHot]        = useState(0)
+  const [mktContacted,  setMktContacted]  = useState(0)
+  const [mktTasks,      setMktTasks]      = useState(0)
+  const [mktFollowup,   setMktFollowup]   = useState(0)
+
+  // ── الوضع العام ──
+  const [companyHealth, setCompanyHealth] = useState({
+    score: 0,
+    suppliersGrowth: 0,
+    customersGrowth: 0,
+    dealsLast3m: 0,
+    dealsNext3m: 0,
+    pendingFollowups: 0,
+    expiredDocs: 0,
+    hotLeads: 0,
+    totalRevenue: 0,
+    totalExpenses: 0,
+  })
+
+  // ── الرسم البياني الديناميكي (7 أيام) ──
+  const [chartData, setChartData] = useState({
+    supp:  [0,0,0,0,0,0,0],
+    cust:  [0,0,0,0,0,0,0],
+    op:    [0,0,0,0,0,0,0],
+    prod:  [0,0,0,0,0,0,0],
+  })
+
+  // ── رسم بياني (fallback) ──
+  const suppChart = chartData.supp
+  const custChart = chartData.cust
+  const opChart   = chartData.op
+  const prodChart = chartData.prod
 
   // ===== تحميل البيانات =====
   useEffect(() => {
@@ -222,9 +258,11 @@ export default function DashboardPage() {
   }, [])
 
   async function loadAll() {
+    const { data: { user } } = await supabase.auth.getUser()
+    const uid = user?.id
+
     // ── الموردين ──
-    const { data: supps } = await supabase
-      .from('suppliers').select('status, total_deals')
+    const { data: supps } = await supabase.from('suppliers').select('status,total_deals,created_at')
     if (supps) {
       setSuppTotal(supps.length)
       setSuppActive(supps.filter(s => s.status === 'active').length)
@@ -233,18 +271,14 @@ export default function DashboardPage() {
     }
 
     // ── المنتجات ──
-    const { data: prods } = await supabase
-      .from('supplier_products').select('name')
+    const { data: prods } = await supabase.from('supplier_products').select('name,created_at')
     if (prods) {
       setProdTotal(prods.length)
-      const { data: forAvg } = await supabase.from('suppliers').select('id')
-      if (forAvg && forAvg.length > 0)
-        setProdAvg((prods.length / forAvg.length).toFixed(1))
+      if (supps && supps.length > 0) setProdAvg((prods.length / supps.length).toFixed(1))
     }
 
     // ── العملاء ──
-    const { data: custs } = await supabase
-      .from('customers').select('status')
+    const { data: custs } = await supabase.from('customers').select('status,created_at')
     if (custs) {
       setCustTotal(custs.length)
       setCustNegotiate(custs.filter(c => c.status === 'negotiating').length)
@@ -253,14 +287,118 @@ export default function DashboardPage() {
     }
 
     // ── أوامر الشراء ──
-    const { data: orders } = await supabase
-      .from('purchase_orders').select('status')
+    let orders: any[] | null = null
+try {
+  const { data } = await supabase.from('purchase_orders').select('status')
+  orders = data
+} catch { orders = null }
     if (orders) {
-      setOpNew(orders.filter(o => o.status === 'published').length)
-      setOpProcess(orders.filter(o => o.status === 'approved').length)
-      setOpReady(orders.filter(o => o.status === 'ready').length)
-      setOpDone(orders.filter(o => o.status === 'completed').length)
+      setOpNew(orders.filter((o:any) => o.status === 'published').length)
+      setOpProcess(orders.filter((o:any) => o.status === 'approved').length)
+      setOpReady(orders.filter((o:any) => o.status === 'ready').length)
+      setOpDone(orders.filter((o:any) => o.status === 'completed').length)
     }
+
+    // ── الحسابات — مرتبط بـ account_balances ──
+    const [accR, balR, vchR] = await Promise.all([
+      supabase.from('accounts').select('account_type'),
+      supabase.from('account_balances').select('*').eq('user_id', uid||''),
+      supabase.from('vouchers').select('voucher_type,amount,status').eq('user_id', uid||'').eq('status','active'),
+    ])
+    if (accR.data && balR.data) {
+      const accWithBal = (accR.data as any[]).map((acc:any, i:number) => ({
+        ...acc,
+        balance: (balR.data as any[])[i]?.balance || 0
+      }))
+      // نحسب من vouchers النشطة فقط
+      const activeVch = (vchR.data as any[]) || []
+      const totalReceipts = activeVch.filter(v => v.voucher_type === 'receipt').reduce((s:number,v:any) => s+(v.amount||0), 0)
+      const totalPayments = activeVch.filter(v => v.voucher_type === 'payment').reduce((s:number,v:any) => s+(v.amount||0), 0)
+
+      const assets = (balR.data as any[]).reduce((s:number,b:any) => {
+        const acc = (accR.data as any[]).find(a => a.id === (b as any).account_id)
+        return acc?.account_type === 'asset' ? s + (b.balance||0) : s
+      }, 0)
+      const liabilities = (balR.data as any[]).reduce((s:number,b:any) => {
+        const acc = (accR.data as any[]).find(a => a.id === (b as any).account_id)
+        return acc?.account_type === 'liability' ? s + Math.abs(b.balance||0) : s
+      }, 0)
+      const income = (balR.data as any[]).reduce((s:number,b:any) => {
+        const acc = (accR.data as any[]).find(a => a.id === (b as any).account_id)
+        return acc?.account_type === 'income' ? s + (b.balance||0) : s
+      }, 0)
+      const expenses = (balR.data as any[]).reduce((s:number,b:any) => {
+        const acc = (accR.data as any[]).find(a => a.id === (b as any).account_id)
+        return acc?.account_type === 'expense' ? s + (b.balance||0) : s
+      }, 0)
+
+      setReceipts(totalReceipts)
+      setPayments(totalPayments)
+      setAccAssets(assets)
+      setAccLiabilities(liabilities)
+      setAccEquity(assets - liabilities)
+      setAccNetProfit(income - expenses)
+    }
+
+    // ── التسويق — مرتبط بـ marketing_leads ──
+    const [leadsR, tasksR] = await Promise.all([
+      supabase.from('marketing_leads').select('stage_id,contacted_at,next_followup_at,last_action_at').eq('created_by', uid||''),
+      supabase.from('marketing_tasks').select('id').eq('created_by', uid||''),
+    ])
+    if (leadsR.data) {
+      const leads = leadsR.data as any[]
+      const today = new Date().toISOString().split('T')[0]
+      setMktTotal(leads.length)
+      setMktHot(leads.filter(l => l.stage_id === 'action').length)
+      setMktContacted(leads.filter(l => l.contacted_at && l.contacted_at.startsWith(today)).length)
+      setMktFollowup(leads.filter(l => {
+        if (!l.next_followup_at) return false
+        return new Date(l.next_followup_at) <= new Date()
+      }).length)
+    }
+    if (tasksR.data) setMktTasks(tasksR.data.length)
+
+    // ── الرسم البياني الديناميكي (آخر 7 أيام فعلية) ──
+    const days7 = Array.from({length:7}, (_,i) => {
+      const d = new Date(); d.setDate(d.getDate()-6+i)
+      return d.toISOString().split('T')[0]
+    })
+    const suppByDay = days7.map(d => (supps||[]).filter((s:any) => s.created_at?.startsWith(d)).length)
+    const custByDay = days7.map(d => (custs||[]).filter((c:any) => c.created_at?.startsWith(d)).length)
+    const leadsByDay = days7.map(d => ((leadsR.data||[]) as any[]).filter((l:any) => l.last_action_at?.startsWith(d)).length)
+    const prodByDay  = days7.map(d => (prods||[]).filter((p:any) => p.created_at?.startsWith(d)).length)
+    setChartData({ supp: suppByDay, cust: custByDay, op: leadsByDay, prod: prodByDay })
+
+    // ── الوضع العام ──
+    const now = new Date()
+    const past3m = new Date(now); past3m.setMonth(past3m.getMonth()-3)
+    const next3m = new Date(now); next3m.setMonth(next3m.getMonth()+3)
+    const dealsLast3m = (supps||[]).reduce((s:number,sup:any) => s+(sup.total_deals||0), 0)
+    const hotLeads = (leadsR.data||[] as any[]).filter((l:any) => l.stage_id === 'action' || l.stage_id === 'decision').length
+    const pendingFollowups = (leadsR.data||[] as any[]).filter((l:any) => {
+      if (!l.next_followup_at) return false
+      return new Date(l.next_followup_at) <= next3m
+    }).length
+
+    const suppScore   = Math.min(suppTotal * 5, 30)
+    const custScore   = Math.min(custDone  * 10, 20)
+    const mktScore    = Math.min(hotLeads  * 5, 20)
+    const accScore    = accNetProfit > 0 ? 20 : accNetProfit === 0 ? 10 : 0
+    const actScore    = Math.min((leadsR.data?.length||0) * 2, 10)
+    const totalScore  = suppScore + custScore + mktScore + accScore + actScore
+
+    setCompanyHealth({
+      score: Math.min(totalScore, 100),
+      suppliersGrowth: (supps||[]).filter((s:any) => new Date(s.created_at) > past3m).length,
+      customersGrowth: (custs||[]).filter((c:any) => new Date(c.created_at) > past3m).length,
+      dealsLast3m,
+      dealsNext3m: hotLeads,
+      pendingFollowups,
+      expiredDocs: 0,
+      hotLeads,
+      totalRevenue: receipts,
+      totalExpenses: payments,
+    })
   }
 
   // ===== إنشاء حساب موظف =====
@@ -345,14 +483,117 @@ export default function DashboardPage() {
       {/* ══ المحتوى ══ */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
-        {/* ─── الرسم البياني الرئيسي ─── */}
+        {/* ══════════════════════════════════════════════
+            الوضع العام للشركة — نظرة 3 شهور
+        ══════════════════════════════════════════════ */}
+        <div style={{ marginBottom: 20 }}>
+          {/* سطر العنوان */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={loadAll} style={{ background: S.card2, border: `1px solid ${S.border}`, color: S.muted, padding: '4px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontFamily: 'inherit' }}>🔄 تحديث</button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, direction: 'rtl' }}>
+              <div style={{ width: 4, height: 20, background: S.gold, borderRadius: 2 }}/>
+              <span style={{ fontSize: 15, fontWeight: 900, color: S.white }}>🏢 الوضع العام للشركة</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+
+            {/* نبضة الشركة */}
+            <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 14, padding: 18, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              {/* مقياس دائري SVG */}
+              <svg width="110" height="110" viewBox="0 0 110 110">
+                <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10"/>
+                <circle cx="55" cy="55" r="46" fill="none"
+                  stroke={companyHealth.score >= 70 ? S.green : companyHealth.score >= 40 ? S.amber : S.red}
+                  strokeWidth="10" strokeLinecap="round"
+                  strokeDasharray={`${(companyHealth.score / 100) * 289} 289`}
+                  strokeDashoffset="72"
+                  style={{ transition: 'stroke-dasharray 1s ease' }}/>
+                <text x="55" y="50" textAnchor="middle" fill={S.white} fontSize="22" fontWeight="900" fontFamily="monospace">{companyHealth.score}</text>
+                <text x="55" y="65" textAnchor="middle" fill={S.muted} fontSize="10" fontFamily="Tajawal,sans-serif">نقطة</text>
+              </svg>
+              <div style={{ fontSize: 13, fontWeight: 800, color: companyHealth.score >= 70 ? S.green : companyHealth.score >= 40 ? S.amber : S.red }}>
+                {companyHealth.score >= 70 ? '💚 ممتاز' : companyHealth.score >= 40 ? '🟡 جيد' : '🔴 يحتاج تحسين'}
+              </div>
+              <div style={{ fontSize: 10, color: S.muted, textAlign: 'center', lineHeight: '1.6' }}>نبضة الشركة<br/>Health Score</div>
+            </div>
+
+            {/* المؤشرات */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+
+              {/* 3 شهور ماضية */}
+              <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: S.green, marginBottom: 10, textAlign: 'right' }}>📅 آخر 3 شهور</div>
+                {[
+                  { l: 'موردون جدد',  v: companyHealth.suppliersGrowth, icon: '🏭' },
+                  { l: 'عملاء جدد',   v: companyHealth.customersGrowth,  icon: '👥' },
+                  { l: 'صفقات منجزة', v: companyHealth.dealsLast3m,      icon: '🤝' },
+                ].map((m, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, paddingBottom: 7, borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none' }}>
+                    <span style={{ fontSize: 14, fontWeight: 900, color: S.green, fontFamily: 'monospace' }}>{m.v}</span>
+                    <span style={{ fontSize: 11, color: S.muted }}>{m.icon} {m.l}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* 3 شهور قادمة */}
+              <div style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.15)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: S.blue, marginBottom: 10, textAlign: 'right' }}>🔭 3 شهور قادمة</div>
+                {[
+                  { l: 'عملاء جاهزون', v: companyHealth.hotLeads,          icon: '🚀', c: S.green },
+                  { l: 'متابعات مطلوبة',v: companyHealth.pendingFollowups, icon: '📞', c: S.amber },
+                  { l: 'صفقات متوقعة', v: companyHealth.dealsNext3m,        icon: '📊', c: S.blue  },
+                ].map((m, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, paddingBottom: 7, borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none' }}>
+                    <span style={{ fontSize: 14, fontWeight: 900, color: m.c, fontFamily: 'monospace' }}>{m.v}</span>
+                    <span style={{ fontSize: 11, color: S.muted }}>{m.icon} {m.l}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* الصحة المالية */}
+              <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: S.amber, marginBottom: 10, textAlign: 'right' }}>💰 الصحة المالية</div>
+                {[
+                  { l: 'إجمالي الأصول',   v: `$${accAssets.toLocaleString()}`,      c: S.green },
+                  { l: 'حقوق الملكية',    v: `$${accEquity.toLocaleString()}`,      c: S.amber },
+                  { l: 'صافي الربح',      v: `${accNetProfit >= 0 ? '+' : ''}$${accNetProfit.toLocaleString()}`, c: accNetProfit >= 0 ? S.green : S.red },
+                ].map((m, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, paddingBottom: 7, borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none' }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, color: m.c, fontFamily: 'monospace' }}>{m.v}</span>
+                    <span style={{ fontSize: 11, color: S.muted }}>{m.l}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* نشاط التسويق */}
+              <div style={{ background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: S.purple, marginBottom: 10, textAlign: 'right' }}>📡 نشاط التسويق</div>
+                {[
+                  { l: 'إجمالي الخيوط',  v: mktTotal,     c: S.purple },
+                  { l: 'جاهزون للإغلاق', v: mktHot,       c: S.green  },
+                  { l: 'متابعة متأخرة',  v: mktFollowup,  c: S.red    },
+                ].map((m, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7, paddingBottom: 7, borderBottom: i < 2 ? `1px solid rgba(255,255,255,0.05)` : 'none' }}>
+                    <span style={{ fontSize: 14, fontWeight: 900, color: m.c, fontFamily: 'monospace' }}>{m.v}</span>
+                    <span style={{ fontSize: 11, color: S.muted }}>{m.l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── الرسم البياني الرئيسي — بيانات حقيقية ─── */}
         <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 16, padding: '20px 24px', marginBottom: 20 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 16 }}>
               {[
                 { label: 'الموردون', color: S.gold },
                 { label: 'العملاء',  color: S.green },
-                { label: 'الطلبات',  color: S.blue },
+                { label: 'التسويق',  color: S.blue },
                 { label: 'المنتجات', color: S.purple },
               ].map(l => (
                 <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: S.muted }}>
@@ -361,10 +602,9 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: S.white }}>📊 نظرة عامة — آخر 7 أيام</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: S.white }}>📊 نظرة عامة — آخر 7 أيام (بيانات فعلية)</div>
           </div>
 
-          {/* الرسم البياني المجمع */}
           <svg width="100%" height="130" viewBox="0 0 700 130" preserveAspectRatio="none" style={{ display: 'block' }}>
             <defs>
               {[
@@ -379,14 +619,10 @@ export default function DashboardPage() {
                 </linearGradient>
               ))}
             </defs>
-
-            {/* خطوط شبكية */}
             {[0.25, 0.5, 0.75].map(r => (
               <line key={r} x1="0" y1={120 * r} x2="700" y2={120 * r}
                 stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
             ))}
-
-            {/* رسم كل خط */}
             {[
               { data: suppChart, color: S.gold,   grad: 'gGold' },
               { data: custChart, color: S.green,  grad: 'gGreen' },
@@ -394,9 +630,9 @@ export default function DashboardPage() {
               { data: prodChart, color: S.purple, grad: 'gPurple' },
             ].map(({ data, color, grad }) => {
               const mx = Math.max(...data, 1)
-              const pts = data.map((v, i) =>
-                `${(i / (data.length - 1)) * 700},${115 - (v / mx) * 100}`
-              ).join(' ')
+              const pts = data.length < 2
+                ? `0,115 700,115`
+                : data.map((v, i) => `${(i / (data.length - 1)) * 700},${115 - (v / mx) * 100}`).join(' ')
               return (
                 <g key={color}>
                   <polygon points={`0,120 ${pts} 700,120`} fill={`url(#${grad})`}/>
@@ -405,10 +641,11 @@ export default function DashboardPage() {
                 </g>
               )
             })}
-
-            {/* أيام الأسبوع */}
-            {['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'].map((d, i) => (
-              <text key={d} x={(i / 6) * 700} y="128" fontSize="9"
+            {Array.from({length:7}, (_,i) => {
+              const d = new Date(); d.setDate(d.getDate()-6+i)
+              return d.toLocaleDateString('ar-EG',{weekday:'short'})
+            }).map((d, i) => (
+              <text key={i} x={(i / 6) * 700} y="128" fontSize="9"
                 fill={S.muted} textAnchor="middle">{d}</text>
             ))}
           </svg>
@@ -462,26 +699,26 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-                {/* ─── 5. إدارة التسويق ─── */}
+                {/* ─── 5. إدارة التسويق — مرتبط بـ marketing_leads ─── */}
         <div style={{ marginBottom: 20 }}>
-          <SectionHead title="إدارة التسويق" icon="⚙️" color={S.purple} href="/purchase-orders" router={router}/>
+          <SectionHead title="إدارة التسويق" icon="📡" color={S.purple} href="/marketing" router={router}/>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
-            <Card label="طلبات جديدة (استلام)"   value={opNew}     color={S.blue}   icon="📥" chart={opChart} onClick={() => router.push('/purchase-orders')}/>
-            <Card label="قيد التجهيز"             value={opProcess} color={S.amber}  icon="⚙️"/>
-            <Card label="جاهزة للتسليم"           value={opReady}   color={S.purple} icon="📦"/>
-            <Card label="مكتملة (تم التسليم)"     value={opDone}    color={S.green}  icon="✅" sub="طلب ناجح"/>
+            <Card label="إجمالي خيوط المبيعات"  value={mktTotal}     color={S.purple} icon="🎯" chart={opChart} onClick={() => router.push('/marketing')}/>
+            <Card label="جاهزون للإغلاق 🚀"     value={mktHot}       color={S.green}  icon="🚀" sub="أولوية قصوى" onClick={() => router.push('/marketing')}/>
+            <Card label="تم التواصل اليوم"       value={mktContacted} color={S.blue}   icon="📞"/>
+            <Card label="متابعة متأخرة ⚠️"       value={mktFollowup}  color={mktFollowup > 0 ? S.red : S.muted} icon="⏰" alert={mktFollowup > 0}/>
           </div>
         </div>
-        {/* ─── 4. إدارة الحسابات ─── */}
+        {/* ─── 4. إدارة الحسابات — مرتبط بـ account_balances ─── */}
         <div style={{ marginBottom: 20 }}>
           <SectionHead title="إدارة الحسابات" icon="💰" href="/accounting" color={S.amber} router={router}/>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
 
             {/* سندات القبض */}
-            <Card label="سندات القبض — مستحقات لنا" value={`$${receipts.toLocaleString()}`} color={S.green} icon="📥" sub="إجمالي المقبوضات"/>
+            <Card label="إجمالي المقبوضات" value={`$${receipts.toLocaleString()}`} color={S.green} icon="📥" sub="سندات القبض النشطة"/>
 
             {/* سندات الصرف */}
-            <Card label="سندات الصرف — علينا" value={`$${payments.toLocaleString()}`} color={S.red} icon="📤" sub="إجمالي المدفوعات"/>
+            <Card label="إجمالي المدفوعات" value={`$${payments.toLocaleString()}`} color={S.red} icon="📤" sub="سندات الصرف النشطة"/>
 
             {/* الأرباح والخسائر */}
             <div style={{ background: S.navy2, border: `2px solid ${profitColor}`, borderRadius: 12, padding: 16, boxShadow: `0 0 22px ${profitColor}28` }}>
