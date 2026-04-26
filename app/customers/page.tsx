@@ -1,10 +1,11 @@
 'use client'
 
 // ===== الاستيرادات =====
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import AppShell from "../components/AppShell";
+import * as XLSX from 'xlsx'
 
 // ===== تعريف نوع بيانات العميل =====
 interface Customer {
@@ -17,7 +18,7 @@ interface Customer {
   country: string
   city: string
   interest: string        // المنتج المطلوب
-  status: | "active" | "pending" | "inactive" | "negotiate" | "execute" | "completed";
+  status: "new" | "negotiate" | "execute" | "completed" | "inactive";
   total_deals: number
   total_amount: number
   notes: string
@@ -93,6 +94,11 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage]     = useState(1)
   const rowsPerPage = 20
 
+  // FIX: ميزة جديدة — تحديد متعدد وإجراء جماعي
+  const [selectedIds, setSelectedIds]     = useState<string[]>([])
+  const [bulkAction,  setBulkAction]      = useState('')
+  const [applyingBulk,setApplyingBulk]   = useState(false)
+
   // ── تحميل البيانات عند فتح الصفحة ──
   useEffect(() => {
     fetchCustomers()
@@ -107,11 +113,11 @@ async function fetchCustomers() {
       if (!user) return
 
       // 2. جلب العملاء الخاصين بهذا المستخدم فقط 🔒
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('user_id', user.id) // القفل الأمني
-        .order('created_at', { ascending: false })
+const { data, error } = await supabase
+  .from('customers')
+  .select('*')
+  .or(`user_id.eq.${user.id},created_by.eq.${user.id}`)
+  .order('created_at', { ascending: false })
 
       if (error) { console.error('خطأ جلب العملاء:', error.message); return }
       setCustomers(data || [])
@@ -134,7 +140,7 @@ async function fetchCustomers() {
       const { error } = await supabase.from('customers').insert([{
         ...form,
         user_id: user.id, // ربط العميل بالمستخدم الحالي ✅
-        status: 'active',
+        status: 'new',
         total_deals: 0,
         total_amount: 0,
       }])
@@ -154,17 +160,41 @@ async function fetchCustomers() {
     }
   }
 
-  // ===== 3. تغيير حالة العميل =====
-  async function toggleStatus(id: string, current: string) {
-    const next = current === 'active' ? 'inactive' : 'active'
-    const { error } = await supabase
-      .from('customers')
-      .update({ status: next })
-      .eq('id', id)
+  // ===== 3. تغيير حالة العميل (FIX: تحديث فوري في DB + State) =====
+// بدّل الدالة كاملاً:
+async function changeStatus(id: string, newStatus: string) {
+  const { error } = await supabase
+    .from('customers')
+    .update({ status: newStatus })
+    .eq('id', id)
 
-    if (error) { console.error('خطأ تغيير الحالة:', error.message); return }
-    // تحديث القائمة محلياً فوراً دون إعادة تحميل
-    setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: next as any } : c))
+  if (error) {
+    console.error('خطأ:', error)
+    alert('خطأ في تحديث الحالة: ' + error.message)
+    return
+  }
+  // تحديث محلي فوري
+  setCustomers(prev => prev.map(c => c.id === id ? { ...c, status: newStatus as any } : c))
+}
+  // FIX: إجراء جماعي على العملاء المحددين
+  async function applyBulkAction() {
+    if (!bulkAction || selectedIds.length === 0) return
+    setApplyingBulk(true)
+    if (bulkAction === 'delete') {
+      if (!window.confirm(`حذف ${selectedIds.length} عميل نهائياً؟`)) { setApplyingBulk(false); return }
+      for (const id of selectedIds) {
+        await supabase.from('customers').delete().eq('id', id)
+      }
+      setCustomers(prev => prev.filter(c => !selectedIds.includes(c.id)))
+    } else {
+      for (const id of selectedIds) {
+        await supabase.from('customers').update({ status: bulkAction }).eq('id', id)
+      }
+      setCustomers(prev => prev.map(c => selectedIds.includes(c.id) ? { ...c, status: bulkAction as any } : c))
+    }
+    setSelectedIds([])
+    setBulkAction('')
+    setApplyingBulk(false)
   }
 
   // ===== 4. حذف عميل =====
@@ -217,11 +247,52 @@ async function fetchCustomers() {
             + إضافة عميل
           </button>
 
-          {/* زر التصدير */}
+          {/* FIX 1: زر التصدير — يصدر Excel فعلياً */}
           <button
+            onClick={() => {
+              if (filtered.length === 0) { alert('لا يوجد عملاء للتصدير'); return }
+              const ws = XLSX.utils.json_to_sheet(filtered.map(c => ({
+                'الاسم الكامل':      c.full_name,
+                'اسم الشركة':        c.company_name || '',
+                'الهاتف':            c.phone || '',
+                'الإيميل':           c.email || '',
+                'الدولة':            c.country || '',
+                'المدينة':           c.city || '',
+                'المنتج المطلوب':    c.interest || '',
+                'الحالة':            STATUS_MAP[c.status]?.label || c.status,
+                'الصفقات':           c.total_deals || 0,
+                'إجمالي المبلغ':     c.total_amount || 0,
+                'آخر تواصل':         c.last_contact_date || '',
+                'الموقع':            c.website || '',
+                'الملاحظات':         c.notes || '',
+              })))
+              const wb = XLSX.utils.book_new()
+              XLSX.utils.book_append_sheet(wb, ws, 'العملاء')
+              XLSX.writeFile(wb, `customers_${new Date().toISOString().split('T')[0]}.xlsx`)
+            }}
             style={{ background: 'rgba(232,201,122,0.1)', color: S.gold2, border: `1px solid ${S.gold}`, padding: '9px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-            📤 تصدير
+            📤 تصدير Excel
           </button>
+
+          {/* ميزة جديدة: إجراء جماعي */}
+          {selectedIds.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(201,168,76,0.08)', border: `1px solid rgba(201,168,76,0.2)`, borderRadius: 8, padding: '6px 12px' }}>
+              <button onClick={applyBulkAction} disabled={!bulkAction || applyingBulk}
+                style={{ background: bulkAction ? S.gold : S.muted, color: S.navy, border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: bulkAction ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
+                {applyingBulk ? '⏳' : '✅ تطبيق'}
+              </button>
+              <select value={bulkAction} onChange={e => setBulkAction(e.target.value)}
+                style={{ background: S.navy2, color: S.white, border: `1px solid ${S.border}`, borderRadius: 6, padding: '5px 8px', fontSize: 11, fontFamily: 'inherit', cursor: 'pointer' }}>
+                <option value="">-- إجراء جماعي --</option>
+                {Object.entries(STATUS_MAP).map(([k, v]) => (
+                  <option key={k} value={k} style={{ background: S.navy2 }}>{v.label}</option>
+                ))}
+                <option value="delete" style={{ background: S.navy2, color: '#EF4444' }}>🗑️ حذف</option>
+              </select>
+              <span style={{ fontSize: 11, color: S.gold }}>{selectedIds.length} محدد</span>
+              <button onClick={() => setSelectedIds([])} style={{ background: 'none', border: 'none', color: S.muted, cursor: 'pointer', fontSize: 14 }}>✕</button>
+            </div>
+          )}
 
         </div>
       </div>
@@ -310,6 +381,15 @@ async function fetchCustomers() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
+                  <th style={{ padding: '12px 10px', textAlign: 'center', width: 36 }}>
+                    <input type="checkbox"
+                      checked={paginatedData.length > 0 && paginatedData.every(c => selectedIds.includes(c.id))}
+                      onChange={e => {
+                        if (e.target.checked) setSelectedIds(prev => [...new Set([...prev, ...paginatedData.map(c => c.id)])])
+                        else setSelectedIds(prev => prev.filter(id => !paginatedData.map(c => c.id).includes(id)))
+                      }}
+                      style={{ cursor: 'pointer', accentColor: S.gold }}/>
+                  </th>
                   {['العميل', 'الشركة', 'الدولة', 'المنتج المطلوب', 'الصفقات', 'آخر تواصل', 'الحالة', 'تواصل سريع', 'إجراء'].map(h => (
                     <th key={h} style={{ padding: '12px 14px', textAlign: 'right', fontSize: '10px', color: S.muted, fontWeight: 700, letterSpacing: '0.5px' }}>{h}</th>
                   ))}
@@ -321,8 +401,19 @@ async function fetchCustomers() {
                   return (
                     <tr
                       key={c.id}
-                      style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)', cursor: 'pointer', transition: 'background 0.15s' }}
+                      style={{ borderTop: `1px solid rgba(255,255,255,0.05)`, background: selectedIds.includes(c.id) ? 'rgba(201,168,76,0.06)' : i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)', cursor: 'pointer', transition: 'background 0.15s' }}
                       onClick={() => router.push(`/customers/${c.id}`)}>
+
+                      {/* Checkbox */}
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                        <input type="checkbox"
+                          checked={selectedIds.includes(c.id)}
+                          onChange={e => {
+                            if (e.target.checked) setSelectedIds(prev => [...prev, c.id])
+                            else setSelectedIds(prev => prev.filter(id => id !== c.id))
+                          }}
+                          style={{ cursor: 'pointer', accentColor: S.gold }}/>
+                      </td>
 
                       {/* العميل */}
                       <td style={{ padding: '12px 14px' }}>
@@ -466,24 +557,16 @@ async function fetchCustomers() {
                               ✕
                             </button>
                           )}
-                          {/* تغيير الحالة */}
-                          <button
-                            style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px', border: `1px solid rgba(255,255,255,0.15)`, background: 'transparent', color: S.muted, cursor: 'pointer', fontFamily: 'inherit' }}>
-                            <select
-                              value={c.status}
-                              onChange={async e => {
-                                e.stopPropagation()
-                                const next = e.target.value
-                                await supabase.from('customers').update({ status: next }).eq('id', c.id)
-                                setCustomers(prev => prev.map(x => x.id === c.id ? { ...x, status: next as any } : x))
-                              }}
-                              onClick={e => e.stopPropagation()}
-                              style={{ background: S.navy2, color: STATUS_MAP[c.status]?.color || S.muted, border: `1px solid ${S.border}`, borderRadius: '6px', padding: '3px 6px', fontSize: '10px', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
-                              {Object.entries(STATUS_MAP).map(([key, val]) => (
-                                <option key={key} value={key} style={{ background: S.navy2 }}>{val.label}</option>
-                              ))}
-                            </select>
-                          </button>
+                          {/* FIX 2: تغيير الحالة — select مستقل بدون button */}
+                          <select
+                            value={c.status}
+                            onClick={e => e.stopPropagation()}
+                            onChange={async e => { e.stopPropagation(); await changeStatus(c.id, e.target.value) }}
+                            style={{ background: S.navy2, color: STATUS_MAP[c.status]?.color || S.muted, border: `1px solid ${S.border}`, borderRadius: '6px', padding: '4px 8px', fontSize: '10px', cursor: 'pointer', fontFamily: 'inherit', outline: 'none' }}>
+                            {Object.entries(STATUS_MAP).map(([key, val]) => (
+                              <option key={key} value={key} style={{ background: S.navy2 }}>{val.label}</option>
+                            ))}
+                          </select>
                         </div>
                       </td>
 
