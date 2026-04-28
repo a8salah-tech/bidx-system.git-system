@@ -446,42 +446,34 @@ try {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal, sans-serif', direction: 'rtl', background: S.navy }}>
 
-      {/* ══ شريط الأدوات ══ */}
-      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.borderG}`, padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      {/* ══ شريط الأدوات — responsive ══ */}
+      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.borderG}`, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
 
-        {/* الوقت */}
-        <div style={{ fontSize: 11, color: S.muted }}>{currentTime}</div>
+        {/* الوقت — مخفي على الجوال */}
+        <div className="hide-mobile" style={{ fontSize: 11, color: S.muted }}>{currentTime}</div>
 
-        {/* اسم الشركة — في الوسط */}
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 17, fontWeight: 900, color: S.gold2, letterSpacing: '-.01em' }}>
-            {companyName}
-          </div>
-          <div style={{ fontSize: 10, color: S.muted, letterSpacing: '.1em', textTransform: 'uppercase' }}>
-            لوحة التحكم الرئيسية
-          </div>
+        {/* اسم الشركة */}
+        <div style={{ textAlign: 'center', flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, color: S.gold2 }}>{companyName}</div>
+          <div className="hide-mobile" style={{ fontSize: 10, color: S.muted, textTransform: 'uppercase' }}>لوحة التحكم الرئيسية</div>
         </div>
 
-        {/* أزرار يسار */}
+        {/* أزرار */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {userRole === 'admin' && (
             <button onClick={() => setShowAddUser(true)}
-              style={{ padding: '8px 14px', borderRadius: 8, background: S.gold3, border: `1px solid ${S.borderG}`, color: S.gold2, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
-              👤 إنشاء حساب موظف
+              style={{ padding: '7px 12px', borderRadius: 8, background: S.gold3, border: `1px solid ${S.borderG}`, color: S.gold2, fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+              👤 <span className="hide-mobile">إنشاء حساب موظف</span><span className="show-mobile">+</span>
             </button>
           )}
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: S.white }}>{userName}</div>
-            <div style={{ fontSize: 10, color: S.muted }}>{userRole === 'admin' ? 'مدير عام' : 'موظف'}</div>
-          </div>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 900, color: S.navy }}>
+          <div style={{ width: 34, height: 34, borderRadius: '50%', background: `linear-gradient(135deg,${S.gold},${S.gold2})`, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 900, color: S.navy, flexShrink: 0 }}>
             {userName.slice(0, 2) || 'BE'}
           </div>
         </div>
       </div>
 
       {/* ══ المحتوى ══ */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      <div className="dash-content" style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
 
         {/* ══════════════════════════════════════════════
             الوضع العام للشركة — نظرة 3 شهور
@@ -498,7 +490,7 @@ try {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+          <div className="dash-health-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
 
             {/* نبضة الشركة */}
             <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 14, padding: 18, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -521,7 +513,7 @@ try {
             </div>
 
             {/* المؤشرات */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="dash-indicators" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
 
               {/* 3 شهور ماضية */}
               <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: 12, padding: '14px 16px' }}>
@@ -588,8 +580,8 @@ try {
 
         {/* ─── الرسم البياني الرئيسي — بيانات حقيقية ─── */}
         <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 16, padding: '20px 24px', marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 16 }}>
+          <div className="dash-chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div className="dash-chart-legends" style={{ display: 'flex', gap: 16 }}>
               {[
                 { label: 'الموردون', color: S.gold },
                 { label: 'العملاء',  color: S.green },
@@ -597,12 +589,12 @@ try {
                 { label: 'المنتجات', color: S.purple },
               ].map(l => (
                 <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: S.muted }}>
-                  <div style={{ width: 24, height: 3, borderRadius: 2, background: l.color }}/>
+                  <div style={{ width: 20, height: 3, borderRadius: 2, background: l.color }}/>
                   {l.label}
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: S.white }}>📊 نظرة عامة — آخر 7 أيام (بيانات فعلية)</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: S.white }}>📊 آخر 7 أيام</div>
           </div>
 
           <svg width="100%" height="130" viewBox="0 0 700 130" preserveAspectRatio="none" style={{ display: 'block' }}>
@@ -654,7 +646,7 @@ try {
         {/* ─── 1. إدارة الموردين ─── */}
         <div style={{ marginBottom: 20, direction: 'rtl', textAlign: 'right' }}>
           <SectionHead title="إدارة الموردين" icon="🏭" color={S.gold} href="/suppliers" router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="dash-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <Card label="إجمالي الموردين"    value={suppTotal}     color={S.gold}  icon="🏭" chart={suppChart} onClick={() => router.push('/suppliers')}/>
             <Card label="الموردون النشطون"   value={suppActive}    color={S.green} icon="✅" onClick={() => router.push('/suppliers')}/>
             <Card label="الموردون الموقوفون" value={suppSuspended} color={S.red}   icon="⛔"/>
@@ -665,7 +657,7 @@ try {
         {/* ─── 2. إدارة المنتجات ─── */}
         <div style={{ marginBottom: 20 }}>
           <SectionHead title="إدارة المنتجات" icon="📦" color={S.blue} href="/products" router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="dash-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <Card label="إجمالي المنتجات"       value={prodTotal} color={S.blue}   icon="📦" chart={prodChart} onClick={() => router.push('/products')}/>
             <Card label="المنتج الأكثر مبيعاً"  value={prodTop}   color={S.gold}   icon="🏅" sub="الأعلى تكراراً"/>
             <Card label="المنتج الأقل مبيعاً"   value={prodLow}   color={S.muted}  icon="📉"/>
@@ -676,7 +668,7 @@ try {
         {/* ─── 3. إدارة العملاء ─── */}
         <div style={{ marginBottom: 20 }}>
           <SectionHead title="إدارة العملاء" icon="👥" color={S.green} href="/customers" router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="dash-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <Card label="إجمالي العملاء"     value={custTotal}     color={S.green} icon="👥" chart={custChart} onClick={() => router.push('/customers')}/>
             <Card label="قيد التفاوض"        value={custNegotiate} color={S.amber} icon="🤝"/>
             <Card label="قيد التنفيذ"        value={custPending}   color={S.blue}  icon="⚙️"/>
@@ -686,7 +678,7 @@ try {
         {/* ─── 6. الموارد البشرية ─── */}
         <div style={{ marginBottom: 24 }}>
           <SectionHead title="إدارة الموارد البشرية" icon="👨‍💼" color={S.green}href="/hr" router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="dash-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <Card label="إجمالي الموظفين"        value={hrCount}                          color={S.green} icon="👨‍💼"/>
             <Card label="إجمالي الرواتب الشهرية" value={`$${hrSalaries.toLocaleString()}`} color={S.gold}  icon="💵" sub="شهرياً"/>
             <Card label="العهد والالتزامات"       value={`$${hrTrust.toLocaleString()}`}    color={S.amber} icon="📋"/>
@@ -702,7 +694,7 @@ try {
                 {/* ─── 5. إدارة التسويق — مرتبط بـ marketing_leads ─── */}
         <div style={{ marginBottom: 20 }}>
           <SectionHead title="إدارة التسويق" icon="📡" color={S.purple} href="/marketing" router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="dash-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <Card label="إجمالي خيوط المبيعات"  value={mktTotal}     color={S.purple} icon="🎯" chart={opChart} onClick={() => router.push('/marketing')}/>
             <Card label="جاهزون للإغلاق 🚀"     value={mktHot}       color={S.green}  icon="🚀" sub="أولوية قصوى" onClick={() => router.push('/marketing')}/>
             <Card label="تم التواصل اليوم"       value={mktContacted} color={S.blue}   icon="📞"/>
@@ -712,7 +704,7 @@ try {
         {/* ─── 4. إدارة الحسابات — مرتبط بـ account_balances ─── */}
         <div style={{ marginBottom: 20 }}>
           <SectionHead title="إدارة الحسابات" icon="💰" href="/accounting" color={S.amber} router={router}/>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+          <div className="dash-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
 
             {/* سندات القبض */}
             <Card label="إجمالي المقبوضات" value={`$${receipts.toLocaleString()}`} color={S.green} icon="📥" sub="سندات القبض النشطة"/>
@@ -852,11 +844,64 @@ try {
         </div>
       )}
 
-      {/* CSS للتأثيرات */}
+      {/* CSS للتأثيرات + Responsive */}
       <style>{`
         @keyframes blink {
           0%, 100% { opacity: 1; transform: scale(1); }
           50%       { opacity: .4; transform: scale(.7); }
+        }
+
+        /* ── موبايل Dashboard ── */
+        @media (max-width: 768px) {
+          .hide-mobile   { display: none !important; }
+          .show-mobile   { display: inline !important; }
+          .dash-content  { padding: 12px 12px !important; }
+
+          /* بطاقات الأقسام: عمودان على الجوال */
+          .dash-cards-grid {
+            grid-template-columns: repeat(2,1fr) !important;
+            gap: 8px !important;
+          }
+
+          /* الوضع العام: عمود واحد */
+          .dash-health-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          /* مؤشرات 3 شهور: 2 × 2 تبقى */
+          .dash-indicators {
+            grid-template-columns: 1fr 1fr !important;
+          }
+
+          /* الرسم البياني: تقليل الخط */
+          .dash-chart-header {
+            flex-direction: column !important;
+            gap: 8px !important;
+            align-items: flex-end !important;
+          }
+          .dash-chart-legends {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+          }
+
+          /* قسم الحسابات الموسّع */
+          .dash-accounting-grid {
+            grid-template-columns: 1fr 1fr !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          /* شاشة صغيرة جداً: عمود واحد */
+          .dash-cards-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .dash-indicators {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
+        @media (min-width: 769px) {
+          .show-mobile { display: none !important; }
         }
       `}</style>
 
