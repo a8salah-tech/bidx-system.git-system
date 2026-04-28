@@ -458,38 +458,36 @@ export default function SuppliersPage(){
   return(
     <div style={{display:'flex',flexDirection:'column',height:'100%',color:S.white,fontFamily:'Tajawal,sans-serif',direction:'rtl',background:S.navy}}>
 
-      {/* ══ شريط الأدوات — responsive ══ */}
-      <div style={{background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,flexWrap:'wrap',gap:8}}>
-        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+      {/* ══ شريط الأدوات ══ */}
+      <div style={{background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <div style={{display:'flex',gap:10,alignItems:'center'}}>
           <button onClick={()=>setShowForm(true)}
-            style={{background:S.gold,color:S.navy,border:'none',padding:'9px 16px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit',whiteSpace:'nowrap'}}>
-            + إضافة
+            style={{background:S.gold,color:S.navy,border:'none',padding:'9px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+            + إضافة مورد
           </button>
           <button onClick={exportToExcel}
-            style={{background:'rgba(232,201,122,0.1)',color:S.gold2,border:`1px solid ${S.gold}`,padding:'9px 12px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
-            📤
+            style={{background:'rgba(232,201,122,0.1)',color:S.gold2,border:`1px solid ${S.gold}`,padding:'9px 18px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+            📤 تصدير
           </button>
           <button onClick={()=>router.push('/pricing/compare')}
-            className="supp-hide-mobile"
-            style={{background:S.card2,color:S.muted,border:`1px solid ${S.border}`,padding:'9px 14px',borderRadius:'8px',fontSize:'12px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            📊 مقارنة
+            style={{background:S.card2,color:S.muted,border:`1px solid ${S.border}`,padding:'9px 18px',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            📊 مقارنة أسعار
           </button>
           <button onClick={()=>router.push('/Buy-Request')}
-            className="supp-hide-mobile"
-            style={{background:S.card2,color:S.muted,border:`1px solid ${S.border}`,padding:'9px 14px',borderRadius:'8px',fontSize:'12px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
-            ⚖️ شراء
+            style={{background:S.card2,color:S.muted,border:`1px solid ${S.border}`,padding:'9px 18px',borderRadius:'8px',fontSize:'13px',fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>
+            ⚖️ طلب شراء
           </button>
         </div>
-        <div style={{fontSize:11,color:S.muted,whiteSpace:'nowrap'}}>
-          {active.length} نشط / {suppliers.length}
+        <div style={{fontSize:12,color:S.muted}}>
+          {active.length} نشط من {suppliers.length} مورد
         </div>
       </div>
 
       {/* ══ المحتوى ══ */}
-      <div className="supp-main" style={{flex:1,overflowY:'auto',padding:'16px 16px'}}>
+      <div style={{flex:1,overflowY:'auto',padding:'18px 24px'}}>
 
         {/* الإحصائيات */}
-        <div className="supp-stats" style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'10px',marginBottom:'16px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'10px',marginBottom:'18px'}}>
           {[
             {label:'إجمالي الموردين', val:suppliers.length,      color:S.gold,    icon:'🏭'},
             {label:'نشطون',           val:active.length,          color:S.green,   icon:'✅'},
@@ -524,7 +522,7 @@ export default function SuppliersPage(){
         )}
 
         {/* شريط البحث والفلاتر */}
-        <div className="supp-filters" style={{display:'flex',gap:'8px',marginBottom:'12px',alignItems:'center',flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:'10px',marginBottom:'14px',alignItems:'center',flexWrap:'wrap'}}>
           <input type="text" placeholder="🔍 ابحث عن مورد..." value={search}
             onChange={e=>{setSearch(e.target.value);setCurrentPage(1)}}
             style={{flex:1,minWidth:'180px',background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'10px',padding:'10px 16px',fontSize:'13px',color:S.white,outline:'none',fontFamily:'inherit',textAlign:'right',boxSizing:'border-box' as any}}/>
@@ -556,7 +554,7 @@ export default function SuppliersPage(){
 
         {/* ── عرض البطاقات ── */}
         {viewMode==='cards'&&!loading&&(
-          <div className="supp-cards" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'12px',marginBottom:'12px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'12px',marginBottom:'12px'}}>
             {filtered.length===0?(
               <div style={{textAlign:'center',color:S.muted,padding:'80px 0',gridColumn:'1/-1'}}>
                 <div style={{fontSize:'48px',marginBottom:'16px'}}>🏭</div>
@@ -605,7 +603,7 @@ export default function SuppliersPage(){
                 <div style={{fontSize:'14px'}}>ابدأ بإضافة أول مورد</div>
               </div>
             ):(
-              <div className="supp-table-wrap" style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'14px',overflow:'hidden'}}>
+              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'14px',overflow:'hidden',alignItems: 'center'}}>
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
                   <thead>
                     <tr style={{background:'rgba(255,255,255,0.05)',borderBottom:`1px solid ${S.border}`,textAlign: 'center'}}>
@@ -786,34 +784,6 @@ export default function SuppliersPage(){
           </>
         )}
       </div>
-
-      {/* ══ Responsive CSS ══ */}
-      <style>{`
-        @media (max-width: 768px) {
-          .supp-hide-mobile { display: none !important; }
-          .supp-main        { padding: 10px 10px !important; }
-
-          /* إحصائيات: عمودان بدل 5 */
-          .supp-stats {
-            grid-template-columns: repeat(3,1fr) !important;
-            gap: 8px !important;
-          }
-
-          /* الجدول قابل للتمرير أفقياً */
-          .supp-table-wrap { overflow-x: auto !important; }
-          .supp-table-wrap table { min-width: 700px; }
-
-          /* الفلاتر: تلتف */
-          .supp-filters { gap: 6px !important; }
-          .supp-filters input[type="text"]:last-of-type { width: 130px !important; }
-
-          /* البطاقات: عمود واحد على الشاشات الصغيرة */
-          .supp-cards { grid-template-columns: 1fr !important; }
-        }
-        @media (max-width: 480px) {
-          .supp-stats { grid-template-columns: repeat(2,1fr) !important; }
-        }
-      `}</style>
 
       {/* ══ Modal إضافة مورد ══ */}
       {showForm&&(
