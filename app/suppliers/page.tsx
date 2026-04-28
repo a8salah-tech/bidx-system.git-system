@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
-import { COUNTRIES } from '@/app/components/options';
+import { COUNTRIES } from '../../app/components/options';
+
 
 // ── نظام الألوان ──
 const S = {
