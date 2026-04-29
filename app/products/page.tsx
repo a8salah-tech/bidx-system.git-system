@@ -398,7 +398,7 @@ setProducts(uniqueProducts)
     <div style={{display:'flex',flexDirection:'column',height:'100%',color:S.white,fontFamily:'Tajawal,sans-serif',direction:'rtl'}}>
 
       {/* ══ شريط الأدوات ══ */}
-      <div style={{background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+      <div className="prod-toolbar" style={{background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'10px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,flexWrap:'wrap',gap:8}}>
         <div style={{display:'flex',gap:10,alignItems:'center'}}>
           <button onClick={()=>setShowAddProduct(true)}
             style={{background:S.gold,color:S.navy,border:'none',padding:'9px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
@@ -532,10 +532,10 @@ setProducts(uniqueProducts)
       )}
 
       {/* ══ المحتوى الرئيسي ══ */}
-      <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
+      <div className="prod-content" style={{flex:1,overflowY:'auto',padding:'16px 16px'}}>
 
         {/* الإحصائيات */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'12px',marginBottom:'20px'}}>
+        <div className="prod-stats" style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'12px',marginBottom:'16px'}}>
           {[
             {label:'إجمالي المنتجات',    val:totalProducts,   color:S.gold},
             {label:'المنتجات النشطة',    val:activeCount,     color:S.green},
@@ -551,7 +551,7 @@ setProducts(uniqueProducts)
         </div>
 
         {/* البحث والفلاتر */}
-        <div style={{display:'flex',gap:'10px',marginBottom:'16px',flexWrap:'wrap',alignItems:'center'}}>
+        <div className="prod-filters" style={{display:'flex',gap:'8px',marginBottom:'12px',flexWrap:'wrap',alignItems:'center'}}>
           <input type="text" placeholder="🔍 ابحث عن منتج..." value={search} onChange={e=>setSearch(e.target.value)}
             style={{flex:1,minWidth:'200px',background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'10px',padding:'10px 16px',fontSize:'13px',color:S.white,outline:'none',fontFamily:'inherit',textAlign:'right',boxSizing:'border-box' as any}}/>
 
@@ -592,11 +592,11 @@ setProducts(uniqueProducts)
             <div style={{fontSize:'14px',marginTop:'8px'}}>ابدأ بإضافة أول منتج</div>
           </div>
         ) : (
-          <div style={{display:'flex',gap:'16px',alignItems:'flex-start'}}>
+          <div className="prod-layout" style={{display:'flex',gap:'16px',alignItems:'flex-start'}}>
 
             {/* ── الجدول ── */}
             {viewMode==='table'&&(
-              <div style={{flex:selectedProduct?'0 0 56%':'1',background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'14px',overflow:'hidden'}}>
+              <div className="prod-table-col prod-table-wrap" style={{flex:selectedProduct?'0 0 56%':'1',background:S.navy2,border:`1px solid ${S.border}`,borderRadius:'14px',overflow:'hidden'}}>
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
                   <thead>
                     <tr style={{background:'rgba(255,255,255,0.05)',borderBottom:`1px solid ${S.border}`}}>
@@ -694,7 +694,7 @@ setProducts(uniqueProducts)
                   </tbody>
                 </table>
                 {totalPagesCount > 1 && (
-  <div style={{ display: 'flex', justifyContent: 'left', alignItems: 'center', gap: 8, marginTop: 14 }}>
+  <div className="prod-pagination" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 12, padding: '12px 16px', borderTop: `1px solid ${S.border}` }}>
     <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1}
       style={{ padding:'6px 14px', borderRadius:7, border:`1px solid ${S.border}`, background:'transparent', color:currentPage===1?S.muted:S.white, cursor:currentPage===1?'not-allowed':'pointer', fontSize:12, fontFamily:'inherit' }}>
       → السابقة
@@ -714,7 +714,7 @@ setProducts(uniqueProducts)
 
             {/* ── البطاقات ── */}
             {viewMode==='cards'&&(
-              <div style={{flex:selectedProduct?'0 0 55%':'1',display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'12px'}}>
+              <div className="prod-cards" style={{flex:selectedProduct?'0 0 55%':'1',display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'12px'}}>
                 {sortedProducts.map(([name, sups], i) => {
                   const avgRating  = sups.length>0?(sups.reduce((a,s)=>a+(s.rating||0),0)/sups.length).toFixed(1):0
                   const isSelected = selectedProduct===name
@@ -740,7 +740,7 @@ setProducts(uniqueProducts)
 
             {/* ══ لوحة تفاصيل المنتج (FIX 1: + إضافة مورد) ══ */}
             {selectedProduct && productMap[selectedProduct] && (
-              <div style={{flex:'0 0 42%',background:S.navy2,border:`1px solid ${S.gold}`,borderRadius:'14px',padding:'18px',position:'sticky',top:0,maxHeight:'calc(100vh - 200px)',overflowY:'auto'}}>
+              <div className="prod-detail" style={{flex:'0 0 42%',background:S.navy2,border:`1px solid ${S.gold}`,borderRadius:'14px',padding:'18px',position:'sticky',top:0,maxHeight:'calc(100vh - 200px)',overflowY:'auto'}}>
                 {/* هيدر */}
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'14px'}}>
                   <button onClick={()=>setSelectedProduct(null)} style={{background:'none',border:'none',color:S.muted,cursor:'pointer',fontSize:'16px'}}>✕</button>
