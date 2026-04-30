@@ -238,7 +238,7 @@ async function changeStatus(id: string, newStatus: string) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal, sans-serif', direction: 'rtl' }}>
 
       {/* ── شريط الأدوات ── */}
-      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      <div className="cust-toolbar" style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: '10px' }}>
 
           {/* زر إضافة عميل */}
@@ -276,7 +276,7 @@ async function changeStatus(id: string, newStatus: string) {
 
           {/* ميزة جديدة: إجراء جماعي */}
           {selectedIds.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(201,168,76,0.08)', border: `1px solid rgba(201,168,76,0.2)`, borderRadius: 8, padding: '6px 12px' }}>
+            <div className="cust-bulk-bar" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(201,168,76,0.08)', border: `1px solid rgba(201,168,76,0.2)`, borderRadius: 8, padding: '6px 12px' }}>
               <button onClick={applyBulkAction} disabled={!bulkAction || applyingBulk}
                 style={{ background: bulkAction ? S.gold : S.muted, color: S.navy, border: 'none', padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: bulkAction ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}>
                 {applyingBulk ? '⏳' : '✅ تطبيق'}
@@ -298,10 +298,10 @@ async function changeStatus(id: string, newStatus: string) {
       </div>
 
       {/* ── المحتوى القابل للتمرير ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      <div className="cust-content" style={{ flex: 1, overflowY: 'auto', padding: '16px 14px' }}>
 
         {/* ── الإحصائيات السريعة ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '20px' }}>
+        <div className="cust-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '16px' }}>
           {[
             { label: 'إجمالي العملاء',  val: customers.length,                                              color: S.gold  },
             { label: 'قيد التفاوض',        val: customers.filter(c => c.status === 'negotiate').length, color: S.amber },
@@ -316,7 +316,7 @@ async function changeStatus(id: string, newStatus: string) {
         </div>
 
         {/* ── شريط البحث والفلاتر ── */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="cust-filters" style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
 
           {/* البحث */}
           <input
@@ -338,7 +338,7 @@ async function changeStatus(id: string, newStatus: string) {
           </select>
 
           {/* فلتر الحالة */}
-          <div style={{ display: 'flex', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '10px', overflow: 'hidden' }}>
+          <div className="cust-status-tabs" style={{ display: 'flex', background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '10px', overflow: 'hidden' }}>
             {[
               { key: 'all',       label: 'الكل' },
               { key: 'new',       label: 'جديد' },
@@ -377,7 +377,7 @@ async function changeStatus(id: string, newStatus: string) {
 
           </div>
         ) : (
-          <div style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>
+          <div className="cust-table-wrap" style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: '14px', overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${S.border}` }}>
@@ -578,7 +578,7 @@ async function changeStatus(id: string, newStatus: string) {
 
             {/* ── Pagination Bar ── */}
             {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderTop: `1px solid ${S.border}`, background: S.navy2 }}>
+              <div className="cust-pagination" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderTop: `1px solid ${S.border}`, background: S.navy2 }}>
                 <div style={{ fontSize: '12px', color: S.muted }}>
                   عرض {(currentPage - 1) * rowsPerPage + 1} – {Math.min(currentPage * rowsPerPage, filtered.length)} من {filtered.length} عميل
                 </div>
@@ -634,7 +634,7 @@ async function changeStatus(id: string, newStatus: string) {
             </div>
 
 {/* حقول النموذج بتنسيق Grid */}
-<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+<div className="cust-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
   {[
     { label: 'الاسم الكامل *',     key: 'full_name',     placeholder: 'اسم العميل' },
     { label: 'اسم الشركة',          key: 'company_name',  placeholder: 'شركة...' },
