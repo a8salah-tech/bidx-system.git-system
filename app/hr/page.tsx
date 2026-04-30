@@ -319,11 +319,50 @@ export default function HREmployeePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal, sans-serif', direction: 'rtl', background: S.navy }}>
+      <style>{`
+        /* ══ HR Mobile Responsive ══ */
+        .hr-header      { padding: 12px 14px !important; }
+        .hr-emp-card    { gap: 10px !important; }
+        .hr-stats       { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+        .hr-tabs        { padding: 0 12px !important; }
+        .hr-tabs button { padding: 10px 12px !important; font-size: 11px !important; }
+        .hr-content     { padding: 14px 14px !important; }
+        .hr-req-cards   { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+        .hr-att-grid    { display: grid; grid-template-columns: 200px 1fr; gap: 16px; }
+        .hr-pay-grid    { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+        .hr-form-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .hr-modal-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .hr-org-grid    { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+
+        @media (max-width: 768px) {
+          .hr-header   { padding: 10px 12px !important; }
+          .hr-stats    { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
+          .hr-tabs     { padding: 0 8px !important; overflow-x: auto !important; }
+          .hr-tabs button { padding: 9px 10px !important; font-size: 11px !important; }
+          .hr-content  { padding: 10px 10px !important; }
+          .hr-req-cards { grid-template-columns: repeat(2,1fr) !important; }
+          .hr-att-grid  { grid-template-columns: 1fr !important; }
+          .hr-pay-grid  { grid-template-columns: repeat(2,1fr) !important; }
+          .hr-form-grid { grid-template-columns: 1fr !important; }
+          .hr-modal-grid{ grid-template-columns: 1fr !important; }
+          .hr-org-grid  { grid-template-columns: 1fr !important; }
+          .hr-emp-card  { flex-direction: column !important; align-items: flex-end !important; }
+          .hr-table-wrap{ overflow-x: auto !important; }
+          .hr-table-wrap table { min-width: 580px; }
+          .hr-hide      { display: none !important; }
+          .hr-att-log   { grid-template-columns: repeat(2,1fr) !important; }
+        }
+        @media (max-width: 480px) {
+          .hr-stats     { grid-template-columns: 1fr 1fr !important; }
+          .hr-req-cards { grid-template-columns: 1fr !important; }
+          .hr-pay-grid  { grid-template-columns: 1fr 1fr !important; }
+        }
+      `}</style>
 
       {/* ── هيدر الموظف + إحصائيات ── */}
-      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '14px 24px', flexShrink: 0 }}>
+      <div className="hr-header" style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, flexShrink: 0 }}>
         {employee && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14, flexDirection: 'row-reverse' }}>
+          <div className="hr-emp-card" style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14, flexDirection: 'row-reverse' }}>
             <div style={{ width: 48, height: 48, borderRadius: 12, background: `linear-gradient(135deg,${S.gold},${S.navy3})`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, flexShrink: 0, border: `2px solid ${S.gold}40` }}>
               {employee.full_name?.split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
             </div>
@@ -335,7 +374,7 @@ export default function HREmployeePage() {
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+        <div className="hr-stats">
           {[
             { icon: '🏖️', label: 'رصيد الإجازة السنوية', val: `${employee?.annual_leave_balance || 0}`, sub: 'يوم متبقي', color: S.blue },
             { icon: '💵', label: 'صافي الراتب الشهري',   val: fmtMoney(lastPayroll?.net_salary || gross), sub: `يُصرف يوم 25`, color: S.green },
@@ -356,7 +395,7 @@ export default function HREmployeePage() {
       </div>
 
       {/* ── التبويبات ── */}
-      <div style={{ display: 'flex', background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0 24px', flexShrink: 0, overflowX: 'auto' }}>
+      <div className="hr-tabs" style={{ display: 'flex', background: S.navy2, borderBottom: `1px solid ${S.border}`, flexShrink: 0, overflowX: 'auto' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)}
             style={{ padding: '11px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', border: 'none', borderBottom: tab === t.key ? `2px solid ${S.gold}` : '2px solid transparent', background: 'transparent', color: tab === t.key ? S.gold2 : S.muted, whiteSpace: 'nowrap', transition: 'all .15s' }}>
@@ -366,7 +405,7 @@ export default function HREmployeePage() {
       </div>
 
       {/* ── المحتوى ── */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 24px' }}>
+      <div className="hr-content" style={{ flex: 1, overflowY: 'auto' }}>
 
         {/* ══ الطلبات ══ */}
         {tab === 'requests' && (
@@ -394,7 +433,7 @@ export default function HREmployeePage() {
               </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+            <div className="hr-req-cards">
               {Object.entries(REQUEST_TYPES).slice(0, 6).map(([key, t]) => (
                 <button key={key} onClick={() => { setReqForm(p => ({ ...p, request_type: key })); setShowForm(true) }}
                   style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 12, padding: '12px 16px', cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all .2s' }}>
@@ -445,7 +484,7 @@ export default function HREmployeePage() {
 
         {/* ══ دليل الموظف ══ */}
         {tab === 'handbook' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
+          <div className="hr-att-grid">
             <div style={{ background: S.navy2, borderRadius: 12, padding: 10, border: `1px solid ${S.border}`, position: 'sticky', top: 0, height: 'fit-content' }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: S.muted, marginBottom: 10, textAlign: 'right', padding: '0 6px' }}>محتويات الدليل</div>
               {HANDBOOK.map(sec => (
@@ -742,7 +781,7 @@ export default function HREmployeePage() {
               {/* نوع الطلب */}
               <div style={{ marginBottom: 18 }}>
                 <label style={{ display: 'block', fontSize: 11, color: S.gold, fontWeight: 700, marginBottom: 10, textAlign: 'right' }}>نوع الطلب *</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+                <div className="hr-att-log" style={{ display: 'grid', gap: 8 }}>
                   {Object.entries(REQUEST_TYPES).map(([key, t]) => (
                     <button key={key} onClick={() => setReqForm(p => ({ ...p, request_type: key }))}
                       style={{ padding: '9px 6px', borderRadius: 9, border: `1px solid ${reqForm.request_type === key ? t.color : S.border}`, background: reqForm.request_type === key ? `${t.color}18` : 'transparent', color: reqForm.request_type === key ? t.color : S.muted, fontSize: 11, fontWeight: reqForm.request_type === key ? 700 : 400, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, transition: 'all .15s' }}>
@@ -755,7 +794,7 @@ export default function HREmployeePage() {
 
               {/* حقول الإجازة */}
               {isLeaveReq && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div className="hr-modal-grid" style={{ marginBottom: 14 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: S.gold, fontWeight: 700, marginBottom: 6, textAlign: 'right' }}>من تاريخ</label>
                     <input type="date" value={reqForm.leave_from}
@@ -784,7 +823,7 @@ export default function HREmployeePage() {
 
               {/* حقول المال */}
               {isMoneyReq && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div className="hr-modal-grid" style={{ marginBottom: 14 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11, color: S.gold, fontWeight: 700, marginBottom: 6, textAlign: 'right' }}>المبلغ المطلوب</label>
                     <input type="number" placeholder="0.00" value={reqForm.amount}
@@ -844,7 +883,7 @@ export default function HREmployeePage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 10 }}>
+              <div className="hr-org-grid">
                 <button onClick={() => setShowForm(false)}
                   style={{ background: S.card2, color: S.white, border: `1px solid ${S.border}`, padding: 11, borderRadius: 9, fontSize: 13, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>إلغاء</button>
                 <button onClick={submitRequest} disabled={saving}
