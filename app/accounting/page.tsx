@@ -109,7 +109,7 @@ function PrintModal({v,sym,onClose}:{v:any;sym:string;onClose:()=>void}){
     <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2000,backdropFilter:'blur(8px)',padding:16}} onClick={onClose}>
       <div style={{background:S.white,width:'100%',maxWidth:600,borderRadius:16,overflow:'hidden',direction:'rtl'}} onClick={e=>e.stopPropagation()}>
         <div style={{background:S.navy2,padding:'12px 20px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div style={{display:'flex',gap:8}}>
+          <div className="acc-tb-btns" style={{display:'flex',gap:8}}>
             <button onClick={()=>window.print()} style={{background:S.gold,color:S.navy,border:'none',padding:'8px 20px',borderRadius:7,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️ طباعة</button>
             <button onClick={onClose} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:'8px 16px',borderRadius:7,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>✕</button>
           </div>
@@ -553,9 +553,52 @@ export default function AccountingPage(){
 
   return(
     <div style={{display:'flex',flexDirection:'column',height:'100%',color:S.white,fontFamily:'Tajawal, sans-serif',direction:'rtl',background:S.navy}}>
+      <style>{`
+        /* ══ Accounting Mobile ══ */
+        .acc-toolbar      { display:flex; align-items:center; justify-content:space-between; }
+        .acc-tb-btns      { display:flex; gap:8px; }
+        .acc-tabs         { padding:0 16px !important; }
+        .acc-content      { padding:14px 14px !important; }
+        .acc-dash-stats   { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+        .acc-dash-3col    { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+        .acc-acc-5col     { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+        .acc-vch-3col     { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+        .acc-rep-2col     { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .acc-stmt-3col    { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+        .acc-table-wrap   { overflow-x:auto !important; }
+        .acc-table-wrap table { min-width:600px; }
+        .acc-modal-form   { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        .acc-modal-btns   { display:grid; grid-template-columns:1fr 2fr; gap:10px; margin-top:18px; }
+        .acc-journal-table{ overflow-x:auto !important; }
+        .acc-journal-table table { min-width:520px; }
+
+        @media (max-width: 768px) {
+          .acc-toolbar    { flex-wrap:wrap !important; gap:8px !important; padding:10px 12px !important; }
+          .acc-tb-btns    { flex-wrap:wrap !important; gap:6px !important; }
+          .acc-tb-btns button { padding:8px 10px !important; font-size:11px !important; }
+          .acc-tabs       { padding:0 6px !important; overflow-x:auto !important; }
+          .acc-tabs button { padding:9px 8px !important; font-size:10px !important; }
+          .acc-content    { padding:10px 10px !important; }
+          .acc-dash-stats { grid-template-columns:repeat(2,1fr) !important; gap:8px !important; }
+          .acc-dash-3col  { grid-template-columns:1fr !important; gap:10px !important; }
+          .acc-acc-5col   { grid-template-columns:repeat(3,1fr) !important; gap:8px !important; }
+          .acc-vch-3col   { grid-template-columns:1fr !important; gap:8px !important; }
+          .acc-rep-2col   { grid-template-columns:1fr !important; gap:12px !important; }
+          .acc-stmt-3col  { grid-template-columns:1fr !important; gap:8px !important; }
+          .acc-table-wrap { overflow-x:auto !important; }
+          .acc-modal-form { grid-template-columns:1fr !important; }
+          .acc-modal-btns { grid-template-columns:1fr 1fr !important; }
+          .acc-journal-table { overflow-x:auto !important; }
+        }
+        @media (max-width: 480px) {
+          .acc-dash-stats { grid-template-columns:1fr 1fr !important; }
+          .acc-acc-5col   { grid-template-columns:1fr 1fr !important; }
+        }
+      `}</style>
+
 
       {/* ── شريط الأدوات ── */}
-      <div style={{background:S.navy2,borderBottom:`1px solid ${S.borderG}`,padding:'12px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+      <div className="acc-toolbar" style={{background:S.navy2,borderBottom:`1px solid ${S.borderG}`,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
         <div style={{display:'flex',gap:8}}>
           <button onClick={()=>{setVchForm(p=>({...p,voucher_number:getNext(p.voucher_type,vouchers),currency}));setShowVchForm(true)}}
             style={{background:S.gold,color:S.navy,border:'none',padding:'9px 20px',borderRadius:'8px',fontSize:'13px',fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
@@ -574,7 +617,7 @@ export default function AccountingPage(){
       </div>
 
       {/* ── التبويبات ── */}
-      <div style={{display:'flex',background:S.navy2,borderBottom:`1px solid ${S.border}`,padding:'0 24px',flexShrink:0,overflowX:'auto'}}>
+      <div className="acc-tabs" style={{display:'flex',background:S.navy2,borderBottom:`1px solid ${S.border}`,flexShrink:0,overflowX:'auto'}}>
         {TABS.map(t=>(
           <button key={t.key} onClick={()=>setTab(t.key as any)}
             style={{padding:'11px 16px',fontSize:'11px',fontWeight:600,cursor:'pointer',fontFamily:'Tajawal, sans-serif',border:'none',borderBottom:tab===t.key?`2px solid ${S.gold}`:'2px solid transparent',background:'transparent',color:tab===t.key?S.gold2:S.muted,transition:'all .15s',whiteSpace:'nowrap'}}>
@@ -584,12 +627,12 @@ export default function AccountingPage(){
       </div>
 
       {/* ── المحتوى ── */}
-      <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
+      <div className="acc-content" style={{flex:1,overflowY:'auto'}}>
 
         {/* ══ لوحة المالية ══ */}
         {tab==='dashboard'&&(
           <div style={{display:'flex',flexDirection:'column',gap:16}}>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
+            <div className="acc-dash-stats">
               {[
                 {label:'إجمالي الأصول',   val:fmt(totalAssets,sym),     color:S.green,sub:'الموجودات'},
                 {label:'إجمالي الخصوم',   val:fmt(totalLiabilities,sym),color:S.red,  sub:'الالتزامات'},
@@ -605,7 +648,7 @@ export default function AccountingPage(){
             </div>
 
             {/* صافي الربح + حقوق الملكية + التدفقات */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+            <div className="acc-dash-3col">
               <div style={{background:S.navy2,border:`1px solid ${profitColor}40`,borderRadius:14,padding:18,textAlign:'right'}}>
                 <div style={{fontSize:9,color:S.muted,marginBottom:4}}>صافي الربح والخسارة</div>
                 <div style={{fontSize:26,fontWeight:900,color:profitColor,fontFamily:'monospace'}}>{netProfit>=0?'+':''}{fmt(netProfit,sym)}</div>
@@ -664,7 +707,7 @@ export default function AccountingPage(){
                 {Object.entries(ACCOUNT_TYPES).map(([k,v])=><option key={k} value={k} style={{background:S.navy2}}>{v.icon} {v.label}</option>)}
               </select>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
+            <div className="acc-acc-5col">
               {Object.entries(ACCOUNT_TYPES).map(([key,t])=>{
                 const accs=accounts.filter(a=>a.account_type===key)
                 const total=accs.reduce((s,a)=>s+(a.balance||0),0)
@@ -677,7 +720,7 @@ export default function AccountingPage(){
                 )
               })}
             </div>
-            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+            <div className="acc-table-wrap" style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>{['الكود','اسم الحساب','النوع','الرصيد الحالي','الوصف','الأستاذ'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
                 <tbody>
@@ -712,7 +755,7 @@ export default function AccountingPage(){
         {tab==='vouchers'&&(
           <div style={{display:'flex',flexDirection:'column',gap:14}}>
             {/* إحصاء السندات النشطة فقط */}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+            <div className="acc-vch-3col">
               {Object.entries(VOUCHER_TYPES).map(([key,t])=>{
                 const vList=activeVouchers.filter(v=>v.voucher_type===key)
                 const total=vList.reduce((s,v)=>s+(v.amount||0),0)
@@ -726,7 +769,7 @@ export default function AccountingPage(){
                 )
               })}
             </div>
-            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+            <div className="acc-table-wrap" style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>{['رقم السند','النوع','التاريخ','الطرف الآخر','المبلغ','العملة','الحالة','إجراءات'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
                 <tbody>
@@ -788,7 +831,7 @@ export default function AccountingPage(){
                 <div style={{fontSize:11,color:S.muted,marginTop:2}}>سجل كافة القيود المحاسبية النشطة — {journalEntries.filter(e=>e.status!=='cancelled').length} قيد</div>
               </div>
             </div>
-            <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+            <div className="acc-table-wrap" style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>
                   {['التاريخ والبيان','الحساب','مدين','دائن'].map(h=><th key={h} style={th}>{h}</th>)}
@@ -836,7 +879,7 @@ export default function AccountingPage(){
               </div>
             </div>
             {ledgerAccount&&(
-              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+              <div className="acc-table-wrap" style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
                 <div style={{padding:'14px 20px',background:'rgba(255,255,255,0.03)',borderBottom:`1px solid ${S.border}`,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                   <span style={{fontSize:11,color:S.muted}}>رصيد افتتاحي: {fmt(ledgerAccount.opening_balance||0,sym)}</span>
                   <div style={{textAlign:'right'}}>
@@ -893,7 +936,7 @@ export default function AccountingPage(){
             {trialBalance.length===0?(
               <div style={{textAlign:'center',color:S.muted,padding:'60px 0'}}><div style={{fontSize:40,marginBottom:12}}>⚖️</div><div>أضف قيوداً لظهور ميزان المراجعة</div></div>
             ):(
-              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+              <div className="acc-table-wrap" style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
                   <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>
                     {['الكود','اسم الحساب','إجمالي المدين','إجمالي الدائن','صافي مدين','صافي دائن'].map(h=><th key={h} style={th}>{h}</th>)}
@@ -933,7 +976,7 @@ export default function AccountingPage(){
           <div style={{display:'flex',flexDirection:'column',gap:14}}>
             <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:20}}>
               <div style={{fontSize:13,fontWeight:800,color:S.white,marginBottom:14,textAlign:'right'}}>📊 كشف الحساب (السندات النشطة فقط)</div>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:14}}>
+              <div className="acc-stmt-3col" style={{marginBottom:14}}>
                 <div>
                   <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>نوع الحساب</label>
                   <select value={stmtType} onChange={e=>{setStmtType(e.target.value as any);setStmtPartyId('');setStmtAccountId('')}} style={{...inp,cursor:'pointer'}}>
@@ -972,7 +1015,7 @@ export default function AccountingPage(){
               <button onClick={()=>window.print()} style={{background:S.gold,color:S.navy,border:'none',padding:'9px 24px',borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>🖨️ طباعة</button>
             </div>
             {stmtVouchers.length>0&&(
-              <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
+              <div className="acc-table-wrap" style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,overflow:'hidden'}}>
                 <table style={{width:'100%',borderCollapse:'collapse'}}>
                   <thead><tr style={{borderBottom:`1px solid ${S.border}`}}>{['التاريخ','رقم السند','البيان','مدين','دائن','الرصيد'].map(h=><th key={h} style={th}>{h}</th>)}</tr></thead>
                   <tbody>
@@ -1004,7 +1047,7 @@ export default function AccountingPage(){
 
         {/* ══ التقارير ══ */}
         {tab==='reports'&&(
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+          <div className="acc-rep-2col">
             <div style={{background:S.navy2,border:`1px solid ${S.border}`,borderRadius:14,padding:20}}>
               <div style={{fontSize:14,fontWeight:800,color:S.white,marginBottom:16,textAlign:'right'}}>📊 قائمة الدخل</div>
               <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -1105,7 +1148,7 @@ export default function AccountingPage(){
                 </select>
               </div>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10,marginTop:18}}>
+            <div className="acc-modal-btns">
               <button onClick={()=>setEditVch(null)} style={{background:S.card2,color:S.white,border:`1px solid ${S.border}`,padding:11,borderRadius:8,fontSize:13,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>إلغاء</button>
               <button onClick={handleEditVoucher} disabled={saving} style={{background:saving?S.muted:S.gold,color:S.navy,border:'none',padding:11,borderRadius:8,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'Tajawal, sans-serif'}}>
                 {saving?'⏳ جاري الحفظ...':'💾 حفظ التعديلات'}
@@ -1123,7 +1166,7 @@ export default function AccountingPage(){
               <button onClick={()=>setShowAccForm(false)} style={{background:'none',border:'none',color:S.muted,fontSize:20,cursor:'pointer'}}>✕</button>
               <div style={{fontSize:16,fontWeight:800,color:S.gold2}}>📁 إضافة حساب جديد</div>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+            <div className="acc-modal-form">
               {[{l:'كود الحساب *',k:'account_code',p:'مثال: 1101'},{l:'اسم الحساب *',k:'account_name',p:'اسم الحساب'}].map(f=>(
                 <div key={f.k}>
                   <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>{f.l}</label>
@@ -1167,7 +1210,7 @@ export default function AccountingPage(){
               <span style={{fontSize:13,fontWeight:900,color:S.gold2,fontFamily:'monospace'}}>{vchForm.voucher_number}</span>
               <span style={{fontSize:10,color:S.muted}}>رقم السند (تلقائي)</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+            <div className="acc-modal-form">
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>نوع السند</label>
                 <select value={vchForm.voucher_type} onChange={e=>{const t=e.target.value;setVchForm(p=>({...p,voucher_type:t,voucher_number:getNext(t,vouchers)}))}} style={{...inp,cursor:'pointer'}}>
@@ -1257,7 +1300,7 @@ export default function AccountingPage(){
             </div>
 
             {/* بيانات القيد */}
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:18}}>
+            <div className="acc-stmt-3col" style={{marginBottom:18}}>
               <div>
                 <label style={{display:'block',fontSize:11,color:S.gold,fontWeight:700,marginBottom:6,textAlign:'right'}}>التاريخ</label>
                 <input type="date" value={jDate} onChange={e=>setJDate(e.target.value)} style={{...inp,colorScheme:'dark' as any}}/>
