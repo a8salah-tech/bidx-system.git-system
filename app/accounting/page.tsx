@@ -557,7 +557,7 @@ export default function AccountingPage(){
         /* ══ Accounting Mobile ══ */
         .acc-toolbar      { display:flex; align-items:center; justify-content:space-between; }
         .acc-tb-btns      { display:flex; gap:8px; }
-        .acc-tabs         { padding:0 16px !important; }
+        .acc-tabs { padding:0 !important; overflow-x:auto !important; -webkit-overflow-scrolling:touch !important; scroll-snap-type: x mandatory !important; }
         .acc-content      { padding:14px 14px !important; }
         .acc-dash-stats   { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
         .acc-dash-3col    { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
@@ -577,7 +577,7 @@ export default function AccountingPage(){
           .acc-tb-btns    { flex-wrap:wrap !important; gap:6px !important; }
           .acc-tb-btns button { padding:8px 10px !important; font-size:11px !important; }
           .acc-tabs       { padding:0 6px !important; overflow-x:auto !important; }
-          .acc-tabs button { padding:9px 8px !important; font-size:10px !important; }
+          .acc-tabs button { padding:8px 6px !important; font-size:9px !important; min-width: fit-content !important; }
           .acc-content    { padding:10px 10px !important; }
           .acc-dash-stats { grid-template-columns:repeat(2,1fr) !important; gap:8px !important; }
           .acc-dash-3col  { grid-template-columns:1fr !important; gap:10px !important; }
