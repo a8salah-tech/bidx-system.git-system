@@ -489,7 +489,7 @@ export default function SuppliersPage(){
       <div className="supp-main" style={{flex:1,overflowY:'auto',padding:'16px 16px'}}>
 
         {/* الإحصائيات */}
-        <div className="supp-stats" style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'10px',marginBottom:'16px'}}>
+        <div className="supp-stats" style={{ gap:'10px', marginBottom:'16px' }}>
           {[
             {label:'إجمالي الموردين', val:suppliers.length,      color:S.gold,    icon:'🏭'},
             {label:'نشطون',           val:active.length,          color:S.green,   icon:'✅'},

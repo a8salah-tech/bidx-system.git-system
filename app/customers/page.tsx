@@ -301,7 +301,7 @@ async function changeStatus(id: string, newStatus: string) {
       <div className="cust-content" style={{ flex: 1, overflowY: 'auto', padding: '16px 14px' }}>
 
         {/* ── الإحصائيات السريعة ── */}
-        <div className="cust-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '16px' }}>
+        <div className="cust-stats" style={{ gap: '12px', marginBottom: '16px' }}>
           {[
             { label: 'إجمالي العملاء',  val: customers.length,                                              color: S.gold  },
             { label: 'قيد التفاوض',        val: customers.filter(c => c.status === 'negotiate').length, color: S.amber },

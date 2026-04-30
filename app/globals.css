@@ -141,3 +141,60 @@ button {
     display: none !important;
   }
 }
+
+/* ══ Responsive — صفحة العملاء ══ */
+.cust-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cust-table-wrap { overflow-x: auto; }
+.cust-table-wrap table { min-width: 700px; }
+
+/* ══ Responsive — صفحة الموردين ══ */
+.supp-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.supp-table-wrap { overflow-x: auto; }
+.supp-table-wrap table { min-width: 700px; }
+
+/* ══ Responsive — صفحة المنتجات ══ */
+.prod-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.prod-table-wrap { overflow-x: auto; }
+.prod-table-wrap table { min-width: 680px; }
+.prod-layout { display: flex; gap: 16px; align-items: flex-start; }
+
+/* ══ Mobile ══ */
+@media (max-width: 768px) {
+  .cust-stats    { grid-template-columns: repeat(2, 1fr) !important; }
+  .cust-table-wrap { overflow-x: auto !important; }
+  .cust-pagination { flex-direction: column !important; align-items: flex-start !important; }
+  .cust-modal-grid { grid-template-columns: 1fr !important; }
+  .cust-status-tabs { overflow-x: auto !important; }
+  .cust-status-tabs button { padding: 8px 10px !important; font-size: 11px !important; }
+
+  .supp-stats    { grid-template-columns: repeat(3, 1fr) !important; }
+  .supp-table-wrap { overflow-x: auto !important; }
+
+  .prod-stats    { grid-template-columns: repeat(3, 1fr) !important; }
+  .prod-table-wrap { overflow-x: auto !important; }
+  .prod-layout   { flex-direction: column !important; }
+  .prod-detail   { position: relative !important; max-height: none !important; }
+  .prod-cards    { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 480px) {
+  .cust-stats  { grid-template-columns: 1fr 1fr !important; }
+  .supp-stats  { grid-template-columns: 1fr 1fr !important; }
+  .prod-stats  { grid-template-columns: 1fr 1fr !important; }
+  .prod-cards  { grid-template-columns: 1fr !important; }
+}

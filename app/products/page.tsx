@@ -535,7 +535,7 @@ setProducts(uniqueProducts)
       <div className="prod-content" style={{flex:1,overflowY:'auto',padding:'16px 16px'}}>
 
         {/* الإحصائيات */}
-        <div className="prod-stats" style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:'12px',marginBottom:'16px'}}>
+        <div className="prod-stats" style={{ gap:'12px', marginBottom:'16px' }}>
           {[
             {label:'إجمالي المنتجات',    val:totalProducts,   color:S.gold},
             {label:'المنتجات النشطة',    val:activeCount,     color:S.green},
