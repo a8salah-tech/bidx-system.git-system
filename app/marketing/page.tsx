@@ -441,7 +441,7 @@ function LeadCard({ lead, stage, stages, templates, onMove, onDelete, onAddNote,
                       {selTpl.text.replace('[اسم العميل]', lead.name)}
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 10 }}>
+                  <div className="mkt-search-row" style={{ display: 'flex', gap: 10 }}>
                     {lead.phone && (
                       <a href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(selTpl?.text?.replace('[اسم العميل]', lead.name) || '')}`}
                         target="_blank" rel="noopener noreferrer"
@@ -496,7 +496,7 @@ function KanbanColumn({ stage, leads, stages, templates, onMove, onDelete, onAdd
   }
 
   return (
-    <div style={{ minWidth: 270, maxWidth: 270, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+    <div className="mkt-col" style={{ minWidth: 270, maxWidth: 270, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
 
       {/* FIX 1: رأس العمود — موحد من اليمين */}
       <div style={{ background: S.navy2, borderRadius: '12px 12px 0 0', padding: '10px 12px', border: `1px solid ${S.border}`, borderBottom: `2px solid ${stage.color}`, direction: 'rtl' }}>
@@ -826,10 +826,42 @@ await supabase.from('marketing_stages').insert([{
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', color: S.white, fontFamily: 'Tajawal, sans-serif', direction: 'rtl', background: S.navy }}>
+      <style>{`
+        /* ══ Marketing Mobile ══ */
+        .mkt-stats       { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 12px; }
+        .mkt-header      { padding: 12px 16px !important; }
+        .mkt-search-row  { display: flex; gap: 10px; }
+        .mkt-tabs        { padding: 0 16px !important; }
+        .mkt-kanban      { padding: 12px 12px !important; gap: 10px !important; }
+        .mkt-col         { min-width: 260px !important; max-width: 260px !important; }
+        .mkt-tab-content { padding: 14px 14px !important; }
+        .mkt-tpl-grid    { display: grid; grid-template-columns: repeat(auto-fill,minmax(340px,1fr)); gap: 14px; }
+        .mkt-task-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .mkt-social-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 14px; }
+
+        @media (max-width: 768px) {
+          .mkt-stats      { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
+          .mkt-header     { padding: 10px 12px !important; }
+          .mkt-search-row { flex-wrap: wrap !important; gap: 8px !important; }
+          .mkt-search-row select { min-width: 130px !important; }
+          .mkt-tabs       { padding: 0 8px !important; overflow-x: auto !important; }
+          .mkt-tabs button { padding: 9px 10px !important; font-size: 11px !important; }
+          .mkt-kanban     { padding: 10px 10px !important; gap: 10px !important; }
+          .mkt-col        { min-width: 240px !important; max-width: 240px !important; }
+          .mkt-tab-content { padding: 12px 12px !important; }
+          .mkt-tpl-grid   { grid-template-columns: 1fr !important; }
+          .mkt-task-form-grid { grid-template-columns: 1fr !important; }
+          .mkt-social-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
+        }
+        @media (max-width: 480px) {
+          .mkt-stats { grid-template-columns: 1fr 1fr !important; }
+          .mkt-col   { min-width: 210px !important; max-width: 210px !important; }
+        }
+      `}</style>
 
       {/* الهيدر */}
-      <div style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '12px 24px', flexShrink: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 12 }}>
+      <div className="mkt-header" style={{ background: S.navy2, borderBottom: `1px solid ${S.border}`, flexShrink: 0 }}>
+        <div className="mkt-stats">
           {[
             { label: 'إجمالي العملاء',    val: totalLeads,     color: S.blue },
             { label: 'جاهزون للإغلاق',   val: hotLeads,       color: S.green },
@@ -854,7 +886,7 @@ await supabase.from('marketing_stages').insert([{
       </div>
 
       {/* التبويبات */}
-      <div style={{ display: 'flex', background: S.navy2, borderBottom: `1px solid ${S.border}`, padding: '0 24px', flexShrink: 0 }}>
+      <div className="mkt-tabs" style={{ display: 'flex', background: S.navy2, borderBottom: `1px solid ${S.border}`, flexShrink: 0, overflowX: 'auto' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setView(t.key as any)}
             style={{ padding: '11px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif', border: 'none', borderBottom: view === t.key ? `2px solid ${S.gold}` : '2px solid transparent', background: 'transparent', color: view === t.key ? S.gold2 : S.muted, whiteSpace: 'nowrap', transition: 'all .15s' }}>
@@ -868,7 +900,7 @@ await supabase.from('marketing_stages').insert([{
 
         {/* ══ الكانبان ══ */}
         {view === 'kanban' && (
-          <div style={{ display: 'flex', gap: 12, padding: '16px 24px', overflowX: 'auto', height: '100%', alignItems: 'flex-start' }}>
+          <div className="mkt-kanban" style={{ display: 'flex', gap: 12, padding: '16px 16px', overflowX: 'auto', height: '100%', alignItems: 'flex-start' }}>
             {stages.map(stage => (
               <KanbanColumn key={stage.id} stage={stage}
                 leads={filteredLeads.filter(l => l.stage_id === stage.id)}
@@ -902,7 +934,7 @@ await supabase.from('marketing_stages').insert([{
 
         {/* ══ القوالب ══ */}
         {view === 'templates' && (
-          <div style={{ padding: '20px 24px', overflowY: 'auto', height: '100%' }}>
+          <div className="mkt-tab-content" style={{ padding: '16px 16px', overflowY: 'auto', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <button onClick={() => setShowTplForm(true)}
                 style={{ background: S.gold, color: S.navy, border: 'none', padding: '9px 20px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
@@ -946,7 +978,7 @@ await supabase.from('marketing_stages').insert([{
                 <div style={{ fontSize: 13 }}>أضف قوالب رسائل مخصصة لشركتك</div>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 14 }}>
+              <div className="mkt-tpl-grid">
                 {templates.map((t: any) => (
                   <div key={t.id} style={{ background: S.navy2, border: `1px solid ${S.border}`, borderRadius: 12, padding: 18, borderRight: `3px solid ${S.gold}` }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -969,7 +1001,7 @@ await supabase.from('marketing_stages').insert([{
 
         {/* ══ المهام ══ */}
         {view === 'tasks' && (
-          <div style={{ padding: '20px 24px', overflowY: 'auto', height: '100%' }}>
+          <div className="mkt-tab-content" style={{ padding: '16px 16px', overflowY: 'auto', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <button onClick={() => setShowTaskForm(true)}
                 style={{ background: S.gold, color: S.navy, border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
@@ -986,7 +1018,7 @@ await supabase.from('marketing_stages').insert([{
             {showTaskForm && (
               <div style={{ background: S.navy2, border: `1px solid ${S.borderG}`, borderRadius: 14, padding: 18, marginBottom: 16, direction: 'rtl' }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: S.gold2, marginBottom: 12, textAlign: 'right' }}>مهمة جديدة</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div className="mkt-task-form-grid">
                   <div>
                     <label style={{ display: 'block', fontSize: 10, color: S.muted, fontWeight: 700, marginBottom: 5, textAlign: 'right' }}>الأيقونة</label>
                     <input type="text" value={taskForm.icon} onChange={e => setTaskForm(p => ({ ...p, icon: e.target.value }))} style={{ ...inp, fontSize: 14 }} placeholder="📌" />
@@ -1062,7 +1094,7 @@ await supabase.from('marketing_stages').insert([{
 
         {/* ══ منصات التواصل ══ */}
         {view === 'social' && (
-          <div style={{ padding: '20px 24px', overflowY: 'auto', height: '100%' }}>
+          <div className="mkt-tab-content" style={{ padding: '16px 16px', overflowY: 'auto', height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <button onClick={editSocial ? saveSocialStats : () => setEditSocial(true)}
                 style={{ background: editSocial ? S.gold : S.card2, color: editSocial ? S.navy : S.white, border: `1px solid ${editSocial ? S.gold : S.border}`, padding: '8px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Tajawal, sans-serif' }}>
@@ -1073,7 +1105,7 @@ await supabase.from('marketing_stages').insert([{
                 <div style={{ fontSize: 11, color: S.muted, marginTop: 2 }}>أدخل الأرقام يدوياً من كل منصة</div>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+            <div className="mkt-social-grid">
               {[
                 { key: 'linkedin',  label: 'LinkedIn',  icon: '💼', color: '#0A66C2', fields: [{ l: 'مرسلة',     k: 'sent',       c: '#0A66C2' }, { l: 'تم الرد',        k: 'replied',    c: S.green }, { l: 'معدل',   k: 'rate',      c: S.gold, s: '%' }] },
                 { key: 'facebook',  label: 'Facebook',  icon: '📘', color: '#1877F2', fields: [{ l: 'تعليقات',   k: 'comments',   c: '#1877F2' }, { l: 'تم الرد',        k: 'responded',  c: S.green }] },
