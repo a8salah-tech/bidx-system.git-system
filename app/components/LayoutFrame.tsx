@@ -105,7 +105,7 @@ export default function LayoutFrame({ children }: { children: React.ReactNode })
   </li>
 
   {/* الروابط المتبقية */}
-  {[, 'الأسعار'].map(l => (
+  {[, 'خدمات مجانية'].map(l => (
     <li key={l}>
       <Link 
         href="#" 
@@ -164,7 +164,7 @@ export default function LayoutFrame({ children }: { children: React.ReactNode })
 
 <div style={{ display: 'flex', gap: 22, fontFamily: "'Tajawal', sans-serif" }}>
   <Link href="/" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الرئيسية</Link>
-  <Link href="/privacy" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الالخصوصية</Link>
+  <Link href="/privacy" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الخصوصية</Link>
   <Link href="/terms" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الشروط</Link>
   <Link href="/tech-center" style={{ fontSize: 12.5, color: C.muted, textDecoration: 'none' }}>الدعم</Link>
   

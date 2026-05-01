@@ -105,7 +105,7 @@ export default function Home() {
         </Link>
 
         <ul className="lp-nav-links" style={{ display:'flex', gap:32, listStyle:'none', margin:0, padding:0 }}>
-          {[{href:'/',l:'الرئيسية'},{href:'/features',l:'المميزات'},{href:'/automation',l:'الأتمتة'},{href:'#',l:'المنتجات'},{href:'#',l:'الأسعار'}].map(n=>(
+          {[{href:'/',l:'الرئيسية'},{href:'/features',l:'المميزات'},{href:'/automation',l:'الأتمتة'},{href:'#',l:'خدمات مجانية'},{href:'#',l:'الأسعار'}].map(n=>(
             <li key={n.l}><Link href={n.href} className={styles.navLink} style={{ color:C.muted, textDecoration:'none', fontSize:14.5, fontWeight:500 }}>{n.l}</Link></li>
           ))}
         </ul>
