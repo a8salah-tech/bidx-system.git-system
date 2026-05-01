@@ -118,7 +118,7 @@ export default function Home() {
       </nav>
 
       {/* ── Hero ── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto', padding: '96px 52px 72px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center', minHeight: 'calc(100vh - 90px)' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto', padding: '96px 52px 72px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 60, alignItems: 'center', minHeight: 'calc(100vh - 90px)' }} >
 
         {/* Left text */}
         <div className={styles.fadeUp1}>
