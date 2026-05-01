@@ -7,10 +7,11 @@ import { supabase } from '../lib/supabase';
 import styles from './page.module.css';
 
 const C = {
-  navy:'#0A1628',navy2:'#0F2040',navy3:'#0C1A32',navy4:'#111D35',
-  gold:'#C9A84C',gold2:'#E8C97A',gold3:'rgba(201,168,76,0.10)',
-  white:'#FAFAF8',muted:'#8A9BB5',border:'rgba(255,255,255,0.07)',
-  borderG:'rgba(201,168,76,0.15)',green:'#22C55E',red:'#EF4444',amber:'#F59E0B',
+  navy:'#0A1628', navy2:'#0F2040', navy3:'#0C1A32', navy4:'#111D35',
+  gold:'#C9A84C', gold2:'#E8C97A', gold3:'rgba(201,168,76,0.10)',
+  white:'#FAFAF8', muted:'#8A9BB5', border:'rgba(255,255,255,0.07)',
+  borderG:'rgba(201,168,76,0.15)', green:'#22C55E', red:'#EF4444', amber:'#F59E0B',
+  card: '#0F2040', // أضف هذا السطر (استخدمت هنا navy2 كخلفية للكارت)
 };
 
 function Badge({ children }: { children: React.ReactNode }) {
@@ -117,77 +118,152 @@ export default function Home() {
       </nav>
 
       {/* ── Hero ── */}
-      <section className="lp-hero"
-        style={{ position:'relative', zIndex:1, maxWidth:1200, margin:'0 auto', padding:'96px 52px 72px', display:'grid', gridTemplateColumns:'1fr 1fr', gap:60, alignItems:'center', minHeight:'calc(100vh - 90px)' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto', padding: '96px 52px 72px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center', minHeight: 'calc(100vh - 90px)' }}>
 
-        {/* Text */}
-        <div className={`${styles.fadeUp1} lp-hero-text`}>
-          <div className={styles.fadeUp1} style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'5px 14px', borderRadius:100, background:C.gold3, border:'1px solid rgba(201,168,76,0.25)', fontSize:12.5, fontWeight:700, color:C.gold2, marginBottom:26 }}>
+        {/* Left text */}
+        <div className={styles.fadeUp1}>
+          {/* Pill */}
+          <div className={styles.fadeUp1} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 100, background: C.gold3, border: `1px solid rgba(201,168,76,0.25)`, fontSize: 12.5, fontWeight: 700, color: C.gold2, marginBottom: 26 }}>
             <span className={styles.liveDot} />
-            نظام تشغيل الأعمال للشركات · معتمد ومؤمّن
+            نظام تشغيل الأعمال للشركات و المؤسسات · معتمد ومؤمّن
           </div>
 
-          <h1 className={styles.fadeUp2} style={{ fontSize:'clamp(28px,4.5vw,56px)', fontWeight:900, lineHeight:1.13, letterSpacing:'-.025em', marginBottom:10 }}>
+          <h1 className={styles.fadeUp2} style={{ fontSize: 'clamp(34px,4.5vw,56px)', fontWeight: 900, lineHeight: 1.13, letterSpacing: '-.025em', marginBottom: 10 }}>
             وداعاً<br />
             <span className={styles.goldText}>للعشوائية</span><br />
             في شركتك
           </h1>
 
-          <div className={styles.fadeUp2} style={{ width:56, height:2, background:`linear-gradient(90deg,${C.gold},transparent)`, margin:'20px 0' }} />
+          <div className={styles.fadeUp2} style={{ width: 56, height: 2, background: `linear-gradient(90deg,${C.gold},transparent)`, margin: '20px 0' }} />
 
-          <p className={styles.fadeUp3} style={{ fontSize:16, color:C.muted, lineHeight:1.75, maxWidth:460, marginBottom:36, fontWeight:400 }}>
-            <strong style={{ color:C.white, fontWeight:600 }}>BidLX</strong> هو العقل الإلكتروني لشركتك — يحفظ موردييك، يقارن عروضهم، يتابع عملاءك، ويحوّل كل شيء إلى نظام <strong style={{ color:C.white, fontWeight:600 }}>احترافي موحّد</strong>.
+          <p className={styles.fadeUp3} style={{ fontSize: 16.5, color: C.muted, lineHeight: 1.75, maxWidth: 460, marginBottom: 40, fontWeight: 400 }}>
+            <strong style={{ color: C.white, fontWeight: 600 }}>BidLX</strong> هو العقل الإلكتروني لشركتك — يحفظ بيانات موردييك، يقارن عروضهم، يتابع عملاءك، ويحوّل كل شيء من جداول بيانات متناثرة إلى نظام{' '}
+            <strong style={{ color: C.white, fontWeight: 600 }}>احترافي موحّد</strong>.
           </p>
 
-          <div className={`${styles.fadeUp4} lp-hero-btns`} style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+          <div className={`${styles.fadeUp4}`} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <Btn href="/login" primary>🚀 ابدأ مجاناً</Btn>
             <Btn href="/login">شاهد العرض التوضيحي</Btn>
           </div>
 
-          <div className={styles.fadeUp5} style={{ display:'flex', gap:20, flexWrap:'wrap', marginTop:24 }}>
-            {['لا بطاقة ائتمان','إعداد في ١٠ دقائق','بيانات مشفرة ١٠٠٪'].map(t=>(
-              <span key={t} style={{ fontSize:13, color:C.muted, display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ color:C.green, fontWeight:800 }}>✓</span> {t}
+          <div className={styles.fadeUp5} style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 28 }}>
+            {['لا بطاقة ائتمان', 'إعداد في ١٠ دقائق', 'بيانات مشفرة ١٠٠٪'].map(t => (
+              <span key={t} style={{ fontSize: 13, color: C.muted, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: C.green, fontWeight: 800 }}>✓</span> {t}
               </span>
             ))}
           </div>
         </div>
 
-        {/* Mini dashboard */}
-        <div className={`${styles.fadeUp2} lp-hero-dashboard`} style={{ position:'relative' }}>
-          <div style={{ background:C.navy4, border:`1px solid ${C.borderG}`, borderRadius:16, overflow:'hidden', boxShadow:'0 32px 80px rgba(0,0,0,0.45)' }}>
-            <div style={{ background:'rgba(201,168,76,0.05)', borderBottom:`1px solid ${C.borderG}`, padding:'13px 18px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                <div style={{ width:24, height:24, borderRadius:5, background:`linear-gradient(135deg,${C.gold},${C.gold2})`, display:'grid', placeItems:'center', fontSize:9, fontWeight:900, color:C.navy }}>TF</div>
-                <span style={{ fontSize:12, fontWeight:800, color:C.gold2 }}>BidLx OS</span>
+        {/* Right: mini dashboard */}
+        <div className={styles.fadeUp2} style={{ position: 'relative' }}>
+          <div style={{ background: C.navy4, border: `1px solid ${C.borderG}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 32px 80px rgba(0,0,0,0.45)' }}>
+
+            {/* App top bar */}
+            <div style={{ background: 'rgba(201,168,76,0.05)', borderBottom: `1px solid ${C.borderG}`, padding: '13px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: 5, background: `linear-gradient(135deg,${C.gold},${C.gold2})`, display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 900, color: C.navy }}>TF</div>
+                <span style={{ fontSize: 12, fontWeight: 800, color: C.gold2 }}>TradeFlow OS</span>
               </div>
-              <span style={{ fontSize:12, fontWeight:700, color:C.white }}>ملف المورد</span>
-              <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:10, fontWeight:700, color:C.green }}>
-                <span className={styles.liveDot}/> مباشر
+              <span style={{ fontSize: 12, fontWeight: 700, color: C.white }}>ملف المورد</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: C.green }}>
+                <span className={styles.liveDot} /> مباشر
               </div>
             </div>
-            <div style={{ padding:16 }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-                <span style={{ fontSize:14, fontWeight:800, color:C.white }}>شركة النور للتصدير</span>
-                <div style={{ display:'flex', gap:6 }}><Badge>Exporter</Badge><Badge>Manufacturer</Badge></div>
-              </div>
-              <div style={{ background:'rgba(201,168,76,0.06)', border:`1px solid rgba(201,168,76,0.12)`, borderRadius:10, padding:'14px 16px', marginBottom:12 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-                  <span style={{ fontSize:11, color:C.muted }}>اكتمال الملف</span>
-                  <span style={{ fontSize:20, fontWeight:900, color:C.gold2 }}>٦٥٪</span>
-                </div>
-                <div style={{ height:6, background:'rgba(255,255,255,0.07)', borderRadius:3, overflow:'hidden' }}>
-                  <div className={styles.progBar} style={{ width:'65%' }} />
+
+            <div style={{ padding: 16 }}>
+              {/* Supplier name */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 15, fontWeight: 800, color: C.white }}>شركة النور للتصدير</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Badge>Exporter</Badge>
+                  <Badge>Manufacturer</Badge>
                 </div>
               </div>
-              <div style={{ display:'flex', gap:8 }}>
-                {[{l:'التقييم',v:'9/10',c:C.green},{l:'الصفقات',v:'١٢',c:C.gold2},{l:'الوثائق',v:'٥',c:'#93C5FD'}].map(m=>(
-                  <div key={m.l} style={{ flex:1, background:'rgba(255,255,255,0.04)', borderRadius:8, padding:'10px 12px', textAlign:'center' }}>
-                    <div style={{ fontSize:16, fontWeight:900, color:m.c }}>{m.v}</div>
-                    <div style={{ fontSize:9, color:C.muted, marginTop:3 }}>{m.l}</div>
+
+              {/* Progress */}
+              <div style={{ background: 'rgba(201,168,76,0.06)', border: `1px solid rgba(201,168,76,0.12)`, borderRadius: 10, padding: '14px 16px', marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, color: C.muted }}>اكتمال الملف</span>
+                  <span style={{ fontSize: 20, fontWeight: 900, color: C.gold2 }}>٦٥٪</span>
+                </div>
+                <div style={{ height: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div className={styles.progBar} style={{ width: '65%' }} />
+                </div>
+              </div>
+
+              {/* Field badges */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                {[
+                  { label: 'اسم الشركة', ok: true }, { label: 'الدولة', ok: true },
+                  { label: 'المدينة', ok: true },    { label: 'المنتجات', ok: true },
+                  { label: 'واتساب', ok: true },     { label: 'الإيميل', ok: true },
+                  { label: 'المسؤول', ok: false },   { label: 'المبيعات', ok: false },
+                  { label: 'تسجيل', ok: false },     { label: 'تعاقد', ok: false },
+                ].map(f => (
+                  <span key={f.label} style={{
+                    fontSize: 10, padding: '3px 9px', borderRadius: 4, fontWeight: 600,
+                    background: f.ok ? 'rgba(34,197,94,.12)' : 'rgba(239,68,68,.10)',
+                    color: f.ok ? C.green : C.red,
+                  }}>
+                    {f.ok ? '✓' : '✗'} {f.label}
+                  </span>
+                ))}
+              </div>
+
+              {/* Mini stats */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 14 }}>
+                {[
+                  { val: '—', lbl: 'المبيعات', color: C.muted },
+                  { val: '٠/١٠', lbl: 'التقييم', color: C.gold2 },
+                  { val: '$٠', lbl: 'المبلغ', color: C.green },
+                  { val: '٠', lbl: 'الصفقات', color: C.white },
+                ].map(s => (
+                  <div key={s.lbl} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: s.color }}>{s.val}</div>
+                    <div style={{ fontSize: 9.5, color: C.muted, marginTop: 3 }}>{s.lbl}</div>
                   </div>
                 ))}
               </div>
+
+              {/* Tabs */}
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden', marginBottom: 14 }}>
+                {['نظرة عامة','التواصل','المنتجات','الصفقات','الوثائق'].map((t, i) => (
+                  <div key={t} style={{ flex: 1, padding: '7px 0', textAlign: 'center', fontSize: 10, fontWeight: i === 0 ? 700 : 600, color: i === 0 ? C.gold2 : C.muted, background: i === 0 ? C.gold3 : 'transparent', borderLeft: i < 4 ? `1px solid ${C.border}` : 'none' }}>
+                    {t}
+                  </div>
+                ))}
+              </div>
+
+              {/* Two cols */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 9, padding: 12 }}>
+                  <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>معلومات الشركة</div>
+                  {[['الدولة','إندونيسيا'],['المدينة','جاكرتا'],['الموقع','—']].map(([k,v]) => (
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
+                      <span style={{ color: C.muted }}>{k}</span>
+                      <span style={{ color: v === '—' ? C.muted : C.white, fontWeight: 600 }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 9, padding: 12 }}>
+                  <div style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 8 }}>المنتجات</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {['زيت نخيل','توابل','مطاط','كاكاو'].map(p => (
+                      <span key={p} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.07)', color: C.muted, border: `1px solid ${C.border}` }}>{p}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating badge */}
+          <div className={styles.floatBadge} style={{ position: 'absolute', bottom: -14, left: -14, background: C.navy2, border: `1px solid ${C.borderG}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, boxShadow: '0 16px 40px rgba(0,0,0,0.4)' }}>
+            <span style={{ fontSize: 22 }}>🏅</span>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 900, color: C.gold2 }}>+٣٤٠ أداة</div>
+              <div style={{ fontSize: 11, color: C.muted }}>موثق في النظام</div>
             </div>
           </div>
         </div>
