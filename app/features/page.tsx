@@ -70,7 +70,7 @@ export default function FeaturesPage() {
           textAlign: 'center'
         }}>
           <h2 style={{ color: S.gold2, fontSize: '24px', marginBottom: '15px', fontWeight: 800 }}>
-            قابلية غير محدودة للتوسع
+            قابلية غير محدودة للتوسع و الانتشار
           </h2>
           <p style={{ color: S.muted, fontSize: '16px', marginBottom: '25px' }}>
             كما يمكن إضافة العديد من الأقسام الأخرى بناءً على حجم شركتك واحتياجاتك الخاصة.
