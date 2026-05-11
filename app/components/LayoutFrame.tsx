@@ -118,7 +118,7 @@ export default function LayoutFrame({ children }: { children: React.ReactNode })
   ))}
 </ul>
 
-  {/* بقية الروابط الافتراضية */}
+  {/*  هنا بقية الروابط الافتراضية */}
   {['الأسعار', ].map(l => (
     <li key={l}>
       <Link 
