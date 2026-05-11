@@ -272,7 +272,7 @@ export default function Home() {
       {/* ── Stats ── */}
       <div className="lp-stats" style={{ position:'relative', zIndex:1, maxWidth:1200, margin:'0 auto', padding:'40px 52px', display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:20 }}>
         {[
-          {n:'٢٤+',l:'مورد مسجّل',d:'ومتنامٍ يومياً'},
+          {n:'٢٤٠+',l:'عميل مسجل',d:'ومتنامٍ يومياً'},
           {n:'١٢',  l:'دولة مرتبطة',d:'آسيا والشرق الأوسط'},
           {n:'٩٨٪', l:'رضا المستخدمين',d:'في أول ٩٠ يوم'},
           {n:'١٠',  l:'دقائق للإعداد',d:'لا كود · لا تدريب'},

@@ -119,10 +119,10 @@ export default function LayoutFrame({ children }: { children: React.ReactNode })
 </ul>
 
   {/* بقية الروابط الافتراضية */}
-  {['المنتجات', ].map(l => (
+  {['الأسعار', ].map(l => (
     <li key={l}>
       <Link 
-        href="#" 
+        href="/prices" 
         className={styles.navLink} 
         style={{ color: C.muted, textDecoration: 'none', fontSize: 14.5, fontWeight: 500 }}
       >
